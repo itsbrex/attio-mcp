@@ -3,7 +3,7 @@
 # Quick setup script for immediate Codex + MCP usage
 # Run with: ./scripts/quick-setup.sh
 
-set -e
+# Note: Don't use 'set -e' to allow graceful handling of optional failures
 
 echo "⚡ Quick Setup: Codex CLI + MCP Brave Search"
 echo "==========================================="
@@ -14,7 +14,11 @@ npm install -g @openai/codex
 
 # Install Python MCP requirements (optional, for custom servers)
 echo "🐍 Installing Python MCP dependencies (optional)..."
-pip install -r requirements-mcp.txt
+if pip install -r requirements-mcp.txt; then
+    echo "✅ Python MCP dependencies installed successfully"
+else
+    echo "⚠️ Python MCP dependencies installation failed (this is optional)"
+fi
 
 # Verify Brave Search MCP Server availability
 echo "🔍 Verifying Brave Search MCP Server..."
