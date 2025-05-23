@@ -8,11 +8,11 @@ import { InvalidRequestError } from '../../src/errors/api-errors.js';
 import { ResourceType } from '../../src/types/attio.js';
 
 // Mock the attribute API module
-jest.mock('../../src/api/attribute-types.js', () => ({
-  getAttributeTypeInfo: jest.fn(),
-  formatAttributeValue: jest.fn(),
-  detectFieldType: jest.fn(),
-  getFieldValidationRules: jest.fn()
+vi.mock('../../src/api/attribute-types.js', () => ({
+  getAttributeTypeInfo: vi.fn(),
+  formatAttributeValue: vi.fn(),
+  detectFieldType: vi.fn(),
+  getFieldValidationRules: vi.fn()
 }));
 
 // Mock response data for company attributes
@@ -77,10 +77,10 @@ const MOCK_ATTRIBUTE_METADATA = {
 
 describe('Attribute Validation Integration', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     
     // Set up mocks for getAttributeTypeInfo
-    (getAttributeTypeInfo as jest.Mock).mockImplementation(
+    (getAttributeTypeInfo as vi.Mock).mockImplementation(
       async (objectSlug, attributeName) => {
         if ((MOCK_ATTRIBUTE_METADATA as any)[attributeName]) {
           return (MOCK_ATTRIBUTE_METADATA as any)[attributeName];
@@ -99,7 +99,7 @@ describe('Attribute Validation Integration', () => {
     );
     
     // Set up mock for formatAttributeValue to pass through the value
-    (formatAttributeValue as jest.Mock).mockImplementation(
+    (formatAttributeValue as vi.Mock).mockImplementation(
       async (objectSlug, attributeName, value) => value
     );
   });
