@@ -28,6 +28,20 @@ export {
   executeAttributeOperationWithFallback,
   configureCacheFallbacks
 } from './error-recovery.js';
+export {
+  AdvancedDataTransformer,
+  dataTransformer,
+  type TransformationRule,
+  type TransformationPipeline,
+  type ValidationRule
+} from './data-transformer.js';
+export {
+  TransformationPipelineManager,
+  pipelineManager,
+  standardWorkflows,
+  type PipelineStage,
+  type PipelineWorkflow
+} from './transformation-pipeline.js';
 
 // Re-export feature configuration for convenience
 export { features, type FeatureFlags } from '../../config/features.js';
