@@ -4,6 +4,14 @@
  */
 
 import { features } from '../../config/features.js';
+import { 
+  ScoringAlgorithm, 
+  createScorer, 
+  HybridScorer,
+  BM25Scorer,
+  TFIDFScorer,
+  SemanticScorer 
+} from './scoring-algorithms.js';
 
 export interface ScoringFactors {
   textMatch: number; // 0-1 score for text similarity
@@ -31,8 +39,10 @@ export class RelevanceScorer {
     completeness: number;
     engagement: number;
   };
+  private algorithm: ScoringAlgorithm = 'hybrid';
+  private scorer: TFIDFScorer | BM25Scorer | SemanticScorer | HybridScorer;
 
-  constructor() {
+  constructor(algorithm: ScoringAlgorithm = 'hybrid') {
     // Default field importance weights
     this.fieldWeights = new Map([
       ['name', 1.0],
@@ -52,6 +62,10 @@ export class RelevanceScorer {
       completeness: 0.2,
       engagement: 0.2,
     };
+    
+    // Initialize scoring algorithm
+    this.algorithm = algorithm;
+    this.scorer = createScorer(algorithm);
   }
 
   /**
@@ -59,22 +73,55 @@ export class RelevanceScorer {
    */
   public scoreResults(
     results: SearchResult[],
-    query: string
+    query: string,
+    options?: {
+      algorithm?: ScoringAlgorithm;
+      updateCorpus?: boolean;
+    }
   ): SearchResult[] {
     if (!features.isEnabled('enableRelevanceScoring')) {
       return results;
     }
 
+    // Use specified algorithm or default
+    const algorithm = options?.algorithm || this.algorithm;
+    if (algorithm !== this.algorithm) {
+      this.scorer = createScorer(algorithm);
+      this.algorithm = algorithm;
+    }
+
+    // Update corpus statistics if requested
+    if (options?.updateCorpus && results.length > 0) {
+      const documents = results.map(r => this.extractTextFromData(r.data));
+      if (this.scorer instanceof HybridScorer) {
+        this.scorer.updateCorpus(documents);
+      } else if (this.scorer instanceof BM25Scorer) {
+        this.scorer.updateCorpusStatistics(documents);
+      } else if (this.scorer instanceof TFIDFScorer) {
+        this.scorer.updateDocumentFrequencies(documents);
+      }
+    }
+
     const queryTerms = this.tokenize(query.toLowerCase());
     
     const scoredResults = results.map(result => {
+      // Calculate algorithm-based score
+      const documentText = this.extractTextFromData(result.data);
+      const algorithmScore = this.scorer.score(query, documentText);
+      
+      // Calculate traditional factors
       const factors = this.calculateFactors(result, queryTerms);
-      const score = this.calculateFinalScore(factors);
+      
+      // Combine algorithm score with other factors
+      const combinedScore = this.combineScores(algorithmScore, factors);
       
       return {
         ...result,
-        score,
-        factors,
+        score: combinedScore,
+        factors: {
+          ...factors,
+          algorithmScore,
+        },
       };
     });
 
@@ -233,6 +280,44 @@ export class RelevanceScorer {
   }
 
   /**
+   * Extract text from data object for algorithm scoring
+   */
+  private extractTextFromData(data: any): string {
+    if (!data) return '';
+    
+    const textParts: string[] = [];
+    
+    // Extract text from important fields
+    for (const [field, weight] of this.fieldWeights.entries()) {
+      const value = this.getFieldValue(data, field);
+      if (value) {
+        // Repeat text based on weight for better scoring
+        const repetitions = Math.ceil(weight);
+        for (let i = 0; i < repetitions; i++) {
+          textParts.push(String(value));
+        }
+      }
+    }
+    
+    return textParts.join(' ');
+  }
+
+  /**
+   * Combine algorithm score with other factors
+   */
+  private combineScores(algorithmScore: number, factors: Partial<ScoringFactors>): number {
+    // Weight algorithm score heavily (60%)
+    const algorithmWeight = 0.6;
+    const factorWeight = 0.4;
+    
+    // Calculate factor-based score
+    const factorScore = this.calculateFinalScore(factors);
+    
+    // Combine scores
+    return algorithmScore * algorithmWeight + factorScore * factorWeight;
+  }
+
+  /**
    * Get nested field value from object
    */
   private getFieldValue(obj: any, path: string): any {
@@ -264,6 +349,32 @@ export class RelevanceScorer {
    */
   public updateFactorWeights(weights: Partial<typeof this.defaultWeights>): void {
     this.defaultWeights = { ...this.defaultWeights, ...weights };
+  }
+
+  /**
+   * Set scoring algorithm
+   */
+  public setAlgorithm(algorithm: ScoringAlgorithm): void {
+    this.algorithm = algorithm;
+    this.scorer = createScorer(algorithm);
+  }
+
+  /**
+   * Get current algorithm
+   */
+  public getAlgorithm(): ScoringAlgorithm {
+    return this.algorithm;
+  }
+
+  /**
+   * Configure algorithm parameters
+   */
+  public configureAlgorithm(config: any): void {
+    if (this.scorer instanceof BM25Scorer && config.k1 !== undefined) {
+      this.scorer.setParameters(config.k1, config.b);
+    } else if (this.scorer instanceof HybridScorer && config.weights) {
+      this.scorer.setWeights(config.weights);
+    }
   }
 }
 

@@ -13,6 +13,14 @@ export {
   type ErrorContext,
   type RecoveryStrategy 
 } from './error-handler.js';
+export {
+  type ScoringAlgorithm,
+  TFIDFScorer,
+  BM25Scorer,
+  SemanticScorer,
+  HybridScorer,
+  createScorer
+} from './scoring-algorithms.js';
 
 // Re-export feature configuration for convenience
 export { features, type FeatureFlags } from '../../config/features.js';
