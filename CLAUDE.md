@@ -334,3 +334,7 @@ EXTERNAL MCP SERVERS (Runtime Dependencies)
   * Purpose: Web crawling and RAG.
   * Tools: get_available_sources(), crawl_single_page(url), smart_crawl_url(url), perform_rag_query(q, source?, match_count?)
   * Setup: Install external server, configure in MCP client.
+
+## Task Master AI Instructions
+**Import Task Master's development workflow commands and guidelines, treat as if import is in the main CLAUDE.md file.**
+@./.taskmaster/CLAUDE.md
