@@ -46,7 +46,8 @@ coverage-e2e/
 
 .env.development
 .specstory
-.cursorindexingignore.env.test
+.cursorindexingignore
+.env.test
 
 # Alternative tools (not used)
 biome.json

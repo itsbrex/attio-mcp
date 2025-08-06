@@ -56,7 +56,10 @@ interface AuthorizationCode {
 const clients = new Map<string, ClientRegistration>();
 const authorizationCodes = new Map<string, AuthorizationCode>();
 const tokens = new Map<string, OAuthToken>();
-const refreshTokens = new Map<string, { client_id: string; scope: string; user_id?: string }>();
+const refreshTokens = new Map<
+  string,
+  { client_id: string; scope: string; user_id?: string }
+>();
 
 /**
  * Generate a secure random string
@@ -83,7 +86,10 @@ export const oauthConfig: OAuthConfig = {
  * Dynamic client registration endpoint
  * POST /oauth/register
  */
-export async function registerClient(req: Request, res: Response): Promise<void> {
+export async function registerClient(
+  req: Request,
+  res: Response
+): Promise<void> {
   try {
     const {
       client_name,
@@ -97,7 +103,8 @@ export async function registerClient(req: Request, res: Response): Promise<void>
     if (!client_name || !redirect_uris || !Array.isArray(redirect_uris)) {
       res.status(400).json({
         error: 'invalid_request',
-        error_description: 'Missing required fields: client_name and redirect_uris',
+        error_description:
+          'Missing required fields: client_name and redirect_uris',
       });
       return;
     }
@@ -404,7 +411,11 @@ export async function token(req: Request, res: Response): Promise<void> {
 /**
  * Token validation middleware
  */
-export function validateToken(req: Request, res: Response, next: NextFunction): void {
+export function validateToken(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -466,11 +477,16 @@ export function initializeOAuthEndpoints(app: express.Application): void {
       authorization_endpoint: `${oauthConfig.issuer}${oauthConfig.authorizationEndpoint}`,
       token_endpoint: `${oauthConfig.issuer}${oauthConfig.tokenEndpoint}`,
       registration_endpoint: `${oauthConfig.issuer}${oauthConfig.registrationEndpoint}`,
-      jwks_uri: oauthConfig.jwksUri ? `${oauthConfig.issuer}${oauthConfig.jwksUri}` : undefined,
+      jwks_uri: oauthConfig.jwksUri
+        ? `${oauthConfig.issuer}${oauthConfig.jwksUri}`
+        : undefined,
       scopes_supported: oauthConfig.supportedScopes,
       response_types_supported: oauthConfig.supportedResponseTypes,
       grant_types_supported: oauthConfig.supportedGrantTypes,
-      token_endpoint_auth_methods_supported: ['client_secret_post', 'client_secret_basic'],
+      token_endpoint_auth_methods_supported: [
+        'client_secret_post',
+        'client_secret_basic',
+      ],
       code_challenge_methods_supported: ['S256', 'plain'],
     });
   });

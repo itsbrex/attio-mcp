@@ -44,11 +44,7 @@ export const defaultSecurityConfig: SecurityConfig = {
     /act\s+as\s+if/gi,
     /pretend\s+to\s+be/gi,
   ],
-  allowedDomains: [
-    'app.attio.com',
-    'api.attio.com',
-    'attio.com',
-  ],
+  allowedDomains: ['app.attio.com', 'api.attio.com', 'attio.com'],
 };
 
 // Rate limiter instance
@@ -152,7 +148,7 @@ function isAllowedDomain(url: string, allowedDomains: string[]): boolean {
     const parsed = new URL(url);
     const hostname = parsed.hostname.toLowerCase();
 
-    return allowedDomains.some(domain => {
+    return allowedDomains.some((domain) => {
       const domainLower = domain.toLowerCase();
       return hostname === domainLower || hostname.endsWith(`.${domainLower}`);
     });
@@ -238,14 +234,20 @@ export function inputSanitizationMiddleware(
       // Sanitize headers (be careful not to break functionality)
       const sensitiveHeaders = ['x-api-key', 'authorization'];
       for (const [key, value] of Object.entries(req.headers)) {
-        if (!sensitiveHeaders.includes(key.toLowerCase()) && typeof value === 'string') {
+        if (
+          !sensitiveHeaders.includes(key.toLowerCase()) &&
+          typeof value === 'string'
+        ) {
           req.headers[key] = sanitizeInput(value);
         }
       }
 
       next();
     } catch (error) {
-      console.error('[Security] Error in input sanitization middleware:', error);
+      console.error(
+        '[Security] Error in input sanitization middleware:',
+        error
+      );
       next();
     }
   };
@@ -268,11 +270,14 @@ export function rateLimitingMiddleware(
 
       // Get or create user-specific rate limiter
       if (!userRateLimiters.has(userId)) {
-        userRateLimiters.set(userId, new RateLimiterMemory({
-          points: config.maxRequestsPerMinute,
-          duration: 60,
-          blockDuration: 60,
-        }));
+        userRateLimiters.set(
+          userId,
+          new RateLimiterMemory({
+            points: config.maxRequestsPerMinute,
+            duration: 60,
+            blockDuration: 60,
+          })
+        );
       }
 
       const limiter = userRateLimiters.get(userId)!;
@@ -369,13 +374,17 @@ export function domainValidationMiddleware(
 /**
  * Audit logging middleware
  */
-export function auditLoggingMiddleware(): (req: Request, res: Response, next: NextFunction) => void {
+export function auditLoggingMiddleware(): (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => void {
   return (req: Request, res: Response, next: NextFunction) => {
     const startTime = Date.now();
     const originalSend = res.send;
 
     // Override res.send to capture response
-    res.send = function(data: any): Response {
+    res.send = function (data: any): Response {
       res.send = originalSend;
 
       // Log audit entry
