@@ -1,0 +1,123 @@
+{
+	"meta": {
+		"generatedAt": "2025-08-06T17:02:46.332Z",
+		"tasksAnalyzed": 15,
+		"totalTasks": 15,
+		"analysisCount": 15,
+		"thresholdScore": 5,
+		"projectName": "Taskmaster",
+		"usedResearch": true
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 1,
+			"complexityScore": 8,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Break down codebase analysis into specific analysis phases: directory structure mapping, dependency graph generation, API surface documentation, cache implementation comparison, error handling pattern review, and migration impact assessment.",
+			"reasoning": "High complexity due to comprehensive analysis requirements across multiple dimensions (structure, dependencies, APIs, performance). Requires specialized tools and deep understanding of existing codebase."
+		},
+		{
+			"taskId": 2,
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Split cache implementation into interface design, core cache engine development, LRU eviction mechanism, metrics and monitoring integration, and factory pattern implementation for extensibility.",
+			"reasoning": "Moderate-high complexity involving interface design, performance optimization, memory management, and extensible architecture patterns."
+		},
+		{
+			"taskId": 3,
+			"complexityScore": 6,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Divide error handling into custom error class hierarchy creation, retry logic with circuit breaker implementation, structured logging system, and error sanitization mechanisms.",
+			"reasoning": "Moderate complexity requiring error taxonomy design, resilience patterns, and security considerations for sensitive data handling."
+		},
+		{
+			"taskId": 4,
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Structure directory reorganization into module boundary definition, barrel export creation, TypeScript path mapping configuration, and architectural layer separation implementation.",
+			"reasoning": "Moderate complexity focusing on architectural organization and TypeScript module system configuration."
+		},
+		{
+			"taskId": 5,
+			"complexityScore": 6,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break transformer refactoring into file relocation and interface standardization, factory pattern implementation, input/output validation system, and async pattern conversion.",
+			"reasoning": "Moderate complexity involving interface design, validation libraries integration, and asynchronous programming patterns."
+		},
+		{
+			"taskId": 7,
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Divide scoring system into algorithm migration and strategy pattern implementation, scoring factory with configuration, performance optimization with worker threads, caching integration, and search pipeline integration.",
+			"reasoning": "Moderate-high complexity due to algorithm implementation, performance optimization, multi-threading, and system integration requirements."
+		},
+		{
+			"taskId": 9,
+			"complexityScore": 8,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Split migration tooling into TypeScript compiler API integration, import statement rewriting engine, codemod script development, validation and rollback systems, AST transformation implementation, and progress reporting interface.",
+			"reasoning": "High complexity requiring deep TypeScript compiler knowledge, AST manipulation, and robust tooling development with safety mechanisms."
+		},
+		{
+			"taskId": 10,
+			"complexityScore": 4,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Organize performance monitoring into metrics collection system, memory usage monitoring, and dashboard data preparation with external metrics library integration.",
+			"reasoning": "Lower complexity as it primarily involves integrating existing Node.js APIs and metrics libraries with straightforward monitoring patterns."
+		},
+		{
+			"taskId": 12,
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Structure index creation into barrel export generation, backward compatibility re-exports, package.json exports configuration, and tree-shaking optimization implementation.",
+			"reasoning": "Moderate complexity involving module resolution understanding, backward compatibility maintenance, and modern packaging standards."
+		},
+		{
+			"taskId": 14,
+			"complexityScore": 6,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Divide testing into existing test suite execution, integration test creation for new modules, performance regression testing, and comprehensive coverage reporting with Jest configuration.",
+			"reasoning": "Moderate complexity requiring test strategy design, performance benchmarking, and comprehensive validation across multiple testing dimensions."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "Integrate Advanced Transformation Features",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on integrate advanced transformation features.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "Update Core API Integration",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on update core api integration.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 11,
+			"taskTitle": "Update Type Definitions and Interfaces",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on update type definitions and interfaces.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 13,
+			"taskTitle": "Run Migration and Update All Import Statements",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on run migration and update all import statements.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 15,
+			"taskTitle": "Clean Up and Documentation",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on clean up and documentation.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		}
+	]
+}
