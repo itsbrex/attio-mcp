@@ -198,7 +198,7 @@ export class RolloutManager extends EventEmitter {
   public async progressRollout(featureName: string): Promise<boolean> {
     const rollout = this.rollouts.get(featureName);
     if (!rollout) {
-      warn(`[RolloutManager] Rollout not found: ${featureName}`);
+      warn('RolloutManager', `Rollout not found: ${featureName}`);
       return false;
     }
 
@@ -218,7 +218,8 @@ export class RolloutManager extends EventEmitter {
       const currentStage = rollout.stages[rollout.currentStage];
       if (!this.checkStageCriteria(currentStage, rollout.metrics)) {
         warn(
-          `[RolloutManager] Stage criteria not met for ${featureName}:${currentStage.name}`
+          'RolloutManager',
+          `Stage criteria not met for ${featureName}:${currentStage.name}`
         );
         return false;
       }
@@ -268,7 +269,7 @@ export class RolloutManager extends EventEmitter {
   ): Promise<boolean> {
     const rollout = this.rollouts.get(featureName);
     if (!rollout) {
-      warn(`[RolloutManager] Rollout not found for rollback: ${featureName}`);
+      warn('RolloutManager', `Rollout not found for rollback: ${featureName}`);
       return false;
     }
 
@@ -303,7 +304,8 @@ export class RolloutManager extends EventEmitter {
     });
 
     logError(
-      `[RolloutManager] Rolled back feature ${featureName}: ${reason}`
+      'RolloutManager',
+      `Rolled back feature ${featureName}: ${reason}`
     );
 
     return true;
@@ -546,9 +548,9 @@ export class RolloutManager extends EventEmitter {
 
     // Log based on severity
     if (severity === 'critical' || severity === 'error') {
-      logError(`[Alert] ${message} - ${feature}: ${value} > ${threshold}`);
+      logError('RolloutManager', `[Alert] ${message} - ${feature}: ${value} > ${threshold}`);
     } else {
-      warn(`[Alert] ${message} - ${feature}: ${value} > ${threshold}`);
+      warn('RolloutManager', `[Alert] ${message} - ${feature}: ${value} > ${threshold}`);
     }
   }
 

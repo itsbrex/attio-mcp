@@ -166,12 +166,12 @@ export class ABTestingManager extends EventEmitter {
   public startExperiment(experimentId: string): boolean {
     const experiment = this.experiments.get(experimentId);
     if (!experiment) {
-      warn(`[ABTestingManager] Experiment not found: ${experimentId}`);
+      warn('ABTestingManager', `Experiment not found: ${experimentId}`);
       return false;
     }
 
     if (experiment.status === 'running') {
-      warn(`[ABTestingManager] Experiment already running: ${experimentId}`);
+      warn('ABTestingManager', `Experiment already running: ${experimentId}`);
       return false;
     }
 
