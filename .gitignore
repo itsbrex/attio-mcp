@@ -41,6 +41,7 @@ docs/shapescale-attio-crm.md
 
 # Test coverage reports
 coverage/
+coverage-e2e/
 *.lcov
 
 .env.development
@@ -50,3 +51,9 @@ coverage/
 # Alternative tools (not used)
 biome.json
 bun.lock
+
+# E2E test configuration (contains workspace-specific data)
+test/e2e/config.local.json
+
+# E2E test results and reports
+test-results/
