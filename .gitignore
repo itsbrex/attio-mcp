@@ -42,10 +42,11 @@ docs/shapescale-attio-crm.md
 # Test coverage reports
 coverage/
 *.lcov
+
+.env.development
 .specstory
 .cursorindexingignore.env.test
 
-.env.development
 # Alternative tools (not used)
 biome.json
 bun.lock
