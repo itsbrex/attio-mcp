@@ -13,6 +13,11 @@ export enum ErrorCategory {
   RATE_LIMIT = 'RATE_LIMIT',
   DATA_INTEGRITY = 'DATA_INTEGRITY',
   CONFIGURATION = 'CONFIGURATION',
+  TIMEOUT = 'TIMEOUT',
+  RESOURCE_NOT_FOUND = 'RESOURCE_NOT_FOUND',
+  CONFLICT = 'CONFLICT',
+  QUOTA_EXCEEDED = 'QUOTA_EXCEEDED',
+  SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE',
   UNKNOWN = 'UNKNOWN',
 }
 
@@ -66,6 +71,21 @@ export class AdvancedErrorHandler {
         retryDelay: 2000,
         backoffMultiplier: 1.5,
       }],
+      [ErrorCategory.TIMEOUT, {
+        maxRetries: 2,
+        retryDelay: 3000,
+        backoffMultiplier: 2,
+      }],
+      [ErrorCategory.SERVICE_UNAVAILABLE, {
+        maxRetries: 4,
+        retryDelay: 10000,
+        backoffMultiplier: 1.5,
+      }],
+      [ErrorCategory.CONFLICT, {
+        maxRetries: 1,
+        retryDelay: 500,
+        backoffMultiplier: 1,
+      }],
     ]);
   }
 
@@ -80,19 +100,46 @@ export class AdvancedErrorHandler {
     const message = error?.message?.toLowerCase() || '';
     const code = error?.code || error?.response?.status;
 
+    // Timeout errors (check first as they can overlap with network)
+    if (
+      message.includes('timeout') ||
+      message.includes('etimedout') ||
+      code === 'ETIMEDOUT' ||
+      code === 408
+    ) {
+      return ErrorCategory.TIMEOUT;
+    }
+
     // Network errors
     if (
       message.includes('network') ||
       message.includes('econnrefused') ||
       message.includes('enotfound') ||
-      message.includes('timeout')
+      message.includes('econnreset') ||
+      code === 'ECONNREFUSED' ||
+      code === 'ENOTFOUND'
     ) {
       return ErrorCategory.NETWORK;
     }
 
     // Rate limiting
-    if (code === 429 || message.includes('rate limit')) {
+    if (code === 429 || message.includes('rate limit') || message.includes('too many requests')) {
       return ErrorCategory.RATE_LIMIT;
+    }
+
+    // Quota exceeded
+    if (code === 402 || message.includes('quota') || message.includes('limit exceeded')) {
+      return ErrorCategory.QUOTA_EXCEEDED;
+    }
+
+    // Resource not found
+    if (code === 404 || message.includes('not found') || message.includes('does not exist')) {
+      return ErrorCategory.RESOURCE_NOT_FOUND;
+    }
+
+    // Conflict errors
+    if (code === 409 || message.includes('conflict') || message.includes('already exists')) {
+      return ErrorCategory.CONFLICT;
     }
 
     // Permission errors
@@ -100,7 +147,8 @@ export class AdvancedErrorHandler {
       code === 401 ||
       code === 403 ||
       message.includes('unauthorized') ||
-      message.includes('forbidden')
+      message.includes('forbidden') ||
+      message.includes('permission denied')
     ) {
       return ErrorCategory.PERMISSION;
     }
@@ -108,13 +156,20 @@ export class AdvancedErrorHandler {
     // Validation errors
     if (
       code === 400 ||
+      code === 422 ||
       message.includes('validation') ||
-      message.includes('invalid')
+      message.includes('invalid') ||
+      message.includes('malformed')
     ) {
       return ErrorCategory.VALIDATION;
     }
 
-    // API errors
+    // Service unavailable
+    if (code === 503 || message.includes('service unavailable') || message.includes('maintenance')) {
+      return ErrorCategory.SERVICE_UNAVAILABLE;
+    }
+
+    // API errors (generic server errors)
     if (code >= 500 && code < 600) {
       return ErrorCategory.API;
     }
@@ -123,7 +178,8 @@ export class AdvancedErrorHandler {
     if (
       message.includes('integrity') ||
       message.includes('duplicate') ||
-      message.includes('constraint')
+      message.includes('constraint') ||
+      message.includes('foreign key')
     ) {
       return ErrorCategory.DATA_INTEGRITY;
     }
@@ -132,7 +188,7 @@ export class AdvancedErrorHandler {
     if (
       message.includes('config') ||
       message.includes('missing') ||
-      message.includes('not found')
+      message.includes('environment')
     ) {
       return ErrorCategory.CONFIGURATION;
     }
@@ -209,6 +265,9 @@ export class AdvancedErrorHandler {
       ErrorCategory.NETWORK,
       ErrorCategory.RATE_LIMIT,
       ErrorCategory.API,
+      ErrorCategory.TIMEOUT,
+      ErrorCategory.SERVICE_UNAVAILABLE,
+      ErrorCategory.CONFLICT,
     ].includes(category);
   }
 
@@ -231,6 +290,16 @@ export class AdvancedErrorHandler {
         return 'Check for duplicate data or constraint violations';
       case ErrorCategory.CONFIGURATION:
         return 'Verify configuration settings and environment variables';
+      case ErrorCategory.TIMEOUT:
+        return 'Operation timed out, check network speed or increase timeout settings';
+      case ErrorCategory.RESOURCE_NOT_FOUND:
+        return 'The requested resource does not exist, verify the ID or path';
+      case ErrorCategory.CONFLICT:
+        return 'Resource conflict detected, check for duplicate operations';
+      case ErrorCategory.QUOTA_EXCEEDED:
+        return 'API quota exceeded, upgrade plan or wait for quota reset';
+      case ErrorCategory.SERVICE_UNAVAILABLE:
+        return 'Service temporarily unavailable, retry after some time';
       default:
         return 'An unexpected error occurred, check logs for details';
     }
@@ -358,6 +427,81 @@ export class AdvancedErrorHandler {
    */
   public clearErrorLog(): void {
     this.errorLog = [];
+  }
+
+  /**
+   * Set fallback action for a specific error category
+   */
+  public setFallbackAction(category: ErrorCategory, fallback: () => Promise<any>): void {
+    const strategy = this.recoveryStrategies.get(category);
+    if (strategy) {
+      strategy.fallbackAction = fallback;
+    } else {
+      this.recoveryStrategies.set(category, {
+        maxRetries: 1,
+        retryDelay: 1000,
+        backoffMultiplier: 1,
+        fallbackAction: fallback,
+      });
+    }
+  }
+
+  /**
+   * Execute operation with custom recovery options
+   */
+  public async executeWithCustomRecovery<T>(
+    operation: () => Promise<T>,
+    options: {
+      maxRetries?: number;
+      retryDelay?: number;
+      backoffMultiplier?: number;
+      fallbackAction?: () => Promise<T>;
+      context?: Record<string, any>;
+    } = {}
+  ): Promise<T> {
+    if (!features.isEnabled('enableAdvancedErrorHandling')) {
+      return operation();
+    }
+
+    let lastError: any;
+    let retryCount = 0;
+    const maxRetries = options.maxRetries || 3;
+    const retryDelay = options.retryDelay || 1000;
+    const backoffMultiplier = options.backoffMultiplier || 2;
+
+    while (retryCount <= maxRetries) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error;
+        const errorContext = this.createErrorContext(error, options.context);
+
+        if (!errorContext.retryable || retryCount >= maxRetries) {
+          if (options.fallbackAction) {
+            try {
+              return await options.fallbackAction();
+            } catch (fallbackError) {
+              throw this.enhanceError(error, errorContext);
+            }
+          }
+          throw this.enhanceError(error, errorContext);
+        }
+
+        // Calculate delay with exponential backoff
+        const delay = retryDelay * Math.pow(backoffMultiplier, retryCount);
+        
+        if (features.isEnabled('enableEnhancedLogging')) {
+          console.log(
+            `[AdvancedErrorHandler] Custom retry (attempt ${retryCount + 1}/${maxRetries}) after ${delay}ms`
+          );
+        }
+
+        await this.delay(delay);
+        retryCount++;
+      }
+    }
+
+    throw lastError;
   }
 
   /**

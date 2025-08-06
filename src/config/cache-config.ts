@@ -3,14 +3,18 @@
  * Provides utilities for configuring and managing the cache system
  */
 
-import { searchCache, recordCache, attributeCache } from '../openai/advanced/index.js';
+import {
+  searchCache,
+  recordCache,
+  attributeCache,
+} from '../openai/advanced/index.js';
 import { features } from './features.js';
 
 export interface CacheConfig {
-  searchTTL?: number;  // TTL for search results in milliseconds
-  recordTTL?: number;  // TTL for record fetches in milliseconds
+  searchTTL?: number; // TTL for search results in milliseconds
+  recordTTL?: number; // TTL for record fetches in milliseconds
   attributeTTL?: number; // TTL for attribute data in milliseconds
-  maxSize?: number;    // Maximum number of entries per cache
+  maxSize?: number; // Maximum number of entries per cache
   enableStats?: boolean; // Enable cache statistics tracking
 }
 
@@ -18,11 +22,11 @@ export interface CacheConfig {
  * Default cache configuration
  */
 export const defaultCacheConfig: CacheConfig = {
-  searchTTL: 5 * 60 * 1000,     // 5 minutes for search results
-  recordTTL: 10 * 60 * 1000,    // 10 minutes for individual records
+  searchTTL: 5 * 60 * 1000, // 5 minutes for search results
+  recordTTL: 10 * 60 * 1000, // 10 minutes for individual records
   attributeTTL: 60 * 60 * 1000, // 1 hour for attributes (rarely change)
-  maxSize: 1000,                // Maximum 1000 entries per cache
-  enableStats: false,           // Statistics disabled by default
+  maxSize: 1000, // Maximum 1000 entries per cache
+  enableStats: false, // Statistics disabled by default
 };
 
 /**
@@ -54,9 +58,12 @@ export class CacheManager {
    */
   private startCleanupInterval(): void {
     // Run cleanup every 5 minutes
-    this.cleanupInterval = setInterval(() => {
-      this.cleanupExpiredEntries();
-    }, 5 * 60 * 1000);
+    this.cleanupInterval = setInterval(
+      () => {
+        this.cleanupExpiredEntries();
+      },
+      5 * 60 * 1000
+    );
   }
 
   /**
@@ -105,7 +112,8 @@ export class CacheManager {
       search: searchCache.getStats(),
       record: recordCache.getStats(),
       attribute: attributeCache.getStats(),
-      totalSize: searchCache.size() + recordCache.size() + attributeCache.size(),
+      totalSize:
+        searchCache.size() + recordCache.size() + attributeCache.size(),
     };
   }
 

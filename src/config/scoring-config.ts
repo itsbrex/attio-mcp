@@ -90,7 +90,10 @@ export class ScoringConfigManager {
 
     // Load algorithm from environment
     const envAlgorithm = process.env.ATTIO_SCORING_ALGORITHM;
-    if (envAlgorithm && ['tfidf', 'bm25', 'semantic', 'hybrid'].includes(envAlgorithm)) {
+    if (
+      envAlgorithm &&
+      ['tfidf', 'bm25', 'semantic', 'hybrid'].includes(envAlgorithm)
+    ) {
       config.algorithm = envAlgorithm as ScoringAlgorithm;
     }
 
@@ -163,7 +166,7 @@ export class ScoringConfigManager {
   public setAlgorithm(algorithm: ScoringAlgorithm): void {
     this.config.algorithm = algorithm;
     relevanceScorer.setAlgorithm(algorithm);
-    
+
     if (features.isEnabled('enableEnhancedLogging')) {
       console.log(`[ScoringConfig] Changed algorithm to: ${algorithm}`);
     }

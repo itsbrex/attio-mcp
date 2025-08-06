@@ -9,6 +9,7 @@ import { debug, warn } from '../utils/logger.js';
 import { transformToFetchResult } from './transformers/index.js';
 import type { OpenAIFetchResult, SupportedAttioType } from './types.js';
 import { recordCache, features } from './advanced/index.js';
+import { withErrorHandling } from './advanced/error-recovery.js';
 import crypto from 'crypto';
 
 /**
@@ -25,7 +26,7 @@ export async function fetch(id: string): Promise<OpenAIFetchResult> {
 
   // Generate cache key for this fetch
   const cacheKey = `fetch:${crypto.createHash('md5').update(id).digest('hex')}`;
-  
+
   // Check cache if enabled
   if (features.isEnabled('enableCache')) {
     const cachedResult = recordCache.get(cacheKey);
@@ -40,19 +41,28 @@ export async function fetch(id: string): Promise<OpenAIFetchResult> {
   const { resourceType, recordId } = parseRecordId(id);
 
   try {
-    // Use the universal get-record-details tool
-    const request = {
-      method: 'tools/call' as const,
-      params: {
-        name: 'get-record-details',
-        arguments: {
-          resource_type: resourceType,
-          record_id: recordId,
-        },
+    // Use the universal get-record-details tool with error handling
+    const result = await withErrorHandling(
+      async () => {
+        const request = {
+          method: 'tools/call' as const,
+          params: {
+            name: 'get-record-details',
+            arguments: {
+              resource_type: resourceType,
+              record_id: recordId,
+            },
+          },
+        };
+        return executeToolRequest(request);
       },
-    };
-
-    const result = await executeToolRequest(request);
+      {
+        operationName: `fetch-${resourceType}`,
+        cacheKey,
+        cache: 'record',
+        context: { resourceType, recordId },
+      }
+    );
 
     if (result.toolResult?.type === 'text') {
       // Parse the detailed response
@@ -76,7 +86,15 @@ export async function fetch(id: string): Promise<OpenAIFetchResult> {
         },
       };
 
-      const detailsResult = await executeToolRequest(detailsRequest);
+      const detailsResult = await withErrorHandling(
+        async () => executeToolRequest(detailsRequest),
+        {
+          operationName: `fetch-details-${resourceType}`,
+          cacheKey: `${cacheKey}:details`,
+          cache: 'record',
+          context: { resourceType, recordId, infoType: 'full' },
+        }
+      );
 
       if (detailsResult.toolResult?.type === 'text') {
         const additionalDetails = parseDetailResponse(
@@ -96,7 +114,7 @@ export async function fetch(id: string): Promise<OpenAIFetchResult> {
           recordCache.set(cacheKey, transformed);
           debug('OpenAI', 'Cached fetch result', { id, cacheKey }, 'fetch');
         }
-        
+
         debug('OpenAI', 'Successfully fetched record', { id }, 'fetch');
         return transformed;
       }
@@ -112,13 +130,18 @@ export async function fetch(id: string): Promise<OpenAIFetchResult> {
       'fetch'
     );
     const result = await fetchDirect(resourceType, recordId);
-    
+
     // Cache fallback result if enabled
     if (features.isEnabled('enableCache')) {
       recordCache.set(cacheKey, result);
-      debug('OpenAI', 'Cached fallback fetch result', { id, cacheKey }, 'fetch');
+      debug(
+        'OpenAI',
+        'Cached fallback fetch result',
+        { id, cacheKey },
+        'fetch'
+      );
     }
-    
+
     return result;
   }
 }

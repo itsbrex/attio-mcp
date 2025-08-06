@@ -21,6 +21,13 @@ export {
   HybridScorer,
   createScorer
 } from './scoring-algorithms.js';
+export {
+  withErrorHandling,
+  executeSearchWithFallback,
+  executeFetchWithFallback,
+  executeAttributeOperationWithFallback,
+  configureCacheFallbacks
+} from './error-recovery.js';
 
 // Re-export feature configuration for convenience
 export { features, type FeatureFlags } from '../../config/features.js';

@@ -35,7 +35,7 @@ describe('Scoring Algorithms', () => {
       // Doc1 and doc3 should score higher than doc2
       expect(score1).toBeGreaterThan(score2);
       expect(score3).toBeGreaterThan(score2);
-      
+
       // Doc1 should score highest (exact match)
       expect(score1).toBeGreaterThan(0);
     });
@@ -66,7 +66,8 @@ describe('Scoring Algorithms', () => {
 
     it('should calculate BM25 score with term frequency saturation', () => {
       const query = 'information retrieval';
-      const doc1 = 'information retrieval systems use information retrieval techniques';
+      const doc1 =
+        'information retrieval systems use information retrieval techniques';
       const doc2 = 'database systems store information';
       const doc3 = 'retrieval of data from databases';
 
@@ -80,7 +81,7 @@ describe('Scoring Algorithms', () => {
       // Doc1 should score highest (contains both terms multiple times)
       expect(score1).toBeGreaterThan(score2);
       expect(score1).toBeGreaterThan(score3);
-      
+
       // Scores should be positive for matching documents
       expect(score2).toBeGreaterThan(0);
       expect(score3).toBeGreaterThan(0);
@@ -91,14 +92,14 @@ describe('Scoring Algorithms', () => {
       const document = 'test document with test query terms';
 
       scorer.updateCorpusStatistics([document]);
-      
+
       // Default parameters
       const defaultScore = scorer.score(query, document);
-      
+
       // Custom parameters (less term frequency saturation)
       scorer.setParameters(0.5, 0.9);
       const customScore = scorer.score(query, document);
-      
+
       // Scores should differ
       expect(defaultScore).not.toBe(customScore);
     });
@@ -106,7 +107,8 @@ describe('Scoring Algorithms', () => {
     it('should handle document length normalization', () => {
       const query = 'important term';
       const shortDoc = 'important term here';
-      const longDoc = 'this is a very long document with many words but also contains the important term somewhere in the middle of all this text';
+      const longDoc =
+        'this is a very long document with many words but also contains the important term somewhere in the middle of all this text';
 
       scorer.updateCorpusStatistics([shortDoc, longDoc]);
 
@@ -185,7 +187,7 @@ describe('Scoring Algorithms', () => {
       // Doc1 should score highest (exact match)
       expect(score1).toBeGreaterThan(score2);
       expect(score1).toBeGreaterThan(score3);
-      
+
       // Doc2 should score higher than doc3
       expect(score2).toBeGreaterThan(score3);
     });
@@ -195,10 +197,10 @@ describe('Scoring Algorithms', () => {
       const document = 'test document';
 
       scorer.updateCorpus([document]);
-      
+
       // Default weights
       const defaultScore = scorer.score(query, document);
-      
+
       // Custom weights (emphasize BM25)
       scorer.setWeights({
         tfidf: 0.1,
@@ -206,7 +208,7 @@ describe('Scoring Algorithms', () => {
         semantic: 0.1,
       });
       const customScore = scorer.score(query, document);
-      
+
       // Scores should differ
       expect(defaultScore).not.toBe(customScore);
     });
@@ -246,24 +248,26 @@ describe('Scoring Algorithms', () => {
     it('should score 100 documents in reasonable time', () => {
       const scorer = new BM25Scorer();
       const query = 'performance benchmark test';
-      
+
       // Generate test documents
-      const documents = Array.from({ length: 100 }, (_, i) => 
-        `Document ${i} contains various terms including benchmark and test`
+      const documents = Array.from(
+        { length: 100 },
+        (_, i) =>
+          `Document ${i} contains various terms including benchmark and test`
       );
-      
+
       scorer.updateCorpusStatistics(documents);
-      
+
       const startTime = Date.now();
-      
+
       // Score all documents
       for (const doc of documents) {
         scorer.score(query, doc);
       }
-      
+
       const endTime = Date.now();
       const duration = endTime - startTime;
-      
+
       // Should complete in less than 100ms
       expect(duration).toBeLessThan(100);
     });
@@ -271,20 +275,21 @@ describe('Scoring Algorithms', () => {
     it('should handle large documents efficiently', () => {
       const scorer = new HybridScorer();
       const query = 'search query';
-      
+
       // Generate a large document (10,000 words)
-      const largeDoc = Array.from({ length: 10000 }, (_, i) => 
-        `word${i % 100}`
+      const largeDoc = Array.from(
+        { length: 10000 },
+        (_, i) => `word${i % 100}`
       ).join(' ');
-      
+
       scorer.updateCorpus([largeDoc]);
-      
+
       const startTime = Date.now();
       const score = scorer.score(query, largeDoc);
       const endTime = Date.now();
-      
+
       const duration = endTime - startTime;
-      
+
       // Should complete in less than 50ms even for large document
       expect(duration).toBeLessThan(50);
       expect(score).toBeGreaterThanOrEqual(0);

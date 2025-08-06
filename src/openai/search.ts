@@ -10,6 +10,7 @@ import { debug, warn } from '../utils/logger.js';
 import { transformToSearchResult } from './transformers/index.js';
 import type { OpenAISearchResult, SupportedAttioType } from './types.js';
 import { searchCache, features } from './advanced/index.js';
+import { withErrorHandling } from './advanced/error-recovery.js';
 import crypto from 'crypto';
 
 /**
@@ -26,7 +27,7 @@ export async function search(query: string): Promise<OpenAISearchResult[]> {
 
   // Generate cache key for this search
   const cacheKey = `search:${crypto.createHash('md5').update(query).digest('hex')}`;
-  
+
   // Check cache if enabled
   if (features.isEnabled('enableCache')) {
     const cachedResults = searchCache.get(cacheKey);
@@ -48,20 +49,29 @@ export async function search(query: string): Promise<OpenAISearchResult[]> {
   // Search across all resource types in parallel
   const searchPromises = resourceTypes.map(async (resourceType) => {
     try {
-      // Use the universal search-records tool
-      const request = {
-        method: 'tools/call' as const,
-        params: {
-          name: 'search-records',
-          arguments: {
-            resource_type: resourceType,
-            query,
-            limit: 10, // Limit per resource type
-          },
+      // Use the universal search-records tool with error handling
+      const result = await withErrorHandling(
+        async () => {
+          const request = {
+            method: 'tools/call' as const,
+            params: {
+              name: 'search-records',
+              arguments: {
+                resource_type: resourceType,
+                query,
+                limit: 10, // Limit per resource type
+              },
+            },
+          };
+          return executeToolRequest(request);
         },
-      };
-
-      const result = await executeToolRequest(request);
+        {
+          operationName: `search-${resourceType}`,
+          cacheKey: `${cacheKey}:${resourceType}`,
+          cache: 'search',
+          context: { resourceType, query },
+        }
+      );
 
       // Check the result structure
       debug(
@@ -101,9 +111,9 @@ export async function search(query: string): Promise<OpenAISearchResult[]> {
   let scoredResults = results;
   if (features.isEnabled('enableRelevanceScoring')) {
     const { relevanceScorer } = await import('./advanced/index.js');
-    
+
     // Convert OpenAI results to format expected by scorer
-    const searchResults = results.map(r => ({
+    const searchResults = results.map((r) => ({
       id: r.id,
       data: {
         title: r.title,
@@ -111,23 +121,27 @@ export async function search(query: string): Promise<OpenAISearchResult[]> {
         url: r.url,
       },
     }));
-    
+
     // Score and sort results
     const scored = relevanceScorer.scoreResults(searchResults, query);
-    
+
     // Map back to OpenAI format with scores
     scoredResults = scored.map((sr, index) => {
-      const original = results.find(r => r.id === sr.id);
+      const original = results.find((r) => r.id === sr.id);
       return original || results[index];
     });
-    
+
     debug('OpenAI', 'Applied relevance scoring', { query }, 'search');
   } else {
     // Fallback to simple sorting
     scoredResults.sort((a, b) => {
       // Prioritize exact matches in title
-      const aScore = a.title.toLowerCase().includes(query.toLowerCase()) ? 1 : 0;
-      const bScore = b.title.toLowerCase().includes(query.toLowerCase()) ? 1 : 0;
+      const aScore = a.title.toLowerCase().includes(query.toLowerCase())
+        ? 1
+        : 0;
+      const bScore = b.title.toLowerCase().includes(query.toLowerCase())
+        ? 1
+        : 0;
       return bScore - aScore;
     });
   }
