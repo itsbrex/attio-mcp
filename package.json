@@ -84,7 +84,12 @@
     "e2e:validate": "tsx -e \"import('./test/e2e/utils/config-loader.js').then(m => m.loadE2EConfig()).then(() => console.log('✅ E2E configuration valid')).catch(e => { console.error('❌ E2E configuration invalid:', e); process.exit(1); })\"",
     "prepare": "husky"
   },
-  "files": ["dist", "README.md", "LICENSE", "CHANGELOG.md"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -114,6 +119,7 @@
     "fast-safe-stringify": "^2.1.1",
     "handlebars": "^4.7.8",
     "ora": "^7.0.1",
+    "rate-limiter-flexible": "^7.2.0",
     "safe-stable-stringify": "^2.5.0",
     "user": "^0.0.0",
     "yargs": "^17.7.2"
@@ -171,7 +177,12 @@
       "output": []
     },
     "check": {
-      "dependencies": ["syncpack:check", "check:format", "lint:check", "test"]
+      "dependencies": [
+        "syncpack:check",
+        "check:format",
+        "lint:check",
+        "test"
+      ]
     }
   }
 }
