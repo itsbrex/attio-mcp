@@ -189,13 +189,12 @@ export class EnhancedTransformer {
    * Create a batch transformer for multiple records
    */
   public createBatchTransformer() {
-    const self = this;
     return {
-      async toSearchResults(records: any[]): Promise<OpenAISearchResult[]> {
+      toSearchResults: async (records: any[]): Promise<OpenAISearchResult[]> => {
         const results: OpenAISearchResult[] = [];
 
         for (const record of records) {
-          const result = await self.toSearchResult(record);
+          const result = await this.toSearchResult(record);
           if (result) {
             results.push(result);
           }
@@ -204,11 +203,11 @@ export class EnhancedTransformer {
         return results;
       },
 
-      async toFetchResults(records: any[]): Promise<OpenAIFetchResult[]> {
+      toFetchResults: async (records: any[]): Promise<OpenAIFetchResult[]> => {
         const results: OpenAIFetchResult[] = [];
 
         for (const record of records) {
-          const result = await self.toFetchResult(record);
+          const result = await this.toFetchResult(record);
           if (result) {
             results.push(result);
           }

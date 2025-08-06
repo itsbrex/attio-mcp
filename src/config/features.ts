@@ -28,6 +28,21 @@ export interface FeatureFlags {
 
   // Rate limiting enhancements
   enableRateLimitingEnhancements: boolean;
+
+  // SSE Streaming capabilities
+  enableSSEStreaming: boolean;
+
+  // Real-time updates via SSE
+  enableRealtimeUpdates: boolean;
+
+  // Connection resilience features
+  enableConnectionResilience: boolean;
+
+  // Batch updates support
+  enableBatchUpdates: boolean;
+
+  // Data compression for SSE
+  enableCompression: boolean;
 }
 
 /**
@@ -43,6 +58,11 @@ export const defaultFeatureFlags: FeatureFlags = {
   enablePerformanceOptimization: false,
   enableEnhancedLogging: false,
   enableRateLimitingEnhancements: false,
+  enableSSEStreaming: false,
+  enableRealtimeUpdates: false,
+  enableConnectionResilience: false,
+  enableBatchUpdates: false,
+  enableCompression: false,
 };
 
 /**
@@ -104,6 +124,26 @@ export class FeatureConfiguration {
 
     if (process.env.ATTIO_ENABLE_RATE_LIMITING_ENHANCEMENTS === 'true') {
       flags.enableRateLimitingEnhancements = true;
+    }
+
+    if (process.env.ATTIO_ENABLE_SSE_STREAMING === 'true') {
+      flags.enableSSEStreaming = true;
+    }
+
+    if (process.env.ATTIO_ENABLE_REALTIME_UPDATES === 'true') {
+      flags.enableRealtimeUpdates = true;
+    }
+
+    if (process.env.ATTIO_ENABLE_CONNECTION_RESILIENCE === 'true') {
+      flags.enableConnectionResilience = true;
+    }
+
+    if (process.env.ATTIO_ENABLE_BATCH_UPDATES === 'true') {
+      flags.enableBatchUpdates = true;
+    }
+
+    if (process.env.ATTIO_ENABLE_COMPRESSION === 'true') {
+      flags.enableCompression = true;
     }
 
     // Log feature flag status if enhanced logging is enabled
