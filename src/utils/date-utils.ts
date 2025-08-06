@@ -3,10 +3,10 @@
  * Provides functions for handling date ranges, relative dates, and date formatting.
  */
 import {
-  RelativeDate,
-  RelativeDateUnit,
-  DateRange,
+  type DateRange,
   DateRangePreset,
+  type RelativeDate,
+  RelativeDateUnit,
 } from '../types/attio.js';
 
 /**
@@ -228,7 +228,7 @@ export function resolveDateRange(dateRange: DateRange): {
   }
 
   // A date range must have at least one of: preset, start, or end
-  if (!dateRange.preset && !dateRange.start && !dateRange.end) {
+  if (!(dateRange.preset || dateRange.start || dateRange.end)) {
     throw new Error(
       'DateRange must specify at least one of: preset, start, or end'
     );

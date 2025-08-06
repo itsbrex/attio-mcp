@@ -4,15 +4,15 @@
 import { getAttioClient } from '../../api/attio-client.js';
 import {
   advancedSearchObject,
-  ListEntryFilters,
+  type ListEntryFilters,
 } from '../../api/operations/index.js';
-import { ResourceType, Person } from '../../types/attio.js';
-import { isValidId, isValidListId } from '../../utils/validation.js';
+import { FilterValidationError } from '../../errors/api-errors.js';
+import { type Person, ResourceType } from '../../types/attio.js';
 import {
   createPeopleByCompanyListFilter,
   createRecordsByNotesFilter,
 } from '../../utils/relationship-utils.js';
-import { FilterValidationError } from '../../errors/api-errors.js';
+import { isValidId, isValidListId } from '../../utils/validation.js';
 
 /**
  * Searches for people associated with a specific company
@@ -98,7 +98,7 @@ export async function searchPeopleByCompanyList(
       // Merge all filters
       for (const filter of listFilters) {
         if (filter.filters) {
-          filters.filters!.push(...filter.filters);
+          filters.filters?.push(...filter.filters);
         }
       }
     }

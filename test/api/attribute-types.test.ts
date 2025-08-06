@@ -1,19 +1,19 @@
 /**
  * Tests for attribute type detection functionality
  */
+
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getAttioClient } from '../../src/api/attio-client.js';
 import {
-  getObjectAttributeMetadata,
+  clearAttributeCache,
   detectFieldType,
   getAttributeTypeInfo,
-  clearAttributeCache,
   getFieldValidationRules,
-} from '../../src/api/attribute-types';
-import { getAttioClient } from '../../src/api/attio-client';
-import { ResourceType } from '../../src/types/attio';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+  getObjectAttributeMetadata,
+} from '../../src/api/attribute-types.js';
 
 // Mock the Attio client
-vi.mock('../../src/api/attio-client');
+vi.mock('../../src/api/attio-client.js');
 
 describe('Attribute Type Detection', () => {
   const mockApi = {

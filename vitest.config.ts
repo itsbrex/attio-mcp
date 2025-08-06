@@ -11,7 +11,7 @@ export default defineConfig({
       'test/handlers/tool-configs/universal/performance.test.ts',
     ],
     globals: true,
-    testTimeout: 30000,
+    testTimeout: 30_000,
     setupFiles: ['./test/setup.ts'],
     coverage: {
       provider: 'v8',
@@ -35,13 +35,6 @@ export default defineConfig({
       all: true,
       clean: true,
     },
-    watchExclude: [
-      'node_modules/**',
-      'dist/**',
-      '.git/**',
-      'coverage/**',
-      '**/*.d.ts',
-    ],
   },
   resolve: {
     alias: {

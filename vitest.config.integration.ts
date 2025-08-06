@@ -1,5 +1,5 @@
-import { defineConfig } from 'vitest/config';
 import { config } from 'dotenv';
+import { defineConfig } from 'vitest/config';
 
 // Load environment variables from .env file for integration tests
 config();
@@ -49,7 +49,7 @@ export default defineConfig({
       ],
     },
     silent: false,
-    reporter: 'verbose',
+    reporters: 'verbose',
   },
   resolve: {
     alias: {

@@ -1,22 +1,23 @@
 /**
  * Relationship-based queries for companies
  */
-import {
-  ResourceType,
-  Company,
-  AttioList,
-  AttioListEntry,
-} from '../../types/attio.js';
-import { ListEntryFilters } from '../../api/operations/index.js';
-import { FilterValidationError } from '../../errors/api-errors.js';
-import { validateNumericParam } from '../../utils/filters/index.js';
+
 import { getAttioClient } from '../../api/attio-client.js';
-import { getListDetails } from '../lists.js';
+import type { ListEntryFilters } from '../../api/operations/index.js';
+import { FilterValidationError } from '../../errors/api-errors.js';
+import {
+  type AttioList,
+  type AttioListEntry,
+  type Company,
+  ResourceType,
+} from '../../types/attio.js';
+import { validateNumericParam } from '../../utils/filters/index.js';
 import {
   createCompaniesByPeopleFilter,
   createCompaniesByPeopleListFilter,
   createRecordsByNotesFilter,
 } from '../../utils/relationship-utils.js';
+import { getListDetails } from '../lists.js';
 import { advancedSearchCompanies } from './search.js';
 
 /**
@@ -35,7 +36,7 @@ export async function searchCompaniesByPeople(
   try {
     // Handle the case where we receive just a person ID (from search-by-relationship)
     let filterObject: ListEntryFilters;
-    
+
     if (typeof peopleFilter === 'string') {
       // Create a filter to find companies associated with this person ID
       filterObject = {
@@ -43,9 +44,9 @@ export async function searchCompaniesByPeople(
           {
             attribute: { slug: 'associated_people' },
             condition: 'contains',
-            value: peopleFilter
-          }
-        ]
+            value: peopleFilter,
+          },
+        ],
       };
     } else if (
       typeof peopleFilter === 'object' &&
@@ -187,7 +188,7 @@ export async function searchCompaniesByNotes(
  */
 export async function getCompanyLists(
   companyId: string,
-  limit: number = 50
+  limit = 50
 ): Promise<AttioList[]> {
   const api = getAttioClient();
 

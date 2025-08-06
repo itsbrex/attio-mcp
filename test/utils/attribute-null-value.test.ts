@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { formatAllAttributes } from '../../src/api/attribute-types';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { formatAllAttributes } from '../../src/api/attribute-types.js';
 
 // Mock dependencies
 const mockGet = vi.fn() as any;

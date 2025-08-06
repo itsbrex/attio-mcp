@@ -3,13 +3,13 @@
  * Re-exports and additional type definitions used across modules
  */
 
-import {
-  BatchRequestItem as BatchRequestItemType,
-  BatchItemResult as BatchItemResultType,
-  BatchResponse as BatchResponseType,
-  BatchConfig as BatchConfigType,
-} from '../../types/attio.js';
 import { FilterValue } from '../../types/api-operations.js';
+import type {
+  BatchConfig as BatchConfigType,
+  BatchItemResult as BatchItemResultType,
+  BatchRequestItem as BatchRequestItemType,
+  BatchResponse as BatchResponseType,
+} from '../../types/attio.js';
 
 // Re-export batch types for convenience
 export type BatchRequestItem<T> = BatchRequestItemType<T>;

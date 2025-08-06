@@ -27,7 +27,7 @@ export interface RetryConfig {
 export const DEFAULT_RETRY_CONFIG: RetryConfig = {
   maxRetries: 3,
   initialDelay: 1000, // 1 second
-  maxDelay: 10000, // 10 seconds
+  maxDelay: 10_000, // 10 seconds
   useExponentialBackoff: true,
   retryableStatusCodes: [408, 429, 500, 502, 503, 504],
 };
@@ -48,7 +48,7 @@ export function calculateRetryDelay(
   }
 
   // Exponential backoff with jitter
-  const exponentialDelay = config.initialDelay * Math.pow(2, attempt);
+  const exponentialDelay = config.initialDelay * 2 ** attempt;
   const jitter = Math.random() * 0.5 + 0.75; // Random value between 0.75 and 1.25
   const delay = exponentialDelay * jitter;
 
@@ -73,7 +73,10 @@ function sleep(ms: number): Promise<void> {
  * @param config - Retry configuration
  * @returns Whether the error should trigger a retry
  */
-export function isRetryableError(error: ApiError, config: RetryConfig): boolean {
+export function isRetryableError(
+  error: ApiError,
+  config: RetryConfig
+): boolean {
   // Network errors should be retried
   if (!error.response) {
     return true;

@@ -6,14 +6,16 @@ export default defineConfig({
     include: ['test/**/*.test.ts', 'test/**/*.test.js'],
     exclude: [
       'node_modules/**',
-      'test/integration/real-api/**',
+      'test/integration/**/*.test.ts',
+      'test/handlers/tool-configs/universal/integration.test.ts',
+      'test/handlers/tool-configs/universal/performance.test.ts',
       'test/manual/**',
       'test/**/*.manual.*',
       'test/**/*real-api-integration*',
       'test/**/*claude-desktop-scenario*',
     ],
     globals: true,
-    testTimeout: 10000,
+    testTimeout: 10_000,
     setupFiles: ['./test/setup.ts'],
     pool: 'forks',
     poolOptions: {
@@ -45,7 +47,7 @@ export default defineConfig({
       clean: true,
     },
     silent: false,
-    reporter: 'verbose',
+    reporters: ['verbose'],
     watchExclude: [
       'node_modules/**',
       'dist/**',

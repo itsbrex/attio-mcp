@@ -6,15 +6,15 @@
  */
 import {
   createCompany,
+  deleteCompany,
   updateCompany,
   updateCompanyAttribute,
-  deleteCompany,
 } from '../../src/objects/companies/basic.js';
-import { Company } from '../../src/types/attio.js';
+import type { Company } from '../../src/types/attio.js';
 
 // Test configuration
 const SKIP_TESTS = process.env.SKIP_INTEGRATION_TESTS === 'true';
-const TEST_TIMEOUT = 30000; // 30 seconds
+const TEST_TIMEOUT = 30_000; // 30 seconds
 const TEST_COMPANY_NAME = `Test Company ${Date.now()}`;
 
 describe('Boolean Attribute API Tests', () => {
@@ -43,8 +43,8 @@ describe('Boolean Attribute API Tests', () => {
     try {
       testCompany = await createCompany({
         name: TEST_COMPANY_NAME,
-        is_active: true,
-        uses_body_composition: true,
+        is_active: 'true',
+        uses_body_composition: 'true',
       });
 
       console.log(`Created test company: ${testCompany.id?.record_id}`);
