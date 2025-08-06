@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 ATTIO MCP SERVER GUIDELINES
 
 🚨 DOCUMENTATION-FIRST RULE (MANDATORY):
@@ -334,6 +338,78 @@ EXTERNAL MCP SERVERS (Runtime Dependencies)
   * Purpose: Web crawling and RAG.
   * Tools: get_available_sources(), crawl_single_page(url), smart_crawl_url(url), perform_rag_query(q, source?, match_count?)
   * Setup: Install external server, configure in MCP client.
+
+HIGH-LEVEL ARCHITECTURE
+
+## Core Components
+
+### 1. MCP Server Foundation (`src/index.ts`)
+- Main entry point that initializes the Model Context Protocol server
+- Uses `@modelcontextprotocol/sdk` for MCP communication
+- Handles stdin/stdout transport for communication with AI assistants
+- Registers all available tools and manages server lifecycle
+
+### 2. Universal Tools System (`src/handlers/tool-configs/universal/`)
+- **13 universal tools** that replace 40+ resource-specific operations
+- Each tool works across all Attio object types (companies, people, lists, etc.)
+- Tools include: search-records, get-record, create-record, update-record, delete-record, etc.
+- Configuration-driven approach using `universalToolConfigs.ts`
+
+### 3. API Layer (`src/api/`)
+- **operations/**: CRUD operations for each object type (companies.ts, people.ts, lists.ts, etc.)
+- **attio-client.ts**: Core HTTP client with retry logic and error handling
+- **base-operations.ts**: Shared logic for all API operations
+- Uses axios for HTTP requests with built-in retry mechanism
+
+### 4. Transport Layer (`src/transport/`)
+- **SSE Server**: Server-Sent Events for real-time communication
+- **OpenAI Adapter**: Bridges OpenAI/ChatGPT requests to MCP protocol
+- **Message Wrapper**: Protocol adaptation between different formats
+- Enables integration with ChatGPT and other OpenAI-compatible systems
+
+### 5. OpenAI Integration (`src/openai/`)
+- **search.ts**: OpenAI-compliant search across all Attio records
+- **fetch.ts**: OpenAI-compliant detailed record fetching
+- **transformers/**: Object-specific data transformers for different record types
+- Converts Attio data to OpenAI's expected format
+
+### 6. Type System (`src/types/`)
+- **api-types.ts**: Core Attio API type definitions
+- **filter-types.ts**: Advanced filtering system types
+- **universal-types.ts**: Types for universal tools
+- **sse-types.ts**: SSE transport types
+- Comprehensive TypeScript interfaces for type safety
+
+### 7. Utilities (`src/utils/`)
+- **filters/**: Advanced filter building and validation
+- **attribute-mapping.ts**: Maps Attio attributes to readable names
+- **error-handler.ts**: Centralized error handling
+- **logger.ts**: Debug and error logging utilities
+- **validators.ts**: Input validation functions
+
+## Request Flow
+
+1. **AI Assistant → MCP Server**: Request comes via stdin/stdout or SSE
+2. **Tool Handler**: Routes to appropriate universal tool
+3. **API Operation**: Executes CRUD operation via Attio API
+4. **Response Transform**: Formats response for AI consumption
+5. **Return to Assistant**: Sends formatted response back
+
+## Key Design Patterns
+
+- **Universal Tool Architecture**: Single interface for all object types
+- **Configuration-Driven**: Tools defined by configuration, not code
+- **Retry with Backoff**: Automatic retry for transient failures
+- **Type Safety**: Comprehensive TypeScript types throughout
+- **Error Recovery**: Graceful error handling with detailed messages
+- **Modular Structure**: Clear separation of concerns
+
+## Environment Configuration
+
+Required environment variables:
+- `ATTIO_API_KEY`: Your Attio API authentication key
+- `ATTIO_WORKSPACE_ID`: Your Attio workspace identifier
+- Optional: `ATTIO_DEFAULT_DEAL_STAGE`, `ATTIO_DEFAULT_DEAL_OWNER`, `ATTIO_DEFAULT_CURRENCY`
 
 ## Task Master AI Instructions
 **Import Task Master's development workflow commands and guidelines, treat as if import is in the main CLAUDE.md file.**

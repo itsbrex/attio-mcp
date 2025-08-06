@@ -80,8 +80,9 @@ function detectPromptInjection(text: string, patterns: RegExp[]): boolean {
   const suspiciousPatterns = [
     // Excessive special characters
     /[^\w\s]{10,}/g,
-    // Unusual Unicode characters
-    /[\u0000-\u001F\u007F-\u009F]/g,
+    // Unusual Unicode characters (excluding common whitespace)
+    // eslint-disable-next-line no-control-regex
+    /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g,
     // Zero-width characters
     /[\u200B-\u200D\uFEFF]/g,
   ];
@@ -115,8 +116,9 @@ function sanitizeInput(input: any): any {
       .replace(/'/g, '&#x27;')
       .replace(/\//g, '&#x2F;');
 
-    // Remove control characters
-    sanitized = sanitized.replace(/[\x00-\x1F\x7F]/g, '');
+    // Remove control characters (excluding common whitespace like \t, \n, \r)
+    // eslint-disable-next-line no-control-regex
+    sanitized = sanitized.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 
     // Limit string length
     const maxLength = 10000;
