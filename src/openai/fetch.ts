@@ -8,6 +8,8 @@ import { executeToolRequest } from '../handlers/tools/dispatcher.js';
 import { debug, warn } from '../utils/logger.js';
 import { transformToFetchResult } from './transformers/index.js';
 import type { OpenAIFetchResult, SupportedAttioType } from './types.js';
+import { recordCache, features } from './advanced/index.js';
+import crypto from 'crypto';
 
 /**
  * Fetch detailed information for a specific record
@@ -20,6 +22,19 @@ export async function fetch(id: string): Promise<OpenAIFetchResult> {
   }
 
   debug('OpenAI', 'Fetching record with ID', { id }, 'fetch');
+
+  // Generate cache key for this fetch
+  const cacheKey = `fetch:${crypto.createHash('md5').update(id).digest('hex')}`;
+  
+  // Check cache if enabled
+  if (features.isEnabled('enableCache')) {
+    const cachedResult = recordCache.get(cacheKey);
+    if (cachedResult) {
+      debug('OpenAI', 'Cache hit for fetch', { id, cacheKey }, 'fetch');
+      return cachedResult as OpenAIFetchResult;
+    }
+    debug('OpenAI', 'Cache miss for fetch', { id, cacheKey }, 'fetch');
+  }
 
   // Parse the ID to determine resource type
   const { resourceType, recordId } = parseRecordId(id);
@@ -76,6 +91,12 @@ export async function fetch(id: string): Promise<OpenAIFetchResult> {
       // Transform to OpenAI format
       const transformed = transformToFetchResult(record, resourceType);
       if (transformed) {
+        // Cache result if enabled
+        if (features.isEnabled('enableCache')) {
+          recordCache.set(cacheKey, transformed);
+          debug('OpenAI', 'Cached fetch result', { id, cacheKey }, 'fetch');
+        }
+        
         debug('OpenAI', 'Successfully fetched record', { id }, 'fetch');
         return transformed;
       }
@@ -90,7 +111,15 @@ export async function fetch(id: string): Promise<OpenAIFetchResult> {
       { resourceType, recordId },
       'fetch'
     );
-    return fetchDirect(resourceType, recordId);
+    const result = await fetchDirect(resourceType, recordId);
+    
+    // Cache fallback result if enabled
+    if (features.isEnabled('enableCache')) {
+      recordCache.set(cacheKey, result);
+      debug('OpenAI', 'Cached fallback fetch result', { id, cacheKey }, 'fetch');
+    }
+    
+    return result;
   }
 }
 
