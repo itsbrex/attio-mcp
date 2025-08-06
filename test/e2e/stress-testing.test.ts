@@ -20,7 +20,7 @@ vi.mock('../../src/handlers/tools/dispatcher.js', () => ({
 
 describe('Stress Testing and Failover', () => {
   const performanceMonitor = new PerformanceMonitor();
-  
+
   beforeEach(() => {
     features.reset();
     searchCache.clear();
@@ -41,43 +41,54 @@ describe('Stress Testing and Failover', () => {
       });
 
       const mockResponse = {
-        content: [{
-          type: 'text',
-          text: 'Found 5 people:\n' + Array(5).fill(null).map((_, i) => 
-            `${i + 1}. Person ${i} (person${i}@example.com) (ID: person-${i}-12345678-1234-1234-1234-123456789abc)`
-          ).join('\n')
-        }]
+        content: [
+          {
+            type: 'text',
+            text:
+              'Found 5 people:\n' +
+              Array(5)
+                .fill(null)
+                .map(
+                  (_, i) =>
+                    `${i + 1}. Person ${i} (person${i}@example.com) (ID: person-${i}-12345678-1234-1234-1234-123456789abc)`
+                )
+                .join('\n'),
+          },
+        ],
       };
 
       vi.mocked(executeToolRequest).mockResolvedValue(mockResponse);
 
       const startTime = Date.now();
       const concurrentRequests = 100;
-      
+
       // Track individual request times
       const requestTimes: number[] = [];
-      
+
       // Launch concurrent searches
-      const promises = Array(concurrentRequests).fill(null).map(async (_, i) => {
-        const reqStart = Date.now();
-        const result = await search(`stress-test-${i % 20}`, 'people'); // Some cache hits
-        const reqDuration = Date.now() - reqStart;
-        requestTimes.push(reqDuration);
-        return result;
-      });
+      const promises = Array(concurrentRequests)
+        .fill(null)
+        .map(async (_, i) => {
+          const reqStart = Date.now();
+          const result = await search(`stress-test-${i % 20}`, 'people'); // Some cache hits
+          const reqDuration = Date.now() - reqStart;
+          requestTimes.push(reqDuration);
+          return result;
+        });
 
       const results = await Promise.all(promises);
       const totalDuration = Date.now() - startTime;
 
       // All requests should succeed
       expect(results).toHaveLength(concurrentRequests);
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result).toBeDefined();
         expect(result.length).toBeGreaterThan(0);
       });
 
       // Calculate statistics
-      const avgTime = requestTimes.reduce((a, b) => a + b, 0) / requestTimes.length;
+      const avgTime =
+        requestTimes.reduce((a, b) => a + b, 0) / requestTimes.length;
       const maxTime = Math.max(...requestTimes);
       const minTime = Math.min(...requestTimes);
       const sortedTimes = [...requestTimes].sort((a, b) => a - b);
@@ -90,7 +101,7 @@ describe('Stress Testing and Failover', () => {
         - Min Request Time: ${minTime}ms
         - Max Request Time: ${maxTime}ms
         - P95 Request Time: ${p95Time}ms
-        - Cache Hit Rate: ${(searchCache.getStats().hits / concurrentRequests * 100).toFixed(2)}%
+        - Cache Hit Rate: ${((searchCache.getStats().hits / concurrentRequests) * 100).toFixed(2)}%
       `);
 
       // Performance assertions
@@ -123,7 +134,7 @@ describe('Stress Testing and Failover', () => {
         };
 
         cache.set(`key-${i}`, largeData);
-        
+
         const stats = cache.getStats();
         if (stats.evictions > evictions) {
           evictions = stats.evictions;
@@ -156,28 +167,32 @@ describe('Stress Testing and Failover', () => {
       });
 
       const mockBatchResponse = {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({
-            results: Array(10).fill(null).map((_, i) => ({
-              id: `batch-${i}`,
-              data: { name: `Batch Item ${i}` }
-            }))
-          })
-        }]
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              results: Array(10)
+                .fill(null)
+                .map((_, i) => ({
+                  id: `batch-${i}`,
+                  data: { name: `Batch Item ${i}` },
+                })),
+            }),
+          },
+        ],
       };
 
       let apiCallCount = 0;
       vi.mocked(executeToolRequest).mockImplementation(async () => {
         apiCallCount++;
-        await new Promise(resolve => setTimeout(resolve, 50)); // Simulate API delay
+        await new Promise((resolve) => setTimeout(resolve, 50)); // Simulate API delay
         return mockBatchResponse;
       });
 
       // Launch 50 requests that should be batched
-      const promises = Array(50).fill(null).map((_, i) => 
-        fetch(`batch-item-${i % 10}`)
-      );
+      const promises = Array(50)
+        .fill(null)
+        .map((_, i) => fetch(`batch-item-${i % 10}`));
 
       const startTime = Date.now();
       await Promise.all(promises);
@@ -187,7 +202,7 @@ describe('Stress Testing and Failover', () => {
         Batching Test Results:
         - Total Requests: 50
         - API Calls Made: ${apiCallCount}
-        - Time Saved: ~${(50 * 50 - duration)}ms
+        - Time Saved: ~${50 * 50 - duration}ms
         - Efficiency: ${((1 - apiCallCount / 50) * 100).toFixed(2)}% reduction in API calls
       `);
 
@@ -218,10 +233,12 @@ describe('Stress Testing and Failover', () => {
           throw errors[attemptCount - 1];
         }
         return {
-          content: [{
-            type: 'text',
-            text: 'Found 1 people:\n1. Recovered Person (recovered@example.com) (ID: recovered-12345678-1234-1234-1234-123456789abc)'
-          }]
+          content: [
+            {
+              type: 'text',
+              text: 'Found 1 people:\n1. Recovered Person (recovered@example.com) (ID: recovered-12345678-1234-1234-1234-123456789abc)',
+            },
+          ],
         };
       });
 
@@ -287,26 +304,32 @@ describe('Stress Testing and Failover', () => {
       // Some object types fail, others succeed
       vi.mocked(executeToolRequest)
         .mockRejectedValueOnce(new Error('Companies API Down')) // companies fail
-        .mockResolvedValueOnce({ // people succeed
-          content: [{
-            type: 'text',
-            text: 'Found 2 people:\n1. Person A (a@example.com) (ID: a-12345678-1234-1234-1234-123456789abc)\n2. Person B (b@example.com) (ID: b-12345678-1234-1234-1234-123456789abc)'
-          }]
+        .mockResolvedValueOnce({
+          // people succeed
+          content: [
+            {
+              type: 'text',
+              text: 'Found 2 people:\n1. Person A (a@example.com) (ID: a-12345678-1234-1234-1234-123456789abc)\n2. Person B (b@example.com) (ID: b-12345678-1234-1234-1234-123456789abc)',
+            },
+          ],
         })
         .mockRejectedValueOnce(new Error('Lists API Down')) // lists fail
-        .mockResolvedValueOnce({ // tasks succeed
-          content: [{
-            type: 'text',
-            text: 'Found 1 tasks:\n1. Task One (ID: task-12345678-1234-1234-1234-123456789abc)'
-          }]
+        .mockResolvedValueOnce({
+          // tasks succeed
+          content: [
+            {
+              type: 'text',
+              text: 'Found 1 tasks:\n1. Task One (ID: task-12345678-1234-1234-1234-123456789abc)',
+            },
+          ],
         });
 
       const results = await search('partial');
 
       // Should return partial results
       expect(results).toHaveLength(3); // 2 people + 1 task
-      expect(results.filter(r => r.title.includes('Person'))).toHaveLength(2);
-      expect(results.filter(r => r.title.includes('Task'))).toHaveLength(1);
+      expect(results.filter((r) => r.title.includes('Person'))).toHaveLength(2);
+      expect(results.filter((r) => r.title.includes('Task'))).toHaveLength(1);
     });
 
     it('should handle timeout scenarios with fallback', async () => {
@@ -323,30 +346,32 @@ describe('Stress Testing and Failover', () => {
         callCount++;
         if (callCount === 1) {
           // First call times out
-          await new Promise(resolve => setTimeout(resolve, 5000));
+          await new Promise((resolve) => setTimeout(resolve, 5000));
           throw timeoutError;
         }
         // Fallback succeeds quickly
         return {
-          content: [{
-            type: 'text',
-            text: 'Found 1 companies:\n1. Fallback Company (fallback.com) (ID: fallback-12345678-1234-1234-1234-123456789abc)'
-          }]
+          content: [
+            {
+              type: 'text',
+              text: 'Found 1 companies:\n1. Fallback Company (fallback.com) (ID: fallback-12345678-1234-1234-1234-123456789abc)',
+            },
+          ],
         };
       });
 
       const startTime = Date.now();
       const controller = new AbortController();
-      
+
       // Set a timeout for the test
       const timeoutId = setTimeout(() => controller.abort(), 2000);
-      
+
       try {
         const results = await search('timeout-test', 'companies');
         clearTimeout(timeoutId);
-        
+
         const duration = Date.now() - startTime;
-        
+
         expect(results).toHaveLength(1);
         expect(results[0].title).toBe('Fallback Company');
         expect(duration).toBeLessThan(3000); // Should not wait full 5s
@@ -374,10 +399,12 @@ describe('Stress Testing and Failover', () => {
           throw error;
         }
         return {
-          content: [{
-            type: 'text',
-            text: 'Found 1 lists:\n1. Recovered List (ID: list-12345678-1234-1234-1234-123456789abc)'
-          }]
+          content: [
+            {
+              type: 'text',
+              text: 'Found 1 lists:\n1. Recovered List (ID: list-12345678-1234-1234-1234-123456789abc)',
+            },
+          ],
         };
       });
 
@@ -400,7 +427,7 @@ describe('Stress Testing and Failover', () => {
 
       // Should handle corrupted cache gracefully
       const cached = searchCache.get('corrupted-key');
-      
+
       // Cache should either return null or valid data
       if (cached !== null) {
         expect(typeof cached).toBe('object');
@@ -408,10 +435,12 @@ describe('Stress Testing and Failover', () => {
 
       // New search should work despite corruption
       vi.mocked(executeToolRequest).mockResolvedValue({
-        content: [{
-          type: 'text',
-          text: 'Found 1 tasks:\n1. Valid Task (ID: task-12345678-1234-1234-1234-123456789abc)'
-        }]
+        content: [
+          {
+            type: 'text',
+            text: 'Found 1 tasks:\n1. Valid Task (ID: task-12345678-1234-1234-1234-123456789abc)',
+          },
+        ],
       });
 
       const result = await search('valid-after-corruption', 'tasks');
@@ -433,24 +462,26 @@ describe('Stress Testing and Failover', () => {
 
       vi.mocked(executeToolRequest).mockImplementation(async (request: any) => {
         const objectType = request.arguments?.object_type || 'unknown';
-        
+
         if (!healthStatus[objectType as keyof typeof healthStatus]) {
           throw new Error(`${objectType} service unhealthy`);
         }
 
         return {
-          content: [{
-            type: 'text',
-            text: `Found 1 ${objectType}:\n1. Healthy ${objectType} (ID: ${objectType}-12345678-1234-1234-1234-123456789abc)`
-          }]
+          content: [
+            {
+              type: 'text',
+              text: `Found 1 ${objectType}:\n1. Healthy ${objectType} (ID: ${objectType}-12345678-1234-1234-1234-123456789abc)`,
+            },
+          ],
         };
       });
 
       // Search should only return results from healthy services
       const results = await search('rebalance-test');
-      
+
       // Should have results only from healthy services (people and lists)
-      const resultTypes = results.map(r => r.id.split(':')[0]);
+      const resultTypes = results.map((r) => r.id.split(':')[0]);
       expect(resultTypes).not.toContain('companies');
       expect(resultTypes).not.toContain('tasks');
     });
@@ -464,25 +495,27 @@ describe('Stress Testing and Failover', () => {
       });
 
       const monitor = new PerformanceMonitor();
-      
+
       // Simulate various operations
       for (let i = 0; i < 20; i++) {
         const opId = `op-${i}`;
         monitor.startOperation(opId, `Operation ${i}`);
-        
+
         // Simulate work
-        await new Promise(resolve => setTimeout(resolve, Math.random() * 100));
-        
+        await new Promise((resolve) =>
+          setTimeout(resolve, Math.random() * 100)
+        );
+
         // Randomly fail some operations
         if (Math.random() > 0.8) {
           monitor.recordError(opId, new Error('Random failure'));
         }
-        
+
         monitor.endOperation(opId);
       }
 
       const summary = monitor.getSummary();
-      
+
       console.log(`
         Performance Monitoring Summary:
         - Total Operations: ${summary.totalOperations}

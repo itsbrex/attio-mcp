@@ -63,6 +63,23 @@ export const transformTask = {
 
     // Collect all metadata
     const metadata: Record<string, any> = {};
+    
+    // Handle both attributes and values structures
+    const attrs = task.attributes || task.values || {};
+    
+    // Extract fields from values if present
+    if (task.values) {
+      // Common task fields that might be in values
+      const valueFields = ['name', 'status', 'due_date', 'assignee', 'priority', 'description'];
+      for (const field of valueFields) {
+        if (attrs[field]) {
+          const value = extractAttributeValue(attrs[field]);
+          if (value) {
+            metadata[field] = value;
+          }
+        }
+      }
+    }
 
     // Task status and completion
     if (task.status) {
@@ -163,7 +180,7 @@ export const transformTask = {
 
     return {
       ...searchResult,
-      metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+      data: Object.keys(metadata).length > 0 ? metadata : undefined,
     };
   },
 };

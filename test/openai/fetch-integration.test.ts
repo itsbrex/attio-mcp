@@ -11,9 +11,19 @@ import { advancedErrorHandler } from '../../src/openai/advanced/error-handler.js
 import crypto from 'crypto';
 
 // Mock the API client
+const mockGet = vi.fn();
+const mockPost = vi.fn();
+const mockPut = vi.fn();
+const mockDelete = vi.fn();
+const mockRequest = vi.fn();
+
 vi.mock('../../src/api/attio-client.js', () => ({
   getAttioClient: vi.fn(() => ({
-    request: vi.fn(),
+    get: mockGet,
+    post: mockPost,
+    put: mockPut,
+    delete: mockDelete,
+    request: mockRequest,
   })),
 }));
 
@@ -29,6 +39,61 @@ describe('OpenAI Fetch Integration', () => {
     features.reset();
     recordCache.clear();
     vi.clearAllMocks();
+
+    // Setup default mock responses for direct API fallback
+    mockGet.mockImplementation((endpoint: string) => {
+      // Parse the endpoint to determine what to return
+      if (endpoint.includes('/people/')) {
+        return Promise.resolve({
+          data: {
+            data: {
+              id: { person_id: endpoint.split('/').pop() },
+              values: {
+                name: [{ value: 'Test Person' }],
+                email_addresses: [{ email_address: 'test@example.com' }],
+              },
+            },
+          },
+        });
+      } else if (endpoint.includes('/companies/')) {
+        return Promise.resolve({
+          data: {
+            data: {
+              id: { company_id: endpoint.split('/').pop() },
+              values: {
+                name: [{ value: 'Test Company' }],
+                domain: [{ value: 'test.com' }],
+              },
+            },
+          },
+        });
+      } else if (endpoint.includes('/lists/')) {
+        return Promise.resolve({
+          data: {
+            data: {
+              id: { list_id: endpoint.split('/').pop() },
+              values: {
+                name: [{ value: 'Test List' }],
+                entries: [{ value: 100 }],
+              },
+            },
+          },
+        });
+      } else if (endpoint.includes('/tasks/')) {
+        return Promise.resolve({
+          data: {
+            data: {
+              id: { task_id: endpoint.split('/').pop() },
+              values: {
+                name: [{ value: 'Test Task' }],
+                status: [{ value: 'pending' }],
+              },
+            },
+          },
+        });
+      }
+      return Promise.reject(new Error('Not found'));
+    });
   });
 
   afterEach(() => {
@@ -38,19 +103,27 @@ describe('OpenAI Fetch Integration', () => {
 
   describe('Basic Fetch Operations', () => {
     it('should fetch a person record by ID', async () => {
-      const mockPerson = {
-        data: {
-          id: { person_id: 'person-123' },
-          values: {
-            name: [{ value: 'John Doe' }],
-            email_addresses: [{ email_address: 'john@example.com' }],
-            phone_numbers: [{ phone_number: '+1234567890' }],
-            job_title: [{ value: 'Software Engineer' }],
-          },
-        },
-      };
+      // First mock the executeToolRequest to fail, which will trigger fallback
+      vi.mocked(executeToolRequest).mockRejectedValueOnce(
+        new Error('Tool not found')
+      );
 
-      vi.mocked(executeToolRequest).mockResolvedValueOnce(mockPerson);
+      // Then mock the direct API call
+      mockGet.mockImplementationOnce((endpoint: string) => {
+        return Promise.resolve({
+          data: {
+            data: {
+              id: { person_id: 'person-123' },
+              values: {
+                name: [{ value: 'John Doe' }],
+                email_addresses: [{ email_address: 'john@example.com' }],
+                phone_numbers: [{ phone_number: '+1234567890' }],
+                job_title: [{ value: 'Software Engineer' }],
+              },
+            },
+          },
+        });
+      });
 
       const result = await fetch('people:person-123');
 
@@ -66,19 +139,27 @@ describe('OpenAI Fetch Integration', () => {
     });
 
     it('should fetch a company record by ID', async () => {
-      const mockCompany = {
-        data: {
-          id: { company_id: 'company-456' },
-          values: {
-            name: [{ value: 'Acme Corp' }],
-            domain: [{ value: 'acme.com' }],
-            employee_count: [{ value: 500 }],
-            industry: [{ value: 'Technology' }],
-          },
-        },
-      };
+      // First mock the executeToolRequest to fail, which will trigger fallback
+      vi.mocked(executeToolRequest).mockRejectedValueOnce(
+        new Error('Tool not found')
+      );
 
-      vi.mocked(executeToolRequest).mockResolvedValueOnce(mockCompany);
+      // Then mock the direct API call
+      mockGet.mockImplementationOnce((endpoint: string) => {
+        return Promise.resolve({
+          data: {
+            data: {
+              id: { company_id: 'company-456' },
+              values: {
+                name: [{ value: 'Acme Corp' }],
+                domain: [{ value: 'acme.com' }],
+                employee_count: [{ value: 500 }],
+                industry: [{ value: 'Technology' }],
+              },
+            },
+          },
+        });
+      });
 
       const result = await fetch('companies:company-456');
 

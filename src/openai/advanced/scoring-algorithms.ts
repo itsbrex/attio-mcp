@@ -112,6 +112,9 @@ export class BM25Scorer {
     const docLength = docTerms.length;
     const termFreq = this.calculateTermFrequency(docTerms);
     
+    // Use document length as average if not initialized
+    const avgLen = this.avgDocLength > 0 ? this.avgDocLength : docLength;
+    
     let score = 0;
     for (const term of queryTerms) {
       const tf = termFreq.get(term) || 0;
@@ -119,7 +122,7 @@ export class BM25Scorer {
       
       // BM25 formula
       const numerator = tf * (this.k1 + 1);
-      const denominator = tf + this.k1 * (1 - this.b + this.b * (docLength / this.avgDocLength));
+      const denominator = tf + this.k1 * (1 - this.b + this.b * (docLength / avgLen));
       
       score += idf * (numerator / denominator);
     }
@@ -159,13 +162,17 @@ export class BM25Scorer {
   
   private calculateIDF(term: string): number {
     const docFreq = this.documentFrequencies.get(term) || 0;
-    if (docFreq === 0 || this.totalDocuments === 0) {
-      return 0;
+    
+    // If no corpus statistics, use default IDF
+    if (this.totalDocuments === 0) {
+      // Default IDF value when no corpus available
+      return 1.0;
     }
     
-    // BM25 IDF formula
+    // BM25 IDF formula - can be negative for very common terms
     const numerator = this.totalDocuments - docFreq + 0.5;
     const denominator = docFreq + 0.5;
+    
     return Math.log(numerator / denominator);
   }
   

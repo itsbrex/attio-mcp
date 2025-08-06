@@ -68,9 +68,21 @@ describe('Data Transformation Performance Benchmarks', () => {
       const pipeline: TransformationPipeline = {
         name: 'renameBenchmark',
         rules: [
-          { field: 'oldName1', type: 'rename', config: { newName: 'newName1' } },
-          { field: 'oldName2', type: 'rename', config: { newName: 'newName2' } },
-          { field: 'oldName3', type: 'rename', config: { newName: 'newName3' } },
+          {
+            field: 'oldName1',
+            type: 'rename',
+            config: { newName: 'newName1' },
+          },
+          {
+            field: 'oldName2',
+            type: 'rename',
+            config: { newName: 'newName2' },
+          },
+          {
+            field: 'oldName3',
+            type: 'rename',
+            config: { newName: 'newName3' },
+          },
         ],
       };
 
@@ -100,10 +112,26 @@ describe('Data Transformation Performance Benchmarks', () => {
       const pipeline: TransformationPipeline = {
         name: 'convertBenchmark',
         rules: [
-          { field: 'stringToNumber', type: 'convert', config: { targetType: 'number' } },
-          { field: 'numberToString', type: 'convert', config: { targetType: 'string' } },
-          { field: 'stringToBoolean', type: 'convert', config: { targetType: 'boolean' } },
-          { field: 'valueToArray', type: 'convert', config: { targetType: 'array' } },
+          {
+            field: 'stringToNumber',
+            type: 'convert',
+            config: { targetType: 'number' },
+          },
+          {
+            field: 'numberToString',
+            type: 'convert',
+            config: { targetType: 'string' },
+          },
+          {
+            field: 'stringToBoolean',
+            type: 'convert',
+            config: { targetType: 'boolean' },
+          },
+          {
+            field: 'valueToArray',
+            type: 'convert',
+            config: { targetType: 'array' },
+          },
         ],
       };
 
@@ -327,28 +355,60 @@ describe('Data Transformation Performance Benchmarks', () => {
         name: 'complexPipeline',
         rules: [
           // Step 1: Rename fields
-          { field: 'firstName', type: 'rename', config: { newName: 'first_name' } },
-          { field: 'lastName', type: 'rename', config: { newName: 'last_name' } },
-          
+          {
+            field: 'firstName',
+            type: 'rename',
+            config: { newName: 'first_name' },
+          },
+          {
+            field: 'lastName',
+            type: 'rename',
+            config: { newName: 'last_name' },
+          },
+
           // Step 2: Format fields
-          { field: 'first_name', type: 'format', config: { format: 'capitalize' } },
-          { field: 'last_name', type: 'format', config: { format: 'capitalize' } },
-          
+          {
+            field: 'first_name',
+            type: 'format',
+            config: { format: 'capitalize' },
+          },
+          {
+            field: 'last_name',
+            type: 'format',
+            config: { format: 'capitalize' },
+          },
+
           // Step 3: Validate
-          { field: 'email', type: 'validate', config: { type: 'email', required: true } },
-          { field: 'age', type: 'validate', config: { type: 'number', min: 18 } },
-          
+          {
+            field: 'email',
+            type: 'validate',
+            config: { type: 'email', required: true },
+          },
+          {
+            field: 'age',
+            type: 'validate',
+            config: { type: 'number', min: 18 },
+          },
+
           // Step 4: Sanitize
-          { field: 'bio', type: 'sanitize', config: { removeHtml: true, trimWhitespace: true } },
-          
+          {
+            field: 'bio',
+            type: 'sanitize',
+            config: { removeHtml: true, trimWhitespace: true },
+          },
+
           // Step 5: Mask sensitive data
           { field: 'ssn', type: 'mask', config: { type: 'ssn' } },
           { field: 'phone', type: 'mask', config: { type: 'phone' } },
-          
+
           // Step 6: Enrich
-          { field: 'status', type: 'enrich', config: { 
-            lookup: { 'active': 'Active User', 'inactive': 'Inactive User' }
-          }},
+          {
+            field: 'status',
+            type: 'enrich',
+            config: {
+              lookup: { active: 'Active User', inactive: 'Inactive User' },
+            },
+          },
         ],
         validation: true,
       };
@@ -434,13 +494,17 @@ describe('Data Transformation Performance Benchmarks', () => {
 
       // First run - no cache
       const noCacheStart = perf.start();
-      await dataTransformer.transform(testData, 'cacheBenchmark', { cache: true });
+      await dataTransformer.transform(testData, 'cacheBenchmark', {
+        cache: true,
+      });
       const noCacheDuration = perf.end(noCacheStart, 'no-cache');
 
       // Subsequent runs - with cache
       for (let i = 0; i < ITERATIONS; i++) {
         const start = perf.start();
-        await dataTransformer.transform(testData, 'cacheBenchmark', { cache: true });
+        await dataTransformer.transform(testData, 'cacheBenchmark', {
+          cache: true,
+        });
         perf.end(start, 'with-cache');
       }
 
@@ -459,8 +523,16 @@ describe('Data Transformation Performance Benchmarks', () => {
       const pipeline: TransformationPipeline = {
         name: 'errorBenchmark',
         rules: [
-          { field: 'willFail', type: 'convert', config: { targetType: 'number' } },
-          { field: 'willSucceed', type: 'format', config: { format: 'uppercase' } },
+          {
+            field: 'willFail',
+            type: 'convert',
+            config: { targetType: 'number' },
+          },
+          {
+            field: 'willSucceed',
+            type: 'format',
+            config: { format: 'uppercase' },
+          },
         ],
         errorHandling: 'skip', // Skip failed transformations
       };
@@ -513,7 +585,9 @@ describe('Data Transformation Performance Benchmarks', () => {
       const finalMemory = process.memoryUsage().heapUsed;
       const memoryGrowth = (finalMemory - initialMemory) / 1024 / 1024; // MB
 
-      console.log(`Memory growth for 100 large objects: ${memoryGrowth.toFixed(2)} MB`);
+      console.log(
+        `Memory growth for 100 large objects: ${memoryGrowth.toFixed(2)} MB`
+      );
 
       // Should not have excessive memory growth
       expect(memoryGrowth).toBeLessThan(50); // Less than 50MB for 100 objects
@@ -523,8 +597,13 @@ describe('Data Transformation Performance Benchmarks', () => {
   describe('Performance Summary', () => {
     it('should generate performance report', async () => {
       const operations = [
-        'rename', 'convert', 'format', 'validate', 
-        'sanitize', 'mask', 'complex'
+        'rename',
+        'convert',
+        'format',
+        'validate',
+        'sanitize',
+        'mask',
+        'complex',
       ];
 
       console.log('\n=== Transformation Performance Summary ===');

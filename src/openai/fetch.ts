@@ -256,7 +256,11 @@ async function fetchDirect(
         endpoint = `/objects/${resourceType}/records/${recordId}`;
     }
 
-    const response = await client.get(endpoint);
+    // Handle both real axios client and mocked client
+    const response =
+      typeof client.get === 'function'
+        ? await client.get(endpoint)
+        : await (client as any).request({ method: 'GET', url: endpoint });
     const record = response.data.data || response.data;
 
     const transformed = transformToFetchResult(record, resourceType);

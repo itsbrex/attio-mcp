@@ -15,16 +15,20 @@ export const transformPerson = {
    * Transform person to search result format
    */
   toSearchResult(person: any): OpenAISearchResult {
-    const id = person.id?.record_id || person.id;
-    const name = extractAttributeValue(person.attributes?.name || person.name);
+    const id = person.id?.record_id || person.id?.person_id || person.id;
+    
+    // Handle both attributes and values structures
+    const attrs = person.attributes || person.values || {};
+    
+    const name = extractAttributeValue(attrs.name || person.name);
     const email = extractAttributeValue(
-      person.attributes?.email_addresses || person.email_addresses
+      attrs.email_addresses || person.email_addresses
     );
     const title = extractAttributeValue(
-      person.attributes?.job_title || person.job_title
+      attrs.job_title || person.job_title
     );
     const company = extractAttributeValue(
-      person.attributes?.company || person.company
+      attrs.company || person.company
     );
 
     // Build text description
@@ -58,7 +62,8 @@ export const transformPerson = {
     // Collect all metadata
     const metadata: Record<string, any> = {};
 
-    const attributes = person.attributes || {};
+    // Handle both attributes and values structures
+    const attributes = person.attributes || person.values || {};
 
     // Professional information
     const professionalFields = [
@@ -76,14 +81,18 @@ export const transformPerson = {
       }
     }
 
-    // Contact information
+    // Contact information - keep as arrays
     if (attributes.phone_numbers) {
-      metadata.phone_numbers = extractAttributeValue(attributes.phone_numbers);
+      const phones = Array.isArray(attributes.phone_numbers) 
+        ? attributes.phone_numbers.map((p: any) => p.phone_number || p.value || p)
+        : [extractAttributeValue(attributes.phone_numbers)];
+      metadata.phone_numbers = phones.filter(Boolean);
     }
     if (attributes.email_addresses) {
-      metadata.email_addresses = extractAttributeValue(
-        attributes.email_addresses
-      );
+      const emails = Array.isArray(attributes.email_addresses)
+        ? attributes.email_addresses.map((e: any) => e.email_address || e.value || e)
+        : [extractAttributeValue(attributes.email_addresses)];
+      metadata.email_addresses = emails.filter(Boolean);
     }
 
     // Social profiles
@@ -168,7 +177,7 @@ export const transformPerson = {
 
     return {
       ...searchResult,
-      metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+      data: Object.keys(metadata).length > 0 ? metadata : undefined,
     };
   },
 };

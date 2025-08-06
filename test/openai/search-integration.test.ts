@@ -3,12 +3,12 @@
  * Tests the search tool with advanced features and backward compatibility
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { search } from '../../src/openai/search.js';
+import crypto from 'crypto';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { features } from '../../src/config/features.js';
 import { searchCache } from '../../src/openai/advanced/cache.js';
-import { RelevanceScoring } from '../../src/openai/advanced/scoring.js';
-import crypto from 'crypto';
+import { RelevanceScorer } from '../../src/openai/advanced/relevance-scorer.js';
+import { search } from '../../src/openai/search.js';
 
 // Mock the tool dispatcher
 vi.mock('../../src/handlers/tools/dispatcher.js', () => ({
@@ -275,7 +275,12 @@ describe('OpenAI Search Integration', () => {
 
       vi.mocked(executeToolRequest).mockResolvedValueOnce(mockResults);
 
-      const scoring = new RelevanceScoring();
+      const scorer = new RelevanceScorer();
+      const results = await scorer.scoreResults(
+        mockResults.data,
+        'Johnathan Smith',
+        'people'
+      );
       const results = await search('Johnathan Smith', 'people');
 
       if (results.length > 0 && results[0].score) {

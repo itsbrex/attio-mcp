@@ -221,7 +221,7 @@ export class ABTestingManager extends EventEmitter {
 
     // Assign variant based on hash
     const variant = this.assignVariant(experiment, userId);
-    
+
     // Store assignment
     if (!userExperiments) {
       userExperiments = new Map();
@@ -244,7 +244,7 @@ export class ABTestingManager extends EventEmitter {
       .createHash('md5')
       .update(`${experiment.id}-${userId}`)
       .digest('hex');
-    
+
     // Convert hash to number between 0-100
     const hashNumber = parseInt(hash.substring(0, 8), 16);
     const percentage = (hashNumber % 10000) / 100;
@@ -356,16 +356,16 @@ export class ABTestingManager extends EventEmitter {
     const zScore = this.getZScore(confidenceLevel);
     const power = 0.8; // 80% power
     const zPower = this.getZScore(power);
-    
+
     // Assuming baseline conversion rate of 10%
     const p1 = 0.1;
     const p2 = p1 * (1 + minDetectableEffect);
     const pBar = (p1 + p2) / 2;
-    
+
     const sampleSize =
       (2 * Math.pow(zScore + zPower, 2) * pBar * (1 - pBar)) /
       Math.pow(p2 - p1, 2);
-    
+
     return Math.ceil(sampleSize);
   }
 
@@ -429,7 +429,8 @@ export class ABTestingManager extends EventEmitter {
       // Update metrics
       variant.metrics.pValue = pValue;
       variant.metrics.confidence = confidence;
-      variant.metrics.significant = confidence >= experiment.config.confidenceLevel;
+      variant.metrics.significant =
+        confidence >= experiment.config.confidenceLevel;
 
       variantResults.set(variant.id, variant.metrics);
 
@@ -465,7 +466,8 @@ export class ABTestingManager extends EventEmitter {
     variant_success: number,
     variant_failure: number
   ): number {
-    const total = control_success + control_failure + variant_success + variant_failure;
+    const total =
+      control_success + control_failure + variant_success + variant_failure;
     const row1 = control_success + control_failure;
     const row2 = variant_success + variant_failure;
     const col1 = control_success + variant_success;
@@ -479,10 +481,14 @@ export class ABTestingManager extends EventEmitter {
 
     // Chi-square statistic
     const chi2 =
-      Math.pow(control_success - expected_control_success, 2) / expected_control_success +
-      Math.pow(control_failure - expected_control_failure, 2) / expected_control_failure +
-      Math.pow(variant_success - expected_variant_success, 2) / expected_variant_success +
-      Math.pow(variant_failure - expected_variant_failure, 2) / expected_variant_failure;
+      Math.pow(control_success - expected_control_success, 2) /
+        expected_control_success +
+      Math.pow(control_failure - expected_control_failure, 2) /
+        expected_control_failure +
+      Math.pow(variant_success - expected_variant_success, 2) /
+        expected_variant_success +
+      Math.pow(variant_failure - expected_variant_failure, 2) /
+        expected_variant_failure;
 
     // Convert to p-value (simplified - use proper statistical library in production)
     // This is an approximation for df=1
@@ -531,8 +537,13 @@ export class ABTestingManager extends EventEmitter {
       }
     }
 
-    if (!hasWinner && experiment.currentSampleSize >= experiment.targetSampleSize) {
-      recommendations.push('No significant difference detected - consider stopping');
+    if (
+      !hasWinner &&
+      experiment.currentSampleSize >= experiment.targetSampleSize
+    ) {
+      recommendations.push(
+        'No significant difference detected - consider stopping'
+      );
     }
 
     return recommendations;
@@ -548,7 +559,7 @@ export class ABTestingManager extends EventEmitter {
 
     try {
       const result = this.calculateSignificance(experiment);
-      
+
       if (
         result.significant &&
         result.confidence >= experiment.config.autoStopSignificance
@@ -576,7 +587,7 @@ export class ABTestingManager extends EventEmitter {
     experiment.endDate = new Date();
 
     const result = this.calculateSignificance(experiment);
-    
+
     this.emit('experiment:completed', {
       experiment,
       result,
@@ -606,7 +617,8 @@ export class ABTestingManager extends EventEmitter {
         // Check for max duration
         if (experiment.startDate) {
           const daysRunning =
-            (Date.now() - experiment.startDate.getTime()) / (1000 * 60 * 60 * 24);
+            (Date.now() - experiment.startDate.getTime()) /
+            (1000 * 60 * 60 * 24);
           if (daysRunning > experiment.config.maxDuration) {
             this.stopExperiment(id);
           }

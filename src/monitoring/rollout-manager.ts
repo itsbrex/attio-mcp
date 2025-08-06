@@ -298,15 +298,13 @@ export class RolloutManager extends EventEmitter {
     this.emit('rollout:rollback', {
       feature: featureName,
       reason,
-      stage: rollout.currentStage >= 0 
-        ? rollout.stages[rollout.currentStage].name 
-        : 'pre-rollout',
+      stage:
+        rollout.currentStage >= 0
+          ? rollout.stages[rollout.currentStage].name
+          : 'pre-rollout',
     });
 
-    logError(
-      'RolloutManager',
-      `Rolled back feature ${featureName}: ${reason}`
-    );
+    logError('RolloutManager', `Rolled back feature ${featureName}: ${reason}`);
 
     return true;
   }
@@ -441,7 +439,10 @@ export class RolloutManager extends EventEmitter {
   /**
    * Apply rollout percentage to feature flags
    */
-  private applyRolloutPercentage(featureName: string, percentage: number): void {
+  private applyRolloutPercentage(
+    featureName: string,
+    percentage: number
+  ): void {
     // Simple hash-based rollout
     // In production, this would use user IDs or other stable identifiers
     const rolloutEnabled = Math.random() * 100 < percentage;
@@ -548,9 +549,15 @@ export class RolloutManager extends EventEmitter {
 
     // Log based on severity
     if (severity === 'critical' || severity === 'error') {
-      logError('RolloutManager', `[Alert] ${message} - ${feature}: ${value} > ${threshold}`);
+      logError(
+        'RolloutManager',
+        `[Alert] ${message} - ${feature}: ${value} > ${threshold}`
+      );
     } else {
-      warn('RolloutManager', `[Alert] ${message} - ${feature}: ${value} > ${threshold}`);
+      warn(
+        'RolloutManager',
+        `[Alert] ${message} - ${feature}: ${value} > ${threshold}`
+      );
     }
   }
 
