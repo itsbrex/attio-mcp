@@ -45,9 +45,9 @@ coverage-e2e/
 *.lcov
 
 .env.development
+.env.test
 .specstory
 .cursorindexingignore
-.env.test
 
 # Alternative tools (not used)
 biome.json
@@ -79,4 +79,4 @@ dev-debug.log
 
 # Task files
 tasks.json
-tasks/ 
+tasks/
