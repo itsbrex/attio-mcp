@@ -118,6 +118,7 @@
     "dotenv": "^16.5.0",
     "fast-safe-stringify": "^2.1.1",
     "handlebars": "^4.7.8",
+    "lru-cache": "^7.18.3",
     "ora": "^7.0.1",
     "rate-limiter-flexible": "^7.2.0",
     "safe-stable-stringify": "^2.5.0",
