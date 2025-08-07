@@ -1,0 +1,133 @@
+# OpenAI Directory Reorganization PRD
+
+## Project Overview
+Reorganize the src/openai/ directory structure to eliminate code duplication, resolve architectural conflicts, and integrate advanced features into the core system. Currently, advanced features are isolated in an "advanced/" subdirectory, creating maintenance overhead and confusing organization.
+
+## Current Problems
+1. **Duplicate Caching Systems**: Two cache implementations (cache.ts vs optimized-cache.ts) with the superior implementation hidden in "advanced"
+2. **Transformer Architecture Conflict**: Core transformers vs enhanced transformers with wrapper patterns instead of integration
+3. **Split Error Handling**: Error logic spread across error-handler.ts and error-recovery.ts
+4. **Data Transformation Complexity**: Overlapping functionality between data-transformer.ts and transformation-pipeline.ts
+5. **Import Dependency Issues**: Core files tightly coupled to "advanced/" folder, making features non-optional
+
+## Goals
+- Eliminate duplicate implementations
+- Integrate advanced features into core workflows
+- Create logical feature-based organization
+- Remove tight coupling between core and advanced modules
+- Improve discoverability and maintainability
+- Maintain backward compatibility where possible
+
+## Technical Requirements
+
+### Phase 1: Consolidate Duplicates
+1. **Unify Caching System**
+   - Replace basic cache with optimized implementation
+   - Create unified cache interface
+   - Export consistent cache instances
+   - Maintain existing cache API compatibility
+
+2. **Merge Error Handling**
+   - Combine error-handler.ts and error-recovery.ts
+   - Create single error handling API
+   - Preserve all error categorization and retry logic
+   - Maintain cache fallback functionality
+
+### Phase 2: Integrate Advanced Features  
+3. **Unified Transformation System**
+   - Move existing transformers to base/ subdirectory
+   - Integrate pipeline features into core transformer flow
+   - Resolve data-transformer vs transformation-pipeline overlap
+   - Make enhanced features part of standard transformation
+
+4. **Elevate Scoring System**
+   - Move scoring algorithms out of "advanced"
+   - Make relevance scoring a first-class feature
+   - Integrate with search functionality
+   - Provide clear configuration options
+
+### Phase 3: Clean Architecture
+5. **Restructure Directory Layout**
+   - Create feature-based folder structure (cache/, error/, transform/, scoring/)
+   - Remove "advanced/" folder entirely
+   - Update all import statements throughout codebase
+   - Create new unified index.ts
+
+6. **Update Core Integration**
+   - Modify fetch.ts and search.ts to use new module structure
+   - Remove advanced/ imports
+   - Use unified interfaces consistently
+   - Maintain existing API surface
+
+## File Structure Changes
+
+### Before (Current):
+```
+src/openai/
+├── fetch.ts, search.ts, types.ts, index.ts
+├── transformers/
+│   ├── companies.ts, people.ts, lists.ts, tasks.ts, generic.ts
+│   ├── enhanced-transformer.ts
+│   └── index.ts
+└── advanced/
+    ├── cache.ts, optimized-cache.ts
+    ├── error-handler.ts, error-recovery.ts  
+    ├── data-transformer.ts, transformation-pipeline.ts
+    ├── relevance-scorer.ts, scoring-algorithms.ts
+    ├── performance.ts
+    └── index.ts
+```
+
+### After (Target):
+```
+src/openai/
+├── api/
+│   ├── fetch.ts, search.ts
+├── cache/
+│   ├── interface.ts, memory-cache.ts, index.ts
+├── error/
+│   ├── handler.ts, categories.ts, index.ts
+├── transform/
+│   ├── base/ (companies.ts, people.ts, etc.)
+│   ├── pipelines/ (data-transformer.ts, workflow-manager.ts)
+│   ├── enhanced.ts, index.ts
+├── scoring/
+│   ├── algorithms.ts, relevance.ts, index.ts
+├── performance/
+│   ├── monitor.ts, optimization.ts, index.ts
+├── types.ts
+└── index.ts
+```
+
+## Testing Requirements
+- All existing functionality must continue to work
+- No breaking changes to public APIs
+- Comprehensive test coverage for refactored modules
+- Performance regression testing
+- Import statement validation
+
+## Success Criteria
+1. Zero duplicate implementations
+2. All advanced features integrated into core workflow
+3. Logical, discoverable module organization
+4. No breaking changes to existing APIs
+5. Improved code maintainability and clarity
+6. Elimination of "advanced/" namespace
+
+## Implementation Priority
+- High: Cache consolidation and error handling merge
+- Medium: Transformer integration and scoring elevation  
+- Low: Directory restructuring and performance optimization
+
+## Dependencies
+- Existing codebase understanding
+- Test suite validation
+- Import dependency mapping
+- Feature flag compatibility
+
+## Constraints
+- Must maintain backward compatibility
+- Cannot break existing tests during transition
+- Should minimize disruption to other development work
+- Must preserve all existing functionality
+

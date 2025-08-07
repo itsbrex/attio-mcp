@@ -1,0 +1,320 @@
+# Phase 2 Advanced Features Merge - Product Requirements Document
+
+## Executive Summary
+This PRD outlines the strategic merge of advanced Phase 2 features from the abandoned branch `claude/issue-2-20250804-0537` into the current main branch. The abandoned branch contains ~5000 lines of sophisticated implementation including caching, relevance scoring, and enhanced error handling that were never integrated. This merge will enhance the OpenAI connector's performance and search quality while maintaining 100% backward compatibility.
+
+## Current State Analysis
+
+### Existing Implementation (PR #7 - ~1575 lines)
+- Basic search functionality with simple query matching
+- Basic fetch functionality for retrieving records
+- Data transformers for different Attio object types
+- Simple type definitions
+- Direct API calls without caching
+- Basic error propagation
+
+### Abandoned Branch Features (~5000 lines)
+- **Advanced Caching System** (cache.ts): TTL management, hit tracking, memory optimization
+- **Relevance Scoring Algorithm** (relevance-scorer.ts): Sophisticated search result ranking
+- **Dedicated Error Handler** (error-handler.ts): Comprehensive error categorization and recovery
+- **SSE Integration Layer** (sse-integration.ts): Enhanced real-time communication
+- **Data Transformation Utilities** (data-transformer.ts): Complex data manipulation
+- **Comprehensive Test Suite**: Unit and integration tests for all components
+
+## Merge Strategy
+
+### Core Principle: Backward Compatibility First
+All existing APIs, interfaces, and behaviors must remain unchanged. New features will be additive enhancements that can be optionally enabled.
+
+### Architecture Approach
+1. **Adapter Pattern**: Wrap new features in adapters that preserve existing interfaces
+2. **Feature Flags**: Use configuration to enable/disable advanced features
+3. **Progressive Enhancement**: New features enhance but don't replace existing functionality
+4. **Deprecation Path**: Mark old implementations for future removal without breaking changes
+
+## Implementation Plan
+
+### Phase 1: Foundation Layer (Non-Breaking)
+1. **Directory Structure Enhancement**
+   - Create `src/openai/advanced/` for new features
+   - Keep existing files in `src/openai/` untouched
+   - Add feature configuration in `src/config/features.ts`
+
+2. **Configuration System**
+   ```typescript
+   interface FeatureFlags {
+     enableCache: boolean;           // Default: false
+     enableRelevanceScoring: boolean; // Default: false
+     enableAdvancedErrorHandling: boolean; // Default: false
+     enableSSEIntegration: boolean;   // Default: false
+   }
+   ```
+
+3. **Backward Compatibility Layer**
+   - Create proxy functions that route to old or new implementation based on config
+   - Ensure all existing function signatures remain unchanged
+   - Add optional parameters for new features without breaking existing calls
+
+### Phase 2: Cache System Integration
+1. **Cache Wrapper Implementation**
+   - Import cache.ts from abandoned branch
+   - Create CacheableSearch and CacheableFetch wrappers
+   - Preserve existing search/fetch behavior when cache disabled
+   - Add cache statistics and monitoring
+
+2. **Cache Configuration**
+   ```typescript
+   interface CacheConfig {
+     enabled: boolean;
+     ttl: number;        // Default: 5 minutes
+     maxSize: number;    // Default: 100MB
+     strategy: 'LRU' | 'LFU' | 'FIFO';
+   }
+   ```
+
+3. **API Enhancement (Non-Breaking)**
+   ```typescript
+   // Existing signature preserved
+   search(query: string, options?: SearchOptions): Promise<SearchResult>
+   
+   // Enhanced with optional cache control
+   interface SearchOptions {
+     // Existing options...
+     useCache?: boolean;      // New optional
+     cacheTTL?: number;       // New optional
+     forceRefresh?: boolean;  // New optional
+   }
+   ```
+
+### Phase 3: Relevance Scoring Integration
+1. **Scoring Module Import**
+   - Integrate relevance-scorer.ts as optional post-processor
+   - Apply scoring only when enabled via configuration
+   - Preserve original result order when disabled
+
+2. **Result Enhancement**
+   ```typescript
+   interface SearchResult {
+     // Existing fields...
+     relevanceScore?: number;  // New optional field
+     scoringDetails?: {        // New optional metadata
+       algorithm: string;
+       factors: Record<string, number>;
+     };
+   }
+   ```
+
+3. **Scoring Configuration**
+   ```typescript
+   interface ScoringConfig {
+     enabled: boolean;
+     algorithm: 'tfidf' | 'bm25' | 'semantic';
+     boostFactors: {
+       exactMatch: number;
+       fieldMatch: number;
+       recency: number;
+     };
+   }
+   ```
+
+### Phase 4: Advanced Error Handling
+1. **Error Handler Integration**
+   - Import error-handler.ts with categorization logic
+   - Wrap existing try-catch blocks with enhanced handler
+   - Preserve existing error formats for backward compatibility
+
+2. **Error Enhancement**
+   ```typescript
+   class EnhancedError extends Error {
+     category: 'network' | 'validation' | 'api' | 'internal';
+     retryable: boolean;
+     suggestedAction?: string;
+     originalError?: Error;  // Preserve original for compatibility
+   }
+   ```
+
+3. **Error Recovery Strategies**
+   - Automatic retry with exponential backoff
+   - Fallback to cached results when available
+   - Graceful degradation to basic functionality
+
+### Phase 5: SSE Integration Enhancement
+1. **SSE Layer Import**
+   - Integrate sse-integration.ts for real-time updates
+   - Maintain existing HTTP endpoints unchanged
+   - Add SSE as optional transport layer
+
+2. **Transport Selection**
+   ```typescript
+   interface TransportConfig {
+     primary: 'http' | 'sse';
+     fallback: 'http' | 'sse' | null;
+     sseEnabled: boolean;
+   }
+   ```
+
+### Phase 6: Testing & Validation
+1. **Test Suite Merge**
+   - Import all tests from abandoned branch
+   - Update tests to work with feature flags
+   - Add compatibility tests for backward compatibility
+   - Create integration tests for feature interactions
+
+2. **Test Coverage Requirements**
+   - Maintain 100% backward compatibility tests
+   - >90% coverage for new features
+   - Performance regression tests
+   - Load testing with cache enabled/disabled
+
+## Migration Path
+
+### For Existing Users (Zero Breaking Changes)
+1. Default configuration keeps all new features disabled
+2. Existing code continues to work without modification
+3. No changes to API contracts or response formats
+4. Performance characteristics remain unchanged
+
+### For Users Wanting Enhanced Features
+1. Enable features progressively via configuration
+2. Monitor performance improvements
+3. Adjust cache and scoring parameters
+4. Utilize new optional fields in responses
+
+### Rollback Strategy
+1. Feature flags allow instant disable of new features
+2. Separate code paths ensure clean rollback
+3. Cache can be cleared without affecting core functionality
+4. Monitoring to detect issues before full rollout
+
+## Risk Mitigation
+
+### Technical Risks
+1. **Memory Usage**: Cache system may increase memory footprint
+   - Mitigation: Configurable cache size limits, LRU eviction
+   
+2. **Performance Overhead**: Scoring algorithm may add latency
+   - Mitigation: Async scoring, optional enablement, caching scored results
+
+3. **Compatibility Issues**: New code may conflict with existing
+   - Mitigation: Separate namespaces, extensive testing, feature isolation
+
+### Implementation Risks
+1. **Code Complexity**: Merging 5000 lines increases maintenance burden
+   - Mitigation: Modular architecture, clear separation of concerns
+   
+2. **Testing Coverage**: Ensuring all paths tested
+   - Mitigation: Automated test generation, coverage requirements
+
+3. **Configuration Complexity**: Many new options to manage
+   - Mitigation: Sensible defaults, configuration validation, documentation
+
+## Success Metrics
+
+### Performance Improvements (with features enabled)
+- 50% reduction in API calls via caching
+- 30% improvement in search relevance via scoring
+- 25% reduction in error rates via enhanced handling
+- <100ms added latency for scoring
+
+### Compatibility Metrics
+- 0 breaking changes to existing APIs
+- 100% of existing tests pass unchanged
+- No performance degradation when features disabled
+- Backward compatibility maintained for 2+ years
+
+### Adoption Metrics
+- Progressive feature adoption over 6 months
+- Documentation completeness score >95%
+- Developer satisfaction score >4.5/5
+- Support ticket reduction by 20%
+
+## Implementation Timeline
+
+### Week 1-2: Foundation & Setup
+- Set up directory structure
+- Implement configuration system
+- Create compatibility layer
+- Import and adapt cache.ts
+
+### Week 3-4: Cache Integration
+- Integrate cache with search/fetch
+- Add cache management endpoints
+- Implement cache statistics
+- Testing and optimization
+
+### Week 5-6: Relevance Scoring
+- Import and adapt scoring algorithm
+- Integrate with search results
+- Add scoring configuration
+- Performance optimization
+
+### Week 7-8: Error Handling & SSE
+- Enhance error handling system
+- Integrate SSE layer
+- Add retry mechanisms
+- Complete integration testing
+
+### Week 9-10: Testing & Documentation
+- Complete test suite merge
+- Write migration guide
+- Update API documentation
+- Performance benchmarking
+
+### Week 11-12: Rollout & Monitoring
+- Staged rollout with feature flags
+- Monitor performance metrics
+- Gather user feedback
+- Final adjustments
+
+## Dependencies and Prerequisites
+
+### Technical Dependencies
+- Node.js 18+ (for advanced async features)
+- Redis (optional, for distributed cache)
+- TypeScript 5.0+ (for latest type features)
+
+### Code Dependencies
+- Access to abandoned branch code
+- Current test infrastructure
+- CI/CD pipeline updates
+- Monitoring system integration
+
+### Resource Requirements
+- 2 senior developers for 12 weeks
+- QA engineer for weeks 7-12
+- Technical writer for documentation
+- DevOps for deployment and monitoring
+
+## Appendix: Detailed File Mapping
+
+### Files to Import from Abandoned Branch
+```
+src/openai/cache.ts -> src/openai/advanced/cache.ts
+src/openai/relevance-scorer.ts -> src/openai/advanced/relevance-scorer.ts
+src/openai/error-handler.ts -> src/openai/advanced/error-handler.ts
+src/openai/sse-integration.ts -> src/openai/advanced/sse-integration.ts
+src/openai/data-transformer.ts -> src/openai/advanced/data-transformer.ts
+```
+
+### Compatibility Wrapper Structure
+```
+src/openai/compat/
+├── search-wrapper.ts    # Routes to basic or advanced search
+├── fetch-wrapper.ts     # Routes to basic or advanced fetch
+├── error-wrapper.ts     # Wraps errors in compatible format
+└── config-loader.ts     # Loads and validates configuration
+```
+
+### Configuration File Structure
+```
+config/
+├── default.json         # Default configuration (all features disabled)
+├── features.json        # Feature flag definitions
+├── cache.json          # Cache-specific configuration
+├── scoring.json        # Relevance scoring configuration
+└── migration.json      # Migration path configuration
+```
+
+## Conclusion
+
+This merge strategy ensures that the valuable work in the abandoned branch is not lost while maintaining absolute backward compatibility. The phased approach allows for careful integration and testing, while feature flags provide a safety net for production deployment. The end result will be a more powerful and efficient OpenAI connector that serves both existing users and those seeking advanced functionality.

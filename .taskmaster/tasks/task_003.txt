@@ -1,0 +1,11 @@
+# Task ID: 3
+# Title: Security Middleware Layer
+# Status: pending
+# Dependencies: 1
+# Priority: high
+# Description: Implement comprehensive security middleware with threat detection and protection mechanisms
+# Details:
+Configure helmet.js for security headers (CSP, CORS, XSS protection). Implement express-rate-limit with 60 requests/minute per user limit. Add input sanitization, prompt injection detection, and data exfiltration prevention. Configure CORS policies, session timeout (30 minutes idle), and request size limits (1MB max). Implement security event logging and threat pattern detection.
+
+# Test Strategy:
+Security tests for all protection mechanisms. Rate limiting tests with various attack patterns. Input validation tests for XSS, injection attacks. CORS policy verification tests.

@@ -1,0 +1,11 @@
+# Task ID: 4
+# Title: Dynamic Client Registration
+# Status: pending
+# Dependencies: 1, 2
+# Priority: medium
+# Description: Implement OAuth 2.0 dynamic client registration with proper validation and security
+# Details:
+Create /oauth/register endpoint following RFC 7591 for dynamic client registration. Implement client metadata validation, redirect URI whitelist verification, and client type validation (public/confidential). Store client registrations with encrypted client secrets and support client credential rotation. Implement client authentication methods including client_secret_post, client_secret_basic, and private_key_jwt.
+
+# Test Strategy:
+Integration tests for client registration flows. Validation tests for client metadata and redirect URIs. Security tests for client secret protection and rotation.

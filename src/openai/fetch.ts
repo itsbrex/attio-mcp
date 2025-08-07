@@ -8,6 +8,9 @@ import { executeToolRequest } from '../handlers/tools/dispatcher.js';
 import { debug, warn } from '../utils/logger.js';
 import { transformToFetchResult } from './transformers/index.js';
 import type { OpenAIFetchResult, SupportedAttioType } from './types.js';
+import { recordCache, features } from './advanced/index.js';
+import { withErrorHandling } from './advanced/error-recovery.js';
+import crypto from 'crypto';
 
 /**
  * Fetch detailed information for a specific record
@@ -21,23 +24,45 @@ export async function fetch(id: string): Promise<OpenAIFetchResult> {
 
   debug('OpenAI', 'Fetching record with ID', { id }, 'fetch');
 
+  // Generate cache key for this fetch
+  const cacheKey = `fetch:${crypto.createHash('md5').update(id).digest('hex')}`;
+
+  // Check cache if enabled
+  if (features.isEnabled('enableCache')) {
+    const cachedResult = recordCache.get(cacheKey);
+    if (cachedResult) {
+      debug('OpenAI', 'Cache hit for fetch', { id, cacheKey }, 'fetch');
+      return cachedResult as OpenAIFetchResult;
+    }
+    debug('OpenAI', 'Cache miss for fetch', { id, cacheKey }, 'fetch');
+  }
+
   // Parse the ID to determine resource type
   const { resourceType, recordId } = parseRecordId(id);
 
   try {
-    // Use the universal get-record-details tool
-    const request = {
-      method: 'tools/call' as const,
-      params: {
-        name: 'get-record-details',
-        arguments: {
-          resource_type: resourceType,
-          record_id: recordId,
-        },
+    // Use the universal get-record-details tool with error handling
+    const result = await withErrorHandling(
+      async () => {
+        const request = {
+          method: 'tools/call' as const,
+          params: {
+            name: 'get-record-details',
+            arguments: {
+              resource_type: resourceType,
+              record_id: recordId,
+            },
+          },
+        };
+        return executeToolRequest(request);
       },
-    };
-
-    const result = await executeToolRequest(request);
+      {
+        operationName: `fetch-${resourceType}`,
+        cacheKey,
+        cache: 'record',
+        context: { resourceType, recordId },
+      }
+    );
 
     if (result.toolResult?.type === 'text') {
       // Parse the detailed response
@@ -61,7 +86,15 @@ export async function fetch(id: string): Promise<OpenAIFetchResult> {
         },
       };
 
-      const detailsResult = await executeToolRequest(detailsRequest);
+      const detailsResult = await withErrorHandling(
+        async () => executeToolRequest(detailsRequest),
+        {
+          operationName: `fetch-details-${resourceType}`,
+          cacheKey: `${cacheKey}:details`,
+          cache: 'record',
+          context: { resourceType, recordId, infoType: 'full' },
+        }
+      );
 
       if (detailsResult.toolResult?.type === 'text') {
         const additionalDetails = parseDetailResponse(
@@ -76,6 +109,12 @@ export async function fetch(id: string): Promise<OpenAIFetchResult> {
       // Transform to OpenAI format
       const transformed = transformToFetchResult(record, resourceType);
       if (transformed) {
+        // Cache result if enabled
+        if (features.isEnabled('enableCache')) {
+          recordCache.set(cacheKey, transformed);
+          debug('OpenAI', 'Cached fetch result', { id, cacheKey }, 'fetch');
+        }
+
         debug('OpenAI', 'Successfully fetched record', { id }, 'fetch');
         return transformed;
       }
@@ -90,7 +129,20 @@ export async function fetch(id: string): Promise<OpenAIFetchResult> {
       { resourceType, recordId },
       'fetch'
     );
-    return fetchDirect(resourceType, recordId);
+    const result = await fetchDirect(resourceType, recordId);
+
+    // Cache fallback result if enabled
+    if (features.isEnabled('enableCache')) {
+      recordCache.set(cacheKey, result);
+      debug(
+        'OpenAI',
+        'Cached fallback fetch result',
+        { id, cacheKey },
+        'fetch'
+      );
+    }
+
+    return result;
   }
 }
 
@@ -204,7 +256,11 @@ async function fetchDirect(
         endpoint = `/objects/${resourceType}/records/${recordId}`;
     }
 
-    const response = await client.get(endpoint);
+    // Handle both real axios client and mocked client
+    const response =
+      typeof client.get === 'function'
+        ? await client.get(endpoint)
+        : await (client as any).request({ method: 'GET', url: endpoint });
     const record = response.data.data || response.data;
 
     const transformed = transformToFetchResult(record, resourceType);

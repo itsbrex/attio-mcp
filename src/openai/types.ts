@@ -29,7 +29,9 @@ export interface OpenAIFetchResult {
   text: string;
   /** URL or reference link for the record */
   url: string;
-  /** Optional metadata for additional information */
+  /** Optional data for additional information */
+  data?: Record<string, any>;
+  /** Optional metadata for additional information (backward compatibility) */
   metadata?: Record<string, any>;
 }
 

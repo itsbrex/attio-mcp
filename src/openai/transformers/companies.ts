@@ -15,15 +15,19 @@ export const transformCompany = {
    * Transform company to search result format
    */
   toSearchResult(company: any): OpenAISearchResult {
-    const id = company.id?.record_id || company.id;
+    const id = company.id?.record_id || company.id?.company_id || company.id;
+    
+    // Handle both attributes and values structures
+    const attrs = company.attributes || company.values || {};
+    
     const name = extractAttributeValue(
-      company.attributes?.name || company.name
+      attrs.name || company.name
     );
     const domain = extractAttributeValue(
-      company.attributes?.domains || company.domains
+      attrs.domains || attrs.domain || company.domains || company.domain
     );
     const description = extractAttributeValue(
-      company.attributes?.description || company.description
+      attrs.description || company.description
     );
 
     // Build text from multiple fields
@@ -59,8 +63,8 @@ export const transformCompany = {
     // Collect all metadata
     const metadata: Record<string, any> = {};
 
-    // Basic info
-    const attributes = company.attributes || {};
+    // Basic info - handle both attributes and values structures
+    const attributes = company.attributes || company.values || {};
 
     // Contact information
     if (attributes.phone_numbers) {
@@ -70,6 +74,12 @@ export const transformCompany = {
       metadata.email_addresses = extractAttributeValue(
         attributes.email_addresses
       );
+    }
+
+    // Add domain if available
+    const domain = extractAttributeValue(attributes.domain || attributes.domains);
+    if (domain) {
+      metadata.domain = domain;
     }
 
     // Business information
@@ -151,7 +161,7 @@ export const transformCompany = {
 
     return {
       ...searchResult,
-      metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+      data: Object.keys(metadata).length > 0 ? metadata : undefined,
     };
   },
 };

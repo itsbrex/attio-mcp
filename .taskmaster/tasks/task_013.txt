@@ -1,0 +1,11 @@
+# Task ID: 13
+# Title: API Documentation Generation
+# Status: pending
+# Dependencies: 9
+# Priority: medium
+# Description: Create comprehensive API reference documentation with interactive examples
+# Details:
+Use OpenAPI 3.0 specification with Swagger UI for interactive documentation. Document all OAuth endpoints, request/response schemas, and error codes. Include authentication examples, PKCE flow diagrams, and integration guides. Implement automated documentation generation from code comments. Create Postman collections and curl examples for all endpoints.
+
+# Test Strategy:
+Validate documentation accuracy against actual API behavior. Test interactive examples and code samples. Ensure documentation stays current with API changes.

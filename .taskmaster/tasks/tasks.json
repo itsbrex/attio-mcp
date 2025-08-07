@@ -1,0 +1,1648 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "OAuth 2.0 Server Core Implementation",
+        "description": "Implement the foundational OAuth 2.0 authorization server with PKCE support using industry-standard libraries",
+        "details": "Use passport-oauth2 v1.5.0+ with PKCE support and openid-client for OAuth handshake. Implement authorization endpoint (/oauth/authorize), token exchange endpoint (/oauth/token), and PKCE flow with S256 code challenge method. Configure Express middleware with helmet for security headers, express-rate-limit for protection, and ensure TLS 1.2+ for all connections. Store configuration in environment variables and implement OAuth 2.0 RFC 6749 compliance with PKCE RFC 7636.",
+        "testStrategy": "Unit tests for OAuth endpoints using Jest and Supertest. Mock OAuth2 server setup for testing authorization flows. Verify PKCE code verifier/challenge generation and validation. Test authorization code exchange and token validation.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up OAuth 2.0 server foundation",
+            "description": "Install and configure node-oauth2-server or similar library, set up basic Express endpoints for authorization flow",
+            "details": "- Install OAuth2 server library (node-oauth2-server recommended)\n- Configure Express app with OAuth middleware\n- Set up basic /oauth/authorize endpoint\n- Set up basic /oauth/token endpoint\n- Configure OAuth server options (grant types, token expiry)",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 1
+          },
+          {
+            "id": 2,
+            "title": "Implement PKCE (Proof Key for Code Exchange)",
+            "description": "Add PKCE support for enhanced security in the authorization code flow",
+            "details": "- Generate code_verifier and code_challenge\n- Store code_verifier with authorization code\n- Validate code_verifier on token exchange\n- Implement S256 challenge method\n- Add PKCE parameter validation",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 1
+          },
+          {
+            "id": 3,
+            "title": "Create authorization code generation and validation",
+            "description": "Implement secure authorization code generation, storage, and validation logic",
+            "details": "- Generate cryptographically secure authorization codes\n- Implement temporary code storage (in-memory or Redis)\n- Set code expiration (10 minutes)\n- Validate codes on token exchange\n- Implement one-time use enforcement",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 1
+          },
+          {
+            "id": 4,
+            "title": "Implement client validation and redirect URI verification",
+            "description": "Add secure client authentication and redirect URI validation to prevent authorization code interception",
+            "details": "- Validate client_id and client_secret\n- Implement redirect URI whitelist validation\n- Prevent open redirect vulnerabilities\n- Add state parameter validation\n- Implement nonce for replay attack prevention",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 1
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Token Management System",
+        "description": "Implement secure token generation, validation, storage, and lifecycle management",
+        "details": "Implement JWT-based access tokens with 1-hour expiry and refresh tokens with 30-day expiry. Use AES-256 encryption for token storage with Redis/in-memory store for session management. Support token scopes (read, write, admin) and implement token revocation endpoint (/oauth/revoke). Use asymmetric cryptography (RS256) for token signing and validation. Implement automatic token rotation and cleanup mechanisms.",
+        "testStrategy": "Unit tests for token generation, validation, and expiry handling. Integration tests for token refresh flows. Security tests for token encryption/decryption. Performance tests for token validation under load.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement JWT token generation",
+            "description": "Create secure JWT access and refresh token generation with proper claims and signatures",
+            "details": "- Set up JWT library (jsonwebtoken)\n- Generate RSA or ECDSA key pairs for signing\n- Create access tokens with 1-hour expiry\n- Create refresh tokens with 30-day expiry\n- Include proper claims (sub, iat, exp, scope)",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 2
+          },
+          {
+            "id": 2,
+            "title": "Create secure token storage",
+            "description": "Implement encrypted token storage with Redis or in-memory store for session management",
+            "details": "- Set up Redis connection or in-memory store\n- Implement AES-256 encryption for stored tokens\n- Create token indexing by user_id and client_id\n- Implement token cleanup for expired tokens\n- Add token versioning support",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 2
+          },
+          {
+            "id": 3,
+            "title": "Implement token refresh mechanism",
+            "description": "Create secure token refresh flow with rotation and revocation support",
+            "details": "- Validate refresh tokens on /oauth/token endpoint\n- Implement refresh token rotation\n- Revoke old refresh tokens after use\n- Maintain refresh token family detection\n- Add rate limiting for refresh requests",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 2
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Security Middleware Layer",
+        "description": "Implement comprehensive security middleware with threat detection and protection mechanisms",
+        "details": "Configure helmet.js for security headers (CSP, CORS, XSS protection). Implement express-rate-limit with 60 requests/minute per user limit. Add input sanitization, prompt injection detection, and data exfiltration prevention. Configure CORS policies, session timeout (30 minutes idle), and request size limits (1MB max). Implement security event logging and threat pattern detection.",
+        "testStrategy": "Security tests for all protection mechanisms. Rate limiting tests with various attack patterns. Input validation tests for XSS, injection attacks. CORS policy verification tests.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Dynamic Client Registration",
+        "description": "Implement OAuth 2.0 dynamic client registration with proper validation and security",
+        "details": "Create /oauth/register endpoint following RFC 7591 for dynamic client registration. Implement client metadata validation, redirect URI whitelist verification, and client type validation (public/confidential). Store client registrations with encrypted client secrets and support client credential rotation. Implement client authentication methods including client_secret_post, client_secret_basic, and private_key_jwt.",
+        "testStrategy": "Integration tests for client registration flows. Validation tests for client metadata and redirect URIs. Security tests for client secret protection and rotation.",
+        "priority": "medium",
+        "dependencies": [
+          1,
+          2
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Audit Logging System",
+        "description": "Implement comprehensive audit logging with structured logging and security event tracking",
+        "details": "Configure Winston logger with JSON structured logging format. Implement Morgan middleware for HTTP request logging integrated with Winston. Create audit log schemas for security events, access patterns, OAuth flows, and API usage. Configure log rotation, retention policies, and secure log storage. Implement log correlation IDs and user activity tracking.",
+        "testStrategy": "Unit tests for log generation and formatting. Integration tests for log correlation across requests. Security tests for sensitive data redaction in logs.",
+        "priority": "medium",
+        "dependencies": [
+          3
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "Attio API Integration Layer",
+        "description": "Integrate OAuth authentication with existing Attio API key system and implement request routing",
+        "details": "Create middleware to convert OAuth tokens to Attio API keys. Implement request queuing and batch operations to handle Attio API rate limits. Add caching layer for frequently accessed data with TTL management. Configure connection pooling and implement retry logic with exponential backoff. Monitor API usage patterns and implement circuit breaker pattern for resilience.",
+        "testStrategy": "Integration tests for OAuth-to-API-key conversion. Load tests for API rate limit handling. Cache effectiveness tests and circuit breaker validation tests.",
+        "priority": "medium",
+        "dependencies": [
+          2,
+          3
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "Session Management Backend",
+        "description": "Implement secure session management with Redis backend and timeout handling",
+        "details": "Configure Redis for session storage with encryption at rest. Implement session timeout management (30 minutes idle) and automatic cleanup. Create session validation middleware and concurrent session limiting. Implement session security features including IP validation and user agent checking. Configure session data encryption and secure cookie settings (httpOnly, secure, sameSite).",
+        "testStrategy": "Unit tests for session creation, validation, and cleanup. Integration tests with Redis backend. Security tests for session hijacking protection.",
+        "priority": "medium",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 8,
+        "title": "Unit Test Suite Implementation",
+        "description": "Develop comprehensive unit tests achieving >80% code coverage across all modules",
+        "details": "Use Jest testing framework with Supertest for HTTP endpoint testing. Implement test coverage tracking with Istanbul/nyc. Create unit tests for OAuth flows, token management, security middleware, and utility functions. Use mock-oauth2-server for OAuth flow testing. Implement test fixtures, mocks, and test data generators. Configure CI pipeline integration for automated testing.",
+        "testStrategy": "Achieve >80% code coverage. Include boundary condition testing, error path testing, and mock validation. Implement parallel test execution and test result reporting.",
+        "priority": "high",
+        "dependencies": [
+          1,
+          2,
+          3
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 9,
+        "title": "Integration Test Suite",
+        "description": "Create comprehensive integration tests for complete OAuth flows and system interactions",
+        "details": "Implement end-to-end OAuth 2.0 flows testing including authorization code flow with PKCE. Test dynamic client registration workflows and token refresh mechanisms. Create integration tests for Attio API interactions and security middleware integration. Test session management across multiple requests and user scenarios. Implement database transaction testing and rollback mechanisms.",
+        "testStrategy": "Full OAuth flow validation from authorization to token usage. Multi-user concurrent session testing. API integration testing with rate limiting scenarios.",
+        "priority": "high",
+        "dependencies": [
+          4,
+          5,
+          6,
+          7
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create OAuth flow integration tests",
+            "description": "Develop comprehensive tests for complete OAuth authorization and token flows",
+            "details": "- Test authorization code flow end-to-end\n- Test PKCE flow with code challenges\n- Test token refresh flow\n- Test error handling scenarios\n- Test redirect URI validation",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 9
+          },
+          {
+            "id": 2,
+            "title": "Test ChatGPT connector integration",
+            "description": "Create integration tests for SSE transport and OpenAI tool execution",
+            "details": "- Test SSE connection establishment\n- Test OpenAI tool invocation through SSE\n- Test message wrapping and unwrapping\n- Test error propagation through SSE\n- Test connection recovery and reconnection",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 9
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Security Penetration Testing",
+        "description": "Conduct comprehensive security testing including vulnerability assessment and threat modeling",
+        "details": "Implement automated security testing using OWASP ZAP or similar tools. Test for OAuth-specific vulnerabilities including authorization code interception, CSRF attacks, and redirect URI manipulation. Perform rate limiting bypass testing and input validation fuzzing. Test for XSS, injection attacks, and authentication bypasses. Implement security regression testing and vulnerability scanning in CI pipeline.",
+        "testStrategy": "Automated vulnerability scanning, manual penetration testing, and security code review. Test OAuth 2.0 specific attack vectors and common web vulnerabilities.",
+        "priority": "high",
+        "dependencies": [
+          8,
+          9
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Perform OWASP security testing",
+            "description": "Conduct OWASP Top 10 vulnerability assessment and compliance testing",
+            "details": "- Test for injection vulnerabilities (SQL, NoSQL, Command)\n- Test for broken authentication scenarios\n- Test for sensitive data exposure\n- Test for XXE and insecure deserialization\n- Test for broken access control\n- Run OWASP ZAP automated scanning",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 10
+          },
+          {
+            "id": 2,
+            "title": "Test prompt injection prevention",
+            "description": "Validate security measures against prompt injection and data exfiltration attacks",
+            "details": "- Test common prompt injection patterns\n- Test system prompt override attempts\n- Test data exfiltration vectors\n- Test input sanitization effectiveness\n- Test output filtering mechanisms\n- Create prompt injection test suite",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 10
+          },
+          {
+            "id": 3,
+            "title": "Perform OAuth security audit",
+            "description": "Conduct thorough security audit of OAuth implementation against RFC standards",
+            "details": "- Audit authorization code interception prevention\n- Test PKCE implementation correctness\n- Validate token entropy and unpredictability\n- Test token leakage scenarios\n- Audit refresh token rotation security\n- Test rate limiting effectiveness",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 10
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Performance Monitoring Implementation",
+        "description": "Implement comprehensive performance monitoring with OpenTelemetry, Prometheus, and Grafana",
+        "details": "Configure OpenTelemetry for trace collection and metric export. Set up Prometheus for metric storage with express-prom-bundle middleware. Implement Grafana dashboards for request latency, throughput, error rates, and system health. Configure alerting rules for performance thresholds and SLA monitoring. Implement custom metrics for OAuth flows, token operations, and API usage patterns.",
+        "testStrategy": "Verify metric collection accuracy and dashboard functionality. Test alerting thresholds and notification systems. Load testing for performance baseline establishment.",
+        "priority": "medium",
+        "dependencies": [
+          6
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 12,
+        "title": "Performance Benchmarking and Optimization",
+        "description": "Establish performance baselines and optimize system for production load requirements",
+        "details": "Implement load testing framework using Artillery or k6. Establish performance baselines for OAuth flow completion (<3s), token validation (<100ms), and API response times (<500ms p95). Optimize database queries, implement connection pooling, and configure caching strategies. Implement horizontal scaling architecture and load balancer configuration. Optimize memory usage and garbage collection tuning.",
+        "testStrategy": "Load testing up to 1000+ concurrent users. Performance regression testing. Memory leak detection and resource utilization monitoring.",
+        "priority": "medium",
+        "dependencies": [
+          11
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 13,
+        "title": "API Documentation Generation",
+        "description": "Create comprehensive API reference documentation with interactive examples",
+        "details": "Use OpenAPI 3.0 specification with Swagger UI for interactive documentation. Document all OAuth endpoints, request/response schemas, and error codes. Include authentication examples, PKCE flow diagrams, and integration guides. Implement automated documentation generation from code comments. Create Postman collections and curl examples for all endpoints.",
+        "testStrategy": "Validate documentation accuracy against actual API behavior. Test interactive examples and code samples. Ensure documentation stays current with API changes.",
+        "priority": "medium",
+        "dependencies": [
+          9
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 14,
+        "title": "Docker Containerization",
+        "description": "Create production-ready Docker containers with security hardening and optimization",
+        "details": "Create multi-stage Dockerfile using Node.js Alpine base image for minimal attack surface. Implement non-root user execution, secret management, and environment variable handling. Configure health checks, resource limits, and graceful shutdown handling. Create docker-compose configuration for development and production environments including Redis, monitoring stack, and load balancer.",
+        "testStrategy": "Container security scanning with tools like Trivy. Test container startup, health checks, and graceful shutdown. Validate resource usage and performance in containerized environment.",
+        "priority": "medium",
+        "dependencies": [
+          12
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 15,
+        "title": "Cloud Deployment Templates",
+        "description": "Create deployment templates and configurations for major cloud platforms",
+        "details": "Create Kubernetes manifests with Helm charts for container orchestration. Implement Terraform templates for AWS, Azure, and GCP deployments. Configure auto-scaling, load balancing, and service mesh integration. Create CI/CD pipeline configurations for GitHub Actions, GitLab CI, and Jenkins. Implement infrastructure as code with environment-specific configurations.",
+        "testStrategy": "Validate deployment templates across different cloud providers. Test auto-scaling and failover mechanisms. Verify CI/CD pipeline functionality and rollback procedures.",
+        "priority": "low",
+        "dependencies": [
+          14
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create AWS deployment templates",
+            "description": "Develop CloudFormation or Terraform templates for AWS deployment",
+            "details": "- Create ECS/Fargate task definitions\n- Configure Application Load Balancer\n- Set up RDS or ElastiCache for session storage\n- Configure CloudWatch monitoring\n- Create IAM roles and policies\n- Set up Secrets Manager for credentials",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 15
+          },
+          {
+            "id": 2,
+            "title": "Create Kubernetes deployment manifests",
+            "description": "Develop Kubernetes manifests and Helm charts for container orchestration",
+            "details": "- Create Deployment and Service manifests\n- Configure Ingress with TLS termination\n- Set up ConfigMaps and Secrets\n- Create Horizontal Pod Autoscaler\n- Configure resource limits and requests\n- Create Helm chart for templating",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 15
+          }
+        ]
+      },
+      {
+        "id": 16,
+        "title": "Security Configuration Guide",
+        "description": "Create comprehensive security configuration and deployment guide",
+        "details": "Document OAuth 2.0 security best practices and configuration recommendations. Create security checklist for production deployment including TLS configuration, secret management, and access controls. Document threat model, security architecture, and incident response procedures. Include compliance considerations (SOC2, GDPR, etc.) and security audit guidelines.",
+        "testStrategy": "Validate security configurations against industry standards. Test security guide completeness through third-party security review. Verify compliance requirement coverage.",
+        "priority": "high",
+        "dependencies": [
+          10,
+          13
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 17,
+        "title": "User Guides and Tutorials",
+        "description": "Create comprehensive user documentation including quick start guides and tutorials",
+        "details": "Create quick start guide for ChatGPT integration setup. Develop step-by-step tutorials for OAuth flow implementation and client registration. Include troubleshooting guide with common issues and solutions. Create video tutorials and interactive demos. Implement feedback collection system for documentation improvement.",
+        "testStrategy": "User testing of documentation with different user personas. Validate tutorial completeness and accuracy. Test troubleshooting guide effectiveness.",
+        "priority": "medium",
+        "dependencies": [
+          13,
+          16
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 18,
+        "title": "Monitoring and Alerting Setup",
+        "description": "Configure comprehensive monitoring, alerting, and observability for production operations",
+        "details": "Configure Prometheus alerting rules for system health, performance thresholds, and security events. Set up Grafana alert notifications via email, Slack, and PagerDuty. Implement log aggregation with ELK stack or similar. Configure uptime monitoring and SLA tracking. Create runbooks for common operational scenarios and incident response procedures.",
+        "testStrategy": "Test all alert conditions and notification channels. Validate monitoring coverage and false positive rates. Test incident response procedures and runbook accuracy.",
+        "priority": "medium",
+        "dependencies": [
+          11,
+          15
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 19,
+        "title": "Backup and Recovery Procedures",
+        "description": "Implement comprehensive backup and disaster recovery procedures",
+        "details": "Implement automated backup procedures for session data, client registrations, and audit logs. Configure database backup and restore procedures with point-in-time recovery. Create disaster recovery plan with RTO/RPO objectives. Implement backup verification and restoration testing procedures. Configure cross-region backup replication for high availability.",
+        "testStrategy": "Regular backup and restore testing. Disaster recovery scenario testing. Data integrity verification after restore operations.",
+        "priority": "medium",
+        "dependencies": [
+          14,
+          18
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 20,
+        "title": "Production Deployment and Validation",
+        "description": "Execute production deployment with comprehensive validation and rollback procedures",
+        "details": "Execute phased production deployment with blue-green deployment strategy. Perform comprehensive production validation including OAuth flows, performance benchmarks, and security verification. Configure production monitoring and establish baseline metrics. Execute ChatGPT platform integration testing and validation. Implement rollback procedures and contingency plans.",
+        "testStrategy": "Full production environment testing including load testing, security validation, and integration testing. Monitor system behavior post-deployment and validate all SLA requirements.",
+        "priority": "high",
+        "dependencies": [
+          17,
+          18,
+          19
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Execute staging deployment",
+            "description": "Deploy to staging environment and conduct pre-production validation",
+            "details": "- Deploy to staging environment\n- Run smoke tests and health checks\n- Validate OAuth flows in staging\n- Test integration with ChatGPT\n- Perform load testing in staging\n- Document any issues found",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 20
+          },
+          {
+            "id": 2,
+            "title": "Execute production deployment with rollback plan",
+            "description": "Deploy to production with comprehensive validation and rollback procedures",
+            "details": "- Create deployment runbook\n- Implement blue-green deployment strategy\n- Execute production deployment\n- Run production smoke tests\n- Monitor metrics and logs\n- Document rollback procedures\n- Create incident response plan",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 20
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2025-08-06T07:02:43.970Z",
+      "updated": "2025-08-06T07:02:43.970Z",
+      "description": "Tasks for master context"
+    }
+  },
+  "phase2-merge": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Foundation Layer Setup",
+        "description": "Set up the foundation for integrating advanced Phase 2 features into existing implementation",
+        "details": "Create src/openai/advanced/ directory for new components (cache, relevance scorer, error handler), implement feature flag configuration system in src/config/features.ts, ensure all new features are disabled by default to maintain backward compatibility",
+        "testStrategy": "Unit tests for configuration loading, integration tests for feature flag toggling, verify existing functionality unchanged when features disabled",
+        "status": "done",
+        "dependencies": [],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Import and Adapt Cache System",
+        "description": "Integrate the advanced caching system from abandoned branch into existing search/fetch operations",
+        "details": "Copy cache.ts from abandoned branch to src/openai/advanced/, modify existing search.ts and fetch.ts to optionally use cache when enabled, add cache configuration options, implement TTL management and cache statistics, ensure zero performance impact when cache disabled",
+        "testStrategy": "Test cache hit/miss scenarios, verify TTL expiration, test memory limits, ensure existing non-cached behavior preserved, load test with cache enabled/disabled",
+        "status": "done",
+        "dependencies": [
+          1
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "Integrate Relevance Scoring Algorithm",
+        "description": "Add sophisticated relevance scoring to enhance search result quality",
+        "details": "Import relevance-scorer.ts from abandoned branch, integrate as optional post-processor in search.ts, add relevanceScore field to search results when scoring enabled, implement configurable scoring algorithms (tfidf, bm25, semantic), preserve original result order when scoring disabled",
+        "testStrategy": "Test scoring algorithms accuracy, verify result ordering with/without scoring, benchmark scoring performance impact, test configuration changes",
+        "status": "done",
+        "dependencies": [
+          1
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Enhance Error Handling System",
+        "description": "Integrate advanced error categorization and recovery mechanisms",
+        "details": "Import error-handler.ts from abandoned branch, enhance existing try-catch blocks with categorized errors, add retry logic with exponential backoff, implement fallback to cached results on errors, maintain backward compatible error formats, add error recovery strategies",
+        "testStrategy": "Test error categorization, verify retry mechanisms, test fallback scenarios, ensure original error formats preserved, test recovery strategies",
+        "status": "done",
+        "dependencies": [
+          1,
+          2
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Import Data Transformation Utilities",
+        "description": "Integrate advanced data transformation utilities from abandoned branch",
+        "details": "Copy data-transformer.ts from abandoned branch, enhance existing transformers with advanced manipulation capabilities, ensure backward compatibility with existing transformer interfaces, add optional transformation features controlled by configuration",
+        "testStrategy": "Test all transformation scenarios, verify backward compatibility, test edge cases and complex data structures, benchmark transformation performance",
+        "status": "done",
+        "dependencies": [
+          1
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "SSE Integration Layer Enhancement",
+        "description": "Integrate enhanced SSE capabilities from abandoned branch",
+        "details": "Import sse-integration.ts from abandoned branch, enhance existing SSE server with advanced features, maintain all existing SSE endpoints and behaviors, add optional real-time update features, ensure HTTP fallback continues to work",
+        "testStrategy": "Test SSE connections and events, verify real-time updates, test HTTP fallback, ensure existing SSE functionality unchanged, test connection resilience",
+        "status": "done",
+        "dependencies": [
+          1
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "Merge Test Suites",
+        "description": "Import and adapt all tests from abandoned branch",
+        "details": "Copy all test files from abandoned branch, update tests to work with feature flags, add backward compatibility tests, create integration tests for feature interactions, ensure all existing tests continue to pass",
+        "testStrategy": "Run all imported tests, verify test coverage metrics, ensure no test regressions, validate feature flag testing, check performance test baselines",
+        "status": "done",
+        "dependencies": [
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 8,
+        "title": "Performance Optimization and Benchmarking",
+        "description": "Optimize merged implementation and establish performance baselines",
+        "details": "Profile code with all features enabled, optimize hot paths and memory usage, establish performance baselines for each feature, create benchmarks comparing old vs enhanced implementation, ensure no degradation when features disabled",
+        "testStrategy": "Load testing with various configurations, memory profiling, latency measurements, throughput testing, regression testing for performance",
+        "status": "done",
+        "dependencies": [
+          7
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 9,
+        "title": "Configuration and Migration Documentation",
+        "description": "Create comprehensive documentation for new features and migration",
+        "details": "Document all feature flags and configuration options, create migration guide for enabling advanced features, write API documentation for new optional fields, create troubleshooting guide, document performance tuning recommendations",
+        "testStrategy": "Documentation review, example code testing, configuration validation, migration path testing",
+        "status": "done",
+        "dependencies": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 10,
+        "title": "Backward Compatibility Validation",
+        "description": "Ensure 100% backward compatibility with existing implementation",
+        "details": "Create comprehensive test suite for all existing APIs, verify all function signatures unchanged, test with existing client code, validate response formats match exactly, ensure no breaking changes in error handling, test with all features disabled to confirm original behavior",
+        "testStrategy": "Regression testing, API contract testing, integration testing with existing clients, snapshot testing for responses",
+        "status": "done",
+        "dependencies": [
+          7
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 11,
+        "title": "End-to-End Integration Testing",
+        "description": "Complete integration testing with ChatGPT and Attio APIs",
+        "details": "Test full flow with cache enabled and disabled, verify relevance scoring improves search quality, test error recovery mechanisms in production scenarios, validate SSE enhancements with real-time updates, test all feature flag combinations",
+        "testStrategy": "E2E testing with real APIs, scenario-based testing, stress testing, failover testing, feature interaction testing",
+        "status": "done",
+        "dependencies": [
+          10
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 12,
+        "title": "Rollout Strategy and Monitoring",
+        "description": "Implement staged rollout with monitoring and rollback capabilities",
+        "details": "Create feature flag management system, implement monitoring for new features, set up alerts for performance degradation, create rollback procedures, establish success metrics and thresholds, implement A/B testing framework for gradual rollout",
+        "testStrategy": "Rollback testing, monitoring validation, alert testing, A/B test framework validation",
+        "status": "done",
+        "dependencies": [
+          11
+        ],
+        "priority": "medium",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-08-06T07:27:10.140Z",
+      "updated": "2025-08-06T09:54:57.343Z",
+      "description": "Merge advanced Phase 2 features from abandoned branch while maintaining backward compatibility"
+    }
+  },
+  "openai-reorganization": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Analyze Current Codebase and Dependencies",
+        "description": "Perform comprehensive analysis of existing src/openai/ directory structure, dependencies, and module relationships",
+        "details": "Use TypeScript compiler API and dependency analysis tools like madge or dependency-cruiser to map all import/export relationships. Document current API surface, identify breaking changes, and create migration plan. Analyze existing cache implementations (cache.ts vs optimized-cache.ts) to understand performance differences and API compatibility. Review error handling patterns across error-handler.ts and error-recovery.ts to identify overlap and consolidation opportunities.",
+        "testStrategy": "Create automated dependency graph validation, run existing test suite to establish baseline, document current API contracts for backward compatibility verification",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Map Directory Structure and File Dependencies",
+            "description": "Scan src/openai/ directory to catalog all files, their sizes, and create comprehensive dependency map using TypeScript compiler API",
+            "dependencies": [],
+            "details": "Use fs.readdir recursively to enumerate all files in src/openai/. Utilize TypeScript compiler API to parse import/export statements and build dependency graph. Document file sizes, line counts, and complexity metrics. Create visual dependency map showing module relationships.",
+            "status": "done",
+            "testStrategy": "Validate dependency graph accuracy by cross-referencing with actual imports, verify all files are cataloged, test dependency resolution for circular dependencies"
+          },
+          {
+            "id": 2,
+            "title": "Analyze Cache Implementation Differences",
+            "description": "Compare cache.ts and optimized-cache.ts to understand API differences, performance characteristics, and compatibility requirements",
+            "dependencies": [],
+            "details": "Perform side-by-side comparison of cache implementations. Document API surface differences, memory usage patterns, and performance benchmarks. Identify breaking changes and compatibility shims needed. Analyze current usage patterns across codebase.",
+            "status": "done",
+            "testStrategy": "Create performance benchmarks for both implementations, test API compatibility with existing consumers, validate memory usage patterns"
+          },
+          {
+            "id": 3,
+            "title": "Document Current API Surface and Breaking Changes",
+            "description": "Create comprehensive documentation of all public APIs and identify potential breaking changes in proposed refactoring",
+            "dependencies": [],
+            "details": "Generate API documentation using TypeScript reflection. Catalog all exported functions, classes, and types. Identify which APIs would break with new structure. Create compatibility matrix and migration guides for each breaking change.",
+            "status": "done",
+            "testStrategy": "Automated API surface validation, backward compatibility testing, migration guide verification through test scenarios"
+          },
+          {
+            "id": 4,
+            "title": "Analyze Error Handling Pattern Overlap",
+            "description": "Review error-handler.ts and error-recovery.ts to identify redundant code, overlapping functionality, and consolidation opportunities",
+            "dependencies": [],
+            "details": "Perform detailed code analysis of error handling modules. Map error types, handling patterns, and recovery strategies. Identify duplicate functionality and conflicting approaches. Document current error flow patterns across the application.",
+            "status": "done",
+            "testStrategy": "Error flow testing, duplicate code detection validation, error type coverage analysis, recovery strategy effectiveness testing"
+          },
+          {
+            "id": 5,
+            "title": "Create Migration Plan and Compatibility Strategy",
+            "description": "Develop comprehensive migration plan with backward compatibility strategy and implementation timeline",
+            "dependencies": [],
+            "details": "Synthesize analysis results into actionable migration plan. Define compatibility shims, deprecation timeline, and migration steps. Create rollback strategy and risk mitigation approaches. Document resource requirements and estimated effort.",
+            "status": "done",
+            "testStrategy": "Migration plan validation through proof-of-concept implementation, compatibility shim testing, rollback procedure verification"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Create Unified Cache Interface and Implementation",
+        "description": "Design and implement unified caching system combining basic cache with optimized implementation",
+        "details": "Create cache/interface.ts with TypeScript interface supporting both sync and async operations. Implement cache-aside pattern with graceful degradation. Use Map-based in-memory cache with LRU eviction policy (node-lru-cache@7.x). Implement serialization/deserialization for complex objects. Add TTL support, cache hit/miss metrics, and memory usage monitoring. Create factory pattern for different cache strategies (memory, Redis-compatible interface for future).",
+        "testStrategy": "Unit tests for cache operations, performance benchmarks comparing old vs new implementation, memory leak testing with large datasets, TTL expiration validation",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design and Create Core Cache Interface",
+            "description": "Define the TypeScript interface for unified caching system in cache/interface.ts with support for both synchronous and asynchronous operations",
+            "dependencies": [],
+            "details": "Create TypeScript interface defining get/set/delete operations with generic type support. Include method signatures for both sync and async variants. Define cache configuration options including TTL, max size, and serialization settings. Add interface for cache statistics and metrics. Include error handling interface definitions for graceful degradation scenarios.",
+            "status": "done",
+            "testStrategy": "Interface compliance testing, TypeScript compilation verification, generic type parameter validation"
+          },
+          {
+            "id": 2,
+            "title": "Implement LRU Memory Cache with node-lru-cache",
+            "description": "Create in-memory cache implementation using Map-based storage with LRU eviction policy leveraging node-lru-cache@7.x library",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "Install and configure node-lru-cache@7.x dependency. Implement cache class extending the interface with LRU eviction policy. Add configurable max size and memory limits. Implement proper disposal handling for evicted items. Add thread-safety considerations for concurrent access patterns.",
+            "status": "done",
+            "testStrategy": "LRU eviction behavior testing, memory limit enforcement, concurrent access validation, disposal callback verification"
+          },
+          {
+            "id": 3,
+            "title": "Implement Serialization and TTL Support",
+            "description": "Add object serialization/deserialization capabilities and time-to-live (TTL) functionality for cached entries",
+            "dependencies": [
+              "2.1",
+              "2.2"
+            ],
+            "details": "Implement JSON serialization with fallback for complex objects. Add custom serializer support for specific data types. Implement TTL mechanism with automatic expiration cleanup. Add background cleanup process for expired entries. Handle serialization errors gracefully with fallback strategies.",
+            "status": "done",
+            "testStrategy": "Serialization round-trip testing, TTL expiration validation, cleanup process verification, error handling for malformed data"
+          },
+          {
+            "id": 4,
+            "title": "Add Cache Metrics and Monitoring",
+            "description": "Implement comprehensive metrics collection including hit/miss ratios, memory usage, and performance monitoring",
+            "dependencies": [
+              "2.2",
+              "2.3"
+            ],
+            "details": "Create metrics collection system tracking cache hits, misses, and hit ratios. Implement memory usage monitoring with configurable thresholds. Add performance timing for cache operations. Create metrics export interface for external monitoring systems. Implement configurable metrics retention and aggregation.",
+            "status": "done",
+            "testStrategy": "Metrics accuracy validation, memory usage calculation verification, performance timing precision testing, metrics export functionality"
+          },
+          {
+            "id": 5,
+            "title": "Create Cache Factory Pattern and Redis Interface",
+            "description": "Implement factory pattern for different cache strategies and create Redis-compatible interface for future extensibility",
+            "dependencies": [
+              "2.1",
+              "2.2",
+              "2.3",
+              "2.4"
+            ],
+            "details": "Create cache factory supporting multiple strategies (memory, future Redis). Implement strategy selection based on configuration. Define Redis-compatible interface matching common Redis operations. Add configuration-driven cache selection. Implement graceful degradation when preferred cache unavailable. Create cache warming and preloading capabilities.",
+            "status": "done",
+            "testStrategy": "Factory pattern functionality testing, strategy selection validation, Redis interface compliance verification, degradation behavior testing"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Consolidate Error Handling System",
+        "description": "Merge error-handler.ts and error-recovery.ts into unified error management system",
+        "details": "Create error/handler.ts extending native Error class with custom ApplicationError, ValidationError, and NetworkError types. Implement error categorization (retryable, catastrophic, validation). Add structured logging with correlation IDs. Create centralized error middleware for Express-like frameworks. Implement exponential backoff retry logic with jitter. Add circuit breaker pattern for external services. Include error sanitization for sensitive data.",
+        "testStrategy": "Error scenario testing, retry logic validation, error sanitization verification, logging output validation, circuit breaker behavior testing",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Custom Error Classes and Type System",
+            "description": "Implement custom error classes extending native Error with ApplicationError, ValidationError, and NetworkError types including error categorization system",
+            "dependencies": [],
+            "details": "Create error/handler.ts with custom error classes extending Error. Implement ApplicationError as base class with properties for error codes, contexts, and metadata. Create ValidationError for input validation failures and NetworkError for network-related issues. Add error categorization enum (retryable, catastrophic, validation) and implement categorization logic for each error type.",
+            "status": "done",
+            "testStrategy": "Unit tests for error class instantiation, inheritance verification, error categorization accuracy, and metadata preservation"
+          },
+          {
+            "id": 2,
+            "title": "Implement Structured Logging with Correlation IDs",
+            "description": "Add structured logging system with correlation ID tracking for error traceability and debugging",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "Integrate structured logging framework with correlation ID generation and propagation. Implement log context management for tracking requests across service boundaries. Add log levels, structured data formatting, and error context enrichment. Create logging utilities for consistent error message formatting and sensitive data redaction.",
+            "status": "done",
+            "testStrategy": "Correlation ID generation and propagation testing, log format validation, sensitive data sanitization verification, and log context preservation testing"
+          },
+          {
+            "id": 3,
+            "title": "Create Centralized Error Middleware for Express Frameworks",
+            "description": "Build centralized error handling middleware for Express-like frameworks with consistent error response formatting",
+            "dependencies": [
+              "3.1",
+              "3.2"
+            ],
+            "details": "Implement Express error middleware function that catches and processes all application errors. Add error response standardization, HTTP status code mapping, and client-safe error message generation. Include error sanitization to prevent sensitive data leakage and implement proper error logging before response generation.",
+            "status": "done",
+            "testStrategy": "Middleware integration testing, error response format validation, HTTP status code mapping accuracy, and sensitive data leak prevention testing"
+          },
+          {
+            "id": 4,
+            "title": "Implement Exponential Backoff Retry Logic with Jitter",
+            "description": "Create retry mechanism with exponential backoff and jitter for handling transient failures",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "Implement configurable retry mechanism with exponential backoff algorithm including randomized jitter to prevent thundering herd problems. Add retry policy configuration for different error types, maximum retry attempts, and backoff multipliers. Include retry decision logic based on error categorization and implement async/await compatible retry wrapper functions.",
+            "status": "done",
+            "testStrategy": "Retry logic timing validation, jitter randomization testing, maximum attempt enforcement, error type-based retry decision testing, and performance impact assessment"
+          },
+          {
+            "id": 5,
+            "title": "Add Circuit Breaker Pattern for External Services",
+            "description": "Implement circuit breaker pattern to handle external service failures and prevent cascading failures",
+            "dependencies": [
+              "3.1",
+              "3.4"
+            ],
+            "details": "Create circuit breaker implementation with configurable failure thresholds, timeout periods, and recovery strategies. Include circuit states (closed, open, half-open) with automatic state transitions. Add metrics collection for circuit breaker events and implement fallback mechanisms for when circuits are open. Integrate with retry logic for coordinated failure handling.",
+            "status": "done",
+            "testStrategy": "Circuit state transition testing, failure threshold accuracy, timeout period validation, fallback mechanism verification, and integration testing with retry logic"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Design New Directory Structure",
+        "description": "Create feature-based folder structure and update import/export mappings",
+        "details": "Implement business-centric module organization: api/ (fetch, search), cache/ (interface, memory-cache, index), error/ (handler, categories, index), transform/ (base/, pipelines/, enhanced), scoring/ (algorithms, relevance), performance/ (monitor, optimization). Create barrel exports (index.ts) for each module with consistent API surface. Use TypeScript path mapping in tsconfig.json for clean imports. Implement layered architecture separating concerns (entry-point, domain, data-access).",
+        "testStrategy": "Import resolution testing, barrel export validation, TypeScript compilation verification, module boundary enforcement testing",
+        "priority": "medium",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design Module Directory Structure",
+            "description": "Create the core directory structure for business-centric modules including api/, cache/, error/, transform/, scoring/, and performance/ directories with proper nesting and organization",
+            "dependencies": [],
+            "details": "Implement feature-based organization following screaming architecture principles. Create api/ (fetch, search), cache/ (interface, memory-cache, index), error/ (handler, categories, index), transform/ (base/, pipelines/, enhanced), scoring/ (algorithms, relevance), performance/ (monitor, optimization). Each module should have clear separation of concerns and logical grouping by domain rather than technical layer.",
+            "status": "pending",
+            "testStrategy": "Directory structure validation, ensure proper nesting and naming conventions, verify all planned modules are created with appropriate subdirectories"
+          },
+          {
+            "id": 2,
+            "title": "Create Barrel Export System",
+            "description": "Implement index.ts files for each module providing consistent API surface through barrel exports with proper re-export patterns",
+            "dependencies": [
+              "4.1"
+            ],
+            "details": "Create index.ts files in each module directory (api/, cache/, error/, transform/, scoring/, performance/) that export public APIs. Use named exports and wildcard exports appropriately. Follow barrel export best practices: single entry point per module, encapsulated internal structure, clean public API definition. Implement tree-shaking friendly exports.",
+            "status": "pending",
+            "testStrategy": "Export resolution testing, verify all public APIs are accessible through barrel exports, validate tree-shaking effectiveness, ensure no circular dependencies"
+          },
+          {
+            "id": 3,
+            "title": "Configure TypeScript Path Mapping",
+            "description": "Set up tsconfig.json with baseUrl and paths configuration for clean import statements across the new module structure",
+            "dependencies": [
+              "4.1",
+              "4.2"
+            ],
+            "details": "Configure tsconfig.json with baseUrl pointing to src/ and paths mapping like '@api/*': ['api/*'], '@cache/*': ['cache/*'], '@error/*': ['error/*'], '@transform/*': ['transform/*'], '@scoring/*': ['scoring/*'], '@performance/*': ['performance/*']. Ensure proper module resolution and IDE support. Add support for both relative and absolute imports.",
+            "status": "pending",
+            "testStrategy": "Import resolution testing, TypeScript compilation verification, IDE autocomplete validation, path alias functionality testing"
+          },
+          {
+            "id": 4,
+            "title": "Implement Module Boundary Enforcement",
+            "description": "Establish layered architecture with proper separation of concerns between entry-point, domain, and data-access layers",
+            "dependencies": [
+              "4.1",
+              "4.2",
+              "4.3"
+            ],
+            "details": "Implement architectural boundaries separating entry-point (public APIs), domain (business logic), and data-access (external dependencies) layers. Create TypeScript project references if needed for strict boundary enforcement. Define clear interfaces between layers and prevent cross-layer violations. Document module dependencies and allowed import patterns.",
+            "status": "pending",
+            "testStrategy": "Module boundary enforcement testing, dependency graph validation, architectural rule verification, cross-layer import prevention testing"
+          },
+          {
+            "id": 5,
+            "title": "Validate Directory Structure Integration",
+            "description": "Perform comprehensive testing of the new directory structure including import resolution, compilation, and backward compatibility",
+            "dependencies": [
+              "4.1",
+              "4.2",
+              "4.3",
+              "4.4"
+            ],
+            "details": "Run full TypeScript compilation to ensure all paths resolve correctly. Test import statements work with both new path aliases and relative imports. Validate that existing code can still access modules through the new structure. Perform build verification and ensure no breaking changes to public APIs. Test with different module resolution strategies.",
+            "status": "pending",
+            "testStrategy": "Full compilation testing, import resolution validation, backward compatibility verification, build process testing, module resolution strategy testing"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Refactor Base Transformers",
+        "description": "Move existing transformers to transform/base/ and standardize interfaces",
+        "details": "Relocate companies.ts, people.ts, lists.ts, tasks.ts, generic.ts to transform/base/. Create common transformer interface with TypeScript generics for input/output types. Implement transformer factory pattern for dynamic transformer selection. Add validation using libraries like zod@3.x or joi@17.x for input/output schemas. Use composition over inheritance for transformer capabilities. Implement async/await patterns throughout with proper error handling.",
+        "testStrategy": "Transformer interface compliance testing, input/output validation, async operation testing, factory pattern functionality verification",
+        "priority": "medium",
+        "dependencies": [
+          4
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create transform/base/ directory structure",
+            "description": "Set up the new directory structure and move existing transformer files to transform/base/",
+            "dependencies": [],
+            "details": "Create transform/base/ directory. Move companies.ts, people.ts, lists.ts, tasks.ts, and generic.ts from their current locations to transform/base/. Update all import paths throughout the codebase to reference the new locations. Ensure all moved files maintain their current functionality during relocation.",
+            "status": "pending",
+            "testStrategy": "Verify all files moved successfully, test import path resolution, run existing transformer tests to ensure no functionality regression"
+          },
+          {
+            "id": 2,
+            "title": "Design and implement common transformer interface",
+            "description": "Create a standardized interface using TypeScript generics for all transformers",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "Define BaseTransformer interface with TypeScript generics for input/output types. Include standard methods like transform(), validate(), and getName(). Create abstract base class implementing common functionality. Define transformer metadata structure for registration and discovery. Ensure interface supports both sync and async operations.",
+            "status": "pending",
+            "testStrategy": "Interface compliance testing, generic type validation, abstract base class functionality verification"
+          },
+          {
+            "id": 3,
+            "title": "Implement transformer factory pattern",
+            "description": "Create factory pattern for dynamic transformer selection and instantiation",
+            "dependencies": [
+              "5.2"
+            ],
+            "details": "Implement TransformerFactory class with registration system for transformers. Add getTransformer() method with type-safe transformer selection. Create transformer registry with lazy loading capabilities. Implement transformer discovery mechanism for automatic registration. Add configuration-based transformer selection.",
+            "status": "pending",
+            "testStrategy": "Factory pattern functionality testing, transformer registration validation, dynamic selection verification, type safety testing"
+          },
+          {
+            "id": 4,
+            "title": "Add input/output validation with schema libraries",
+            "description": "Integrate zod or joi for robust input/output validation across all transformers",
+            "dependencies": [
+              "5.2"
+            ],
+            "details": "Choose and install validation library (zod@3.x or joi@17.x). Create validation schemas for each transformer's input and output types. Implement validation middleware that can be composed with transformers. Add schema-based error messages and validation reporting. Create schema registry for reusable validation patterns.",
+            "status": "pending",
+            "testStrategy": "Schema validation testing, error message verification, validation middleware integration testing, schema registry functionality validation"
+          },
+          {
+            "id": 5,
+            "title": "Refactor transformers with composition and async patterns",
+            "description": "Update all transformers to use composition over inheritance and implement proper async/await patterns",
+            "dependencies": [
+              "5.2",
+              "5.3",
+              "5.4"
+            ],
+            "details": "Refactor existing transformers to extend new base interface. Replace inheritance-based designs with composition using mixins or decorators. Implement async/await patterns throughout with proper error handling and timeout management. Add capability-based composition for features like caching, logging, and validation. Implement proper error boundaries and recovery mechanisms.",
+            "status": "pending",
+            "testStrategy": "Composition pattern verification, async operation testing, error handling validation, capability integration testing, performance regression testing"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Integrate Advanced Transformation Features",
+        "description": "Merge data-transformer.ts and transformation-pipeline.ts into unified transformation system",
+        "details": "Create transform/pipelines/ directory with pipeline orchestration. Implement functional programming approach with composable transformation steps. Use Promise.all for parallel transformations where possible. Add transformation middleware pattern for cross-cutting concerns (logging, validation, caching). Implement stream-based processing for large datasets using Node.js streams. Add transformation metrics and performance monitoring. Create pipeline builder with fluent API.",
+        "testStrategy": "Pipeline composition testing, parallel execution validation, stream processing verification, middleware integration testing, performance regression testing",
+        "priority": "medium",
+        "dependencies": [
+          5
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Transform Directory Structure and Pipeline Orchestration Framework",
+            "description": "Establish the transform/pipelines/ directory structure and implement core pipeline orchestration infrastructure with functional programming foundations",
+            "dependencies": [],
+            "details": "Create transform/pipelines/ directory with base pipeline interfaces, abstract pipeline orchestrator class, and functional composition utilities. Implement core transformation types and interfaces using TypeScript generics. Create pipeline registry for managing different transformation pipelines. Establish error handling patterns and pipeline lifecycle management.",
+            "status": "pending",
+            "testStrategy": "Unit tests for pipeline orchestration, interface validation, error handling scenarios, and pipeline registry functionality"
+          },
+          {
+            "id": 2,
+            "title": "Implement Composable Transformation Steps with Parallel Execution",
+            "description": "Design and implement functional programming approach for composable transformation steps with Promise.all support for parallel processing",
+            "dependencies": [
+              "6.1"
+            ],
+            "details": "Create composable transformation step functions using currying and higher-order functions. Implement transformation step chaining with pipe/compose utilities. Add parallel execution support using Promise.all for independent transformations. Create step validators and transformation result aggregators. Implement step dependency resolution for complex transformation workflows.",
+            "status": "pending",
+            "testStrategy": "Functional composition testing, parallel execution validation, transformation step isolation testing, and dependency resolution verification"
+          },
+          {
+            "id": 3,
+            "title": "Build Middleware Pattern for Cross-Cutting Concerns",
+            "description": "Implement transformation middleware pattern supporting logging, validation, caching, and other cross-cutting concerns",
+            "dependencies": [
+              "6.1",
+              "6.2"
+            ],
+            "details": "Create middleware interface with before/after hooks for transformations. Implement built-in middleware for logging, validation, caching, and error handling. Design middleware composition and execution order management. Add middleware configuration system with conditional middleware application. Create middleware factory pattern for reusable middleware instances.",
+            "status": "pending",
+            "testStrategy": "Middleware integration testing, execution order validation, conditional middleware application testing, and cross-cutting concern verification"
+          },
+          {
+            "id": 4,
+            "title": "Implement Stream-Based Processing with Performance Monitoring",
+            "description": "Add Node.js streams support for large dataset processing and implement comprehensive transformation metrics and performance monitoring",
+            "dependencies": [
+              "6.2",
+              "6.3"
+            ],
+            "details": "Implement Transform streams for large dataset processing using Node.js streams API. Create stream-based transformation pipeline with backpressure handling. Add performance metrics collection (execution time, memory usage, throughput). Implement transformation monitoring with custom metrics and health checks. Create performance dashboard integration and alerting mechanisms.",
+            "status": "pending",
+            "testStrategy": "Stream processing verification, backpressure handling testing, performance regression testing, memory leak detection, and metrics accuracy validation"
+          },
+          {
+            "id": 5,
+            "title": "Create Pipeline Builder with Fluent API and Integration",
+            "description": "Develop fluent API pipeline builder and integrate with existing data-transformer.ts and transformation-pipeline.ts functionality",
+            "dependencies": [
+              "6.1",
+              "6.2",
+              "6.3",
+              "6.4"
+            ],
+            "details": "Create fluent API builder pattern for constructing transformation pipelines. Implement method chaining for adding steps, middleware, and configurations. Merge existing data-transformer.ts and transformation-pipeline.ts functionality into unified system. Create migration utilities and backward compatibility layer. Add pipeline validation and optimization features.",
+            "status": "pending",
+            "testStrategy": "Fluent API usability testing, backward compatibility validation, pipeline builder integration testing, and migration utility verification"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Implement Unified Scoring System",
+        "description": "Elevate scoring algorithms from advanced/ to core scoring/ module",
+        "details": "Move relevance-scorer.ts and scoring-algorithms.ts to scoring/ module. Implement strategy pattern for different scoring algorithms (TF-IDF, semantic similarity, custom business logic). Create scoring factory with configurable weights and parameters. Add caching layer for expensive scoring operations. Implement batch scoring for performance. Use worker threads for CPU-intensive scoring tasks. Create scoring pipeline that integrates with search functionality.",
+        "testStrategy": "Algorithm accuracy testing, performance benchmarking, batch operation validation, worker thread functionality, caching effectiveness testing",
+        "priority": "medium",
+        "dependencies": [
+          4
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Move and Restructure Scoring Files to Core Module",
+            "description": "Relocate relevance-scorer.ts and scoring-algorithms.ts from advanced/ to core scoring/ module with proper directory structure",
+            "dependencies": [],
+            "details": "Create scoring/ directory structure and move existing files. Update all import statements throughout the codebase. Ensure proper barrel exports (index.ts) for clean module interface. Verify no breaking changes to existing functionality during relocation.",
+            "status": "pending",
+            "testStrategy": "Import resolution testing, compilation verification, regression testing to ensure existing scoring functionality remains intact"
+          },
+          {
+            "id": 2,
+            "title": "Implement Strategy Pattern for Scoring Algorithms",
+            "description": "Create strategy pattern implementation supporting TF-IDF, semantic similarity, and custom business logic scoring algorithms",
+            "dependencies": [
+              "7.1"
+            ],
+            "details": "Define abstract ScoringStrategy interface with score() method. Implement concrete strategies: TfIdfScoringStrategy, SemanticSimilarityStrategy, BusinessLogicStrategy. Create ScoringContext class to manage strategy execution. Ensure strategies are pluggable and configurable.",
+            "status": "pending",
+            "testStrategy": "Unit tests for each strategy implementation, algorithm accuracy validation, strategy switching verification, performance benchmarking across different algorithms"
+          },
+          {
+            "id": 3,
+            "title": "Create Scoring Factory with Configurable Parameters",
+            "description": "Implement factory pattern for scoring strategy instantiation with configurable weights and parameters",
+            "dependencies": [
+              "7.2"
+            ],
+            "details": "Build ScoringFactory class with createScorer() method accepting configuration objects. Support weight configuration for algorithm blending. Implement parameter validation and default value handling. Create configuration schema for different scoring scenarios.",
+            "status": "pending",
+            "testStrategy": "Factory instantiation testing, configuration validation, weight adjustment verification, default parameter testing, error handling for invalid configurations"
+          },
+          {
+            "id": 4,
+            "title": "Implement Caching Layer and Batch Scoring",
+            "description": "Add caching mechanism for expensive scoring operations and implement batch scoring for performance optimization",
+            "dependencies": [
+              "7.3"
+            ],
+            "details": "Create ScoringCache class with LRU eviction policy. Implement cache key generation based on input parameters. Add batch scoring functionality to process multiple items efficiently. Include cache hit/miss metrics and TTL support for cached results.",
+            "status": "pending",
+            "testStrategy": "Cache effectiveness testing, batch operation validation, performance benchmarking comparing cached vs uncached operations, memory usage monitoring, TTL expiration verification"
+          },
+          {
+            "id": 5,
+            "title": "Implement Worker Threads and Scoring Pipeline",
+            "description": "Create worker thread implementation for CPU-intensive scoring tasks and integrate scoring pipeline with search functionality",
+            "dependencies": [
+              "7.4"
+            ],
+            "details": "Implement WorkerPool class for managing scoring worker threads. Create scoring pipeline that integrates with search functionality. Add task queuing and result aggregation. Implement fallback to main thread for small datasets. Create pipeline configuration for different use cases.",
+            "status": "pending",
+            "testStrategy": "Worker thread functionality testing, pipeline integration validation, performance comparison between threaded and non-threaded operations, search integration testing, queue management verification"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Update Core API Integration",
+        "description": "Modify fetch.ts and search.ts to use new unified module structure",
+        "details": "Refactor api/fetch.ts and api/search.ts to use dependency injection pattern for cache, error handling, transformations, and scoring. Implement constructor-based DI to avoid tight coupling. Use async/await throughout with proper error boundaries. Add request/response interceptors for logging and monitoring. Implement rate limiting and request queuing. Add OpenTelemetry instrumentation for observability. Create API client factory for different configurations.",
+        "testStrategy": "API functionality testing, dependency injection validation, error boundary testing, rate limiting verification, instrumentation data validation",
+        "priority": "high",
+        "dependencies": [
+          2,
+          3,
+          6,
+          7
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement dependency injection pattern in fetch.ts",
+            "description": "Refactor api/fetch.ts to use constructor-based dependency injection for cache, error handling, and transformations components",
+            "dependencies": [],
+            "details": "Create FetchClient class with constructor accepting dependencies (cache service, error handler, transformer). Replace direct imports with injected dependencies. Implement interface segregation for better testability. Add configuration object parameter for API endpoints and settings.",
+            "status": "pending",
+            "testStrategy": "Unit testing with mock dependencies, integration testing with real dependencies, dependency injection container validation"
+          },
+          {
+            "id": 2,
+            "title": "Implement dependency injection pattern in search.ts",
+            "description": "Refactor api/search.ts to use constructor-based dependency injection for scoring, cache, and error handling components",
+            "dependencies": [
+              "8.1"
+            ],
+            "details": "Create SearchClient class with constructor accepting dependencies (scoring service, cache service, error handler). Replace direct imports with injected dependencies. Implement search-specific interfaces for dependency contracts. Add search configuration object for query parameters and settings.",
+            "status": "pending",
+            "testStrategy": "Unit testing with mock dependencies, search functionality validation, scoring integration testing"
+          },
+          {
+            "id": 3,
+            "title": "Add request/response interceptors and monitoring",
+            "description": "Implement interceptor pattern for logging, monitoring, and request/response transformation in both fetch.ts and search.ts",
+            "dependencies": [
+              "8.1",
+              "8.2"
+            ],
+            "details": "Create interceptor interface and implementation for request/response lifecycle. Add logging interceptors for API calls and responses. Implement monitoring interceptors for performance metrics. Create interceptor chain for multiple interceptor execution. Add error interceptors for centralized error handling.",
+            "status": "pending",
+            "testStrategy": "Interceptor execution order testing, logging validation, monitoring data collection verification, error interceptor functionality"
+          },
+          {
+            "id": 4,
+            "title": "Implement rate limiting and request queuing",
+            "description": "Add rate limiting and request queuing mechanisms to prevent API overload and ensure controlled request flow",
+            "dependencies": [
+              "8.3"
+            ],
+            "details": "Implement token bucket algorithm for rate limiting. Create request queue with priority support. Add retry mechanism with exponential backoff. Implement circuit breaker pattern for API protection. Add configuration for rate limits and queue sizes per API endpoint.",
+            "status": "pending",
+            "testStrategy": "Rate limiting effectiveness testing, queue functionality validation, retry mechanism testing, circuit breaker state transition verification"
+          },
+          {
+            "id": 5,
+            "title": "Add OpenTelemetry instrumentation and create API factory",
+            "description": "Integrate OpenTelemetry for observability and create API client factory for different configurations",
+            "dependencies": [
+              "8.4"
+            ],
+            "details": "Add OpenTelemetry tracing for API calls and operations. Implement metrics collection for performance monitoring. Create API client factory with configuration-based client creation. Add factory methods for different API client types (cached, rate-limited, instrumented). Implement factory registration for dependency injection container.",
+            "status": "pending",
+            "testStrategy": "OpenTelemetry trace validation, metrics collection verification, factory pattern functionality testing, configuration-based client creation validation"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Create Migration Scripts and Utilities",
+        "description": "Develop automated migration tools for import statement updates and code transformation",
+        "details": "Create Node.js scripts using TypeScript compiler API and ts-morph library for automated refactoring. Implement import statement rewriting from 'advanced/' to new module structure. Add codemod scripts for common patterns. Create validation scripts to ensure no broken imports. Implement backup and rollback mechanisms. Use jscodeshift or similar for complex AST transformations. Add progress reporting and dry-run capabilities.",
+        "testStrategy": "Migration script validation, import rewriting verification, rollback functionality testing, AST transformation accuracy testing",
+        "priority": "medium",
+        "dependencies": [
+          4
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Setup Migration Script Infrastructure",
+            "description": "Create the foundational structure and tooling setup for migration scripts including TypeScript compiler API and ts-morph library integration",
+            "dependencies": [],
+            "details": "Initialize Node.js migration project with TypeScript configuration. Install and configure ts-morph, jscodeshift, and TypeScript compiler API. Create base migration script template with common utilities for file operations, logging, and error handling. Set up package.json with necessary dependencies and script commands.",
+            "status": "pending",
+            "testStrategy": "Infrastructure setup validation, dependency installation verification, basic script execution testing"
+          },
+          {
+            "id": 2,
+            "title": "Implement Import Statement Rewriting Engine",
+            "description": "Develop core functionality to automatically rewrite import statements from 'advanced/' to new module structure",
+            "dependencies": [
+              "9.1"
+            ],
+            "details": "Create AST traversal logic using ts-morph to identify and parse import statements. Implement mapping logic to convert old 'advanced/' imports to new module paths. Add support for various import types (default, named, namespace imports). Handle relative and absolute import paths with proper resolution. Create configuration system for import mapping rules.",
+            "status": "pending",
+            "testStrategy": "Import statement parsing accuracy, rewriting logic validation, various import type handling verification"
+          },
+          {
+            "id": 3,
+            "title": "Build Backup and Rollback Mechanisms",
+            "description": "Implement comprehensive backup system and rollback capabilities for safe migration operations",
+            "dependencies": [
+              "9.1"
+            ],
+            "details": "Create file backup system that preserves original files before modifications. Implement rollback functionality to restore previous state on migration failure. Add git integration for version control backup options. Create backup metadata tracking with timestamps and operation details. Implement selective rollback for partial migration scenarios.",
+            "status": "pending",
+            "testStrategy": "Backup creation verification, rollback functionality testing, git integration validation, metadata accuracy testing"
+          },
+          {
+            "id": 4,
+            "title": "Develop Validation and Progress Reporting",
+            "description": "Create validation scripts to ensure migration integrity and implement progress reporting with dry-run capabilities",
+            "dependencies": [
+              "9.2"
+            ],
+            "details": "Implement TypeScript compilation validation after migration to detect broken imports. Create import resolution verification to ensure all imports are correctly mapped. Add progress tracking with detailed logging and user feedback. Implement dry-run mode to preview changes without applying them. Create validation reports with before/after comparisons.",
+            "status": "pending",
+            "testStrategy": "TypeScript compilation validation, import resolution testing, dry-run accuracy verification, progress reporting functionality"
+          },
+          {
+            "id": 5,
+            "title": "Create Advanced Codemod Scripts",
+            "description": "Implement sophisticated AST transformation scripts for common refactoring patterns using jscodeshift",
+            "dependencies": [
+              "9.2",
+              "9.3"
+            ],
+            "details": "Develop jscodeshift transforms for complex code patterns beyond simple import rewriting. Create codemods for API changes, function signature updates, and class restructuring. Implement batch processing for multiple file transformations. Add configuration system for custom transformation rules. Create reusable transform modules for common migration patterns.",
+            "status": "pending",
+            "testStrategy": "AST transformation accuracy testing, batch processing validation, custom rule configuration verification, transform module reusability testing"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Implement Performance Monitoring",
+        "description": "Create performance/ module with monitoring and optimization utilities",
+        "details": "Move performance.ts to performance/monitor.ts with enhanced capabilities. Implement performance metrics collection using perf_hooks. Add memory usage monitoring with process.memoryUsage(). Create performance budget enforcement. Implement custom performance marks and measures. Add async operation timing. Create performance dashboard data collection. Use lightweight metrics library like prom-client for Prometheus compatibility.",
+        "testStrategy": "Performance metrics accuracy, memory leak detection, performance regression testing, dashboard data validation, metrics export verification",
+        "priority": "low",
+        "dependencies": [
+          4
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Performance Module Structure and Move Existing Files",
+            "description": "Create performance/ directory and move performance.ts to performance/monitor.ts with enhanced module structure",
+            "dependencies": [],
+            "details": "Create performance/ directory with proper index.ts barrel exports. Move existing performance.ts to performance/monitor.ts. Set up TypeScript path mapping for clean imports. Create foundational module structure for monitoring and optimization utilities.",
+            "status": "pending",
+            "testStrategy": "Module import resolution testing, file structure validation, TypeScript compilation verification"
+          },
+          {
+            "id": 2,
+            "title": "Implement Core Performance Metrics Collection",
+            "description": "Integrate perf_hooks for performance metrics and process.memoryUsage() for memory monitoring",
+            "dependencies": [
+              "10.1"
+            ],
+            "details": "Implement performance metrics collection using Node.js perf_hooks API. Add memory usage monitoring with process.memoryUsage(). Create custom performance marks and measures for application-specific metrics. Implement async operation timing utilities.",
+            "status": "pending",
+            "testStrategy": "Performance metrics accuracy testing, memory usage tracking validation, async timing precision verification"
+          },
+          {
+            "id": 3,
+            "title": "Create Performance Budget Enforcement System",
+            "description": "Build performance budget system with configurable thresholds and enforcement mechanisms",
+            "dependencies": [
+              "10.2"
+            ],
+            "details": "Implement performance budget enforcement with configurable thresholds for memory usage, response times, and resource consumption. Create alert mechanisms for budget violations. Add performance regression detection capabilities.",
+            "status": "pending",
+            "testStrategy": "Budget threshold enforcement testing, violation alert verification, performance regression detection validation"
+          },
+          {
+            "id": 4,
+            "title": "Integrate Prometheus-Compatible Metrics Library",
+            "description": "Add prom-client library for Prometheus compatibility and metrics export functionality",
+            "dependencies": [
+              "10.2"
+            ],
+            "details": "Install and configure prom-client library for Prometheus compatibility. Create metrics registry with custom performance indicators. Implement metrics export endpoints for external monitoring systems. Add histogram and gauge metrics for performance tracking.",
+            "status": "pending",
+            "testStrategy": "Prometheus metrics export verification, registry functionality testing, external monitoring system integration validation"
+          },
+          {
+            "id": 5,
+            "title": "Build Performance Dashboard Data Collection",
+            "description": "Create comprehensive dashboard data collection system for performance visualization",
+            "dependencies": [
+              "10.3",
+              "10.4"
+            ],
+            "details": "Implement performance dashboard data collection system that aggregates metrics from monitoring components. Create data formatting utilities for dashboard consumption. Add real-time performance data streaming capabilities. Implement historical performance data retention.",
+            "status": "pending",
+            "testStrategy": "Dashboard data accuracy validation, real-time streaming functionality testing, historical data retention verification"
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Update Type Definitions and Interfaces",
+        "description": "Consolidate and update TypeScript type definitions for new architecture",
+        "details": "Create comprehensive types.ts with strict TypeScript configuration. Use discriminated unions for error types. Implement generic interfaces for transformers, cache, and scoring systems. Add utility types for configuration objects. Use branded types for IDs and sensitive data. Implement type guards for runtime type checking. Add JSDoc comments for better IDE support. Use const assertions and readonly modifiers appropriately.",
+        "testStrategy": "Type checking validation, generic interface compliance, utility type functionality, type guard accuracy testing",
+        "priority": "medium",
+        "dependencies": [
+          2,
+          3,
+          5,
+          7
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Core Type Definitions and Strict TypeScript Configuration",
+            "description": "Establish the foundation types.ts file with strict TypeScript configuration, basic type definitions, and project-wide type infrastructure",
+            "dependencies": [],
+            "details": "Create comprehensive types.ts file with strict TypeScript configuration (strict: true, noImplicitAny: true, strictNullChecks: true). Define base types for the new architecture including entity types, configuration objects, and system-wide constants. Set up type infrastructure with proper module declarations and ambient type definitions. Configure TypeScript compiler options for optimal type checking and IntelliSense support.",
+            "status": "pending",
+            "testStrategy": "TypeScript compilation validation, strict mode compliance testing, type inference verification, configuration validation"
+          },
+          {
+            "id": 2,
+            "title": "Implement Discriminated Unions and Error Type System",
+            "description": "Design and implement discriminated union types for comprehensive error handling and type-safe error management",
+            "dependencies": [
+              "11.1"
+            ],
+            "details": "Create discriminated unions for error types using literal types as discriminators. Implement Result<T, E> patterns for error handling. Define specific error types for different system components (ValidationError, NetworkError, TransformationError, etc.). Use tagged unions for state management and API responses. Implement exhaustive checking with TypeScript's never type for compile-time safety.",
+            "status": "pending",
+            "testStrategy": "Discriminated union type checking, exhaustive pattern matching validation, error type accuracy testing, Result pattern functionality verification"
+          },
+          {
+            "id": 3,
+            "title": "Design Generic Interfaces for System Components",
+            "description": "Create generic interfaces for transformers, cache systems, and scoring mechanisms with proper type constraints and variance",
+            "dependencies": [
+              "11.2"
+            ],
+            "details": "Implement generic interfaces with TypeScript generics for transformers (Transformer<TInput, TOutput>), cache systems (Cache<TKey, TValue>), and scoring systems (Scorer<TInput, TScore>). Use proper type constraints and conditional types for flexibility. Implement covariance and contravariance where appropriate. Create factory interfaces and builder patterns with generic type support. Add mapped types and utility types for configuration objects.",
+            "status": "pending",
+            "testStrategy": "Generic interface compliance testing, type constraint validation, covariance/contravariance verification, factory pattern functionality testing"
+          },
+          {
+            "id": 4,
+            "title": "Implement Branded Types and Type Guards",
+            "description": "Create branded types for IDs and sensitive data, along with runtime type checking through type guard implementations",
+            "dependencies": [
+              "11.3"
+            ],
+            "details": "Implement branded types using intersection types with unique symbols for IDs (UserId, CompanyId, etc.) and sensitive data (Token, ApiKey, etc.). Create comprehensive type guards for runtime type checking using TypeScript's type predicate functions. Implement assertion functions for type narrowing. Use const assertions and readonly modifiers throughout for immutability. Add utility functions for type validation and conversion.",
+            "status": "pending",
+            "testStrategy": "Branded type uniqueness validation, type guard accuracy testing, runtime type checking verification, immutability constraint testing"
+          },
+          {
+            "id": 5,
+            "title": "Add JSDoc Documentation and IDE Support Enhancements",
+            "description": "Complete type definitions with comprehensive JSDoc comments, examples, and IDE support features for optimal developer experience",
+            "dependencies": [
+              "11.4"
+            ],
+            "details": "Add comprehensive JSDoc comments to all type definitions with @example, @param, @returns, and @throws annotations. Create type documentation with usage examples and best practices. Implement TypeScript declaration merging where needed. Add IntelliSense support with proper type annotations and generic constraints. Create utility types for common patterns and add deprecation warnings for legacy types. Ensure proper module resolution and export strategies.",
+            "status": "pending",
+            "testStrategy": "JSDoc documentation completeness validation, IDE IntelliSense functionality testing, type declaration merging verification, utility type functionality testing"
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "Create Comprehensive Index Exports",
+        "description": "Build main index.ts and module-specific index files with backward compatibility",
+        "details": "Create barrel exports maintaining existing public API surface. Implement re-exports for backward compatibility. Use TypeScript module resolution with exports field in package.json. Add deprecation warnings for old import paths. Create named and default exports appropriately. Implement tree-shaking friendly exports. Add module documentation and usage examples. Use conditional exports for different environments (Node.js, browser).",
+        "testStrategy": "Export resolution testing, backward compatibility validation, tree-shaking effectiveness, conditional export functionality",
+        "priority": "medium",
+        "dependencies": [
+          8,
+          11
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Analyze Current Module Structure and API Surface",
+            "description": "Research existing src/openai/ directory structure to identify all public APIs, exports, and module relationships for comprehensive index creation",
+            "dependencies": [],
+            "details": "Use Task tool to analyze codebase structure, identify all exportable modules, functions, classes, and types. Document current public API surface and import patterns used by consumers. Map module dependencies and circular import risks.",
+            "status": "pending",
+            "testStrategy": "API surface documentation validation, export completeness verification"
+          },
+          {
+            "id": 2,
+            "title": "Design Index File Architecture",
+            "description": "Create comprehensive plan for main index.ts and module-specific index files with backward compatibility strategy",
+            "dependencies": [
+              "12.1"
+            ],
+            "details": "Design barrel export structure maintaining existing public API. Plan re-export strategy for backward compatibility with old import paths. Define TypeScript module resolution approach and conditional exports for different environments.",
+            "status": "pending",
+            "testStrategy": "Architecture design validation, backward compatibility planning verification"
+          },
+          {
+            "id": 3,
+            "title": "Implement Main Index File with Barrel Exports",
+            "description": "Create main index.ts file with comprehensive barrel exports and tree-shaking friendly structure",
+            "dependencies": [
+              "12.2"
+            ],
+            "details": "Implement main index.ts with named and default exports. Create tree-shaking friendly export structure using ES modules. Add proper TypeScript type exports and module declarations. Implement conditional exports for Node.js and browser environments.",
+            "status": "pending",
+            "testStrategy": "Export resolution testing, tree-shaking effectiveness validation, TypeScript compilation verification"
+          },
+          {
+            "id": 4,
+            "title": "Create Module-Specific Index Files",
+            "description": "Build individual index files for each major module with focused exports and documentation",
+            "dependencies": [
+              "12.3"
+            ],
+            "details": "Create index files for cache/, transform/, error/, and other major modules. Implement focused exports per module with proper documentation. Add usage examples and module-level documentation. Ensure consistent export patterns across modules.",
+            "status": "pending",
+            "testStrategy": "Module-specific export testing, documentation completeness verification, usage example validation"
+          },
+          {
+            "id": 5,
+            "title": "Implement Backward Compatibility and Package.json Exports",
+            "description": "Add backward compatibility layer with deprecation warnings and configure package.json exports field",
+            "dependencies": [
+              "12.4"
+            ],
+            "details": "Implement re-exports for old import paths with deprecation warnings. Configure package.json exports field for proper module resolution. Add conditional exports for different environments. Create migration documentation for consumers.",
+            "status": "pending",
+            "testStrategy": "Backward compatibility validation, package.json exports functionality testing, deprecation warning verification"
+          }
+        ]
+      },
+      {
+        "id": 13,
+        "title": "Run Migration and Update All Import Statements",
+        "description": "Execute migration scripts across entire codebase to update import statements",
+        "details": "Execute automated migration scripts on entire codebase. Update all import statements from 'advanced/' structure to new feature-based modules. Verify no circular dependencies introduced. Update any dynamic imports or require statements. Fix any TypeScript compilation errors. Update related configuration files (tsconfig paths, Jest module mapping). Run linting and formatting tools (ESLint, Prettier) to ensure code quality.",
+        "testStrategy": "Import statement verification, circular dependency detection, TypeScript compilation validation, test suite execution, linting compliance",
+        "priority": "high",
+        "dependencies": [
+          9,
+          12
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Execute Migration Scripts on Core Import Statements",
+            "description": "Run automated migration tools to update all import statements from 'advanced/' structure to new feature-based modules across the entire codebase",
+            "dependencies": [],
+            "details": "Use the migration scripts created in Task 9 to systematically replace all import statements. Process TypeScript and JavaScript files, handle relative and absolute imports, and maintain proper path mappings. Create backup of original files before transformation.",
+            "status": "pending",
+            "testStrategy": "Verify all import statements are correctly transformed, no broken imports remain, and file structure integrity is maintained"
+          },
+          {
+            "id": 2,
+            "title": "Update Dynamic Imports and Require Statements",
+            "description": "Identify and update all dynamic imports, require() calls, and conditional imports to use new module structure",
+            "dependencies": [
+              "13.1"
+            ],
+            "details": "Search for dynamic import() statements, require() calls, and conditional imports throughout the codebase. Update these to reference the new feature-based module paths. Handle async imports and lazy loading patterns appropriately.",
+            "status": "pending",
+            "testStrategy": "Test dynamic import functionality, verify lazy loading still works, and validate conditional import behavior"
+          },
+          {
+            "id": 3,
+            "title": "Update Configuration Files and Path Mappings",
+            "description": "Modify tsconfig.json paths, Jest module mappings, and other configuration files to reflect new import structure",
+            "dependencies": [
+              "13.1"
+            ],
+            "details": "Update tsconfig.json baseUrl and paths configuration. Modify Jest moduleNameMapper for test file imports. Update webpack or bundler configurations if present. Ensure ESLint import resolver configurations are updated.",
+            "status": "pending",
+            "testStrategy": "Verify TypeScript path resolution works correctly, Jest can resolve modules in tests, and build tools function properly"
+          },
+          {
+            "id": 4,
+            "title": "Fix TypeScript Compilation Errors and Validate Dependencies",
+            "description": "Resolve TypeScript compilation errors introduced by import changes and verify no circular dependencies exist",
+            "dependencies": [
+              "13.1",
+              "13.2",
+              "13.3"
+            ],
+            "details": "Run TypeScript compiler to identify and fix compilation errors. Use dependency analysis tools to detect circular dependencies. Resolve type import issues and ensure all module declarations are correct. Fix any missing type definitions.",
+            "status": "pending",
+            "testStrategy": "TypeScript compilation passes without errors, no circular dependencies detected, and all type imports resolve correctly"
+          },
+          {
+            "id": 5,
+            "title": "Run Code Quality Tools and Final Validation",
+            "description": "Execute ESLint, Prettier, and test suite to ensure code quality and functionality after migration",
+            "dependencies": [
+              "13.4"
+            ],
+            "details": "Run ESLint to fix any linting issues introduced by import changes. Execute Prettier to ensure consistent formatting. Run full test suite to verify no functionality is broken. Generate final migration report with statistics and any remaining issues.",
+            "status": "pending",
+            "testStrategy": "All linting rules pass, code formatting is consistent, full test suite passes, and migration report shows successful completion"
+          }
+        ]
+      },
+      {
+        "id": 14,
+        "title": "Execute Comprehensive Testing Suite",
+        "description": "Run full test suite validation and create regression tests for new architecture",
+        "details": "Execute existing test suite to ensure no functionality regression. Create integration tests for new module interactions. Add performance regression tests comparing old vs new implementations. Implement end-to-end tests covering complete workflows. Add load testing for caching and scoring systems. Create backward compatibility tests. Use Jest@29.x with TypeScript support. Add test coverage reporting and ensure >90% coverage.",
+        "testStrategy": "Full test suite execution, regression test validation, performance comparison testing, integration test verification, coverage threshold enforcement",
+        "priority": "high",
+        "dependencies": [
+          13
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Execute Existing Test Suite Baseline",
+            "description": "Run the complete existing test suite to establish baseline functionality and identify any current test failures before architecture changes",
+            "dependencies": [],
+            "details": "Execute all existing Jest tests to capture current test results, performance metrics, and coverage data. Document any failing tests and their reasons. Generate baseline test report for comparison after migration. Verify test environment setup and Jest@29.x configuration is working properly.",
+            "status": "pending",
+            "testStrategy": "Full test suite execution, baseline metrics capture, test failure documentation, coverage report generation"
+          },
+          {
+            "id": 2,
+            "title": "Create Integration Tests for New Module Structure",
+            "description": "Develop integration tests that validate interactions between the new feature-based modules and ensure proper module boundaries",
+            "dependencies": [
+              "14.1"
+            ],
+            "details": "Create integration tests covering transform/, cache/, scoring/, and utils/ module interactions. Test cross-module data flow and API contracts. Validate that module boundaries are respected and no unwanted coupling exists. Include tests for dynamic module loading and dependency injection patterns.",
+            "status": "pending",
+            "testStrategy": "Module interaction validation, API contract testing, boundary enforcement verification, dependency injection testing"
+          },
+          {
+            "id": 3,
+            "title": "Implement Performance Regression Tests",
+            "description": "Create performance tests comparing old vs new architecture implementations to ensure no performance degradation",
+            "dependencies": [
+              "14.1",
+              "14.2"
+            ],
+            "details": "Develop benchmark tests comparing cache performance (cache.ts vs optimized-cache.ts), transformer execution times, and overall system throughput. Create automated performance regression detection with configurable thresholds. Include memory usage profiling and garbage collection impact analysis.",
+            "status": "pending",
+            "testStrategy": "Performance benchmarking, regression threshold validation, memory profiling, throughput comparison testing"
+          },
+          {
+            "id": 4,
+            "title": "Create End-to-End and Load Testing Suite",
+            "description": "Implement comprehensive E2E tests covering complete workflows and load tests for caching and scoring systems",
+            "dependencies": [
+              "14.2",
+              "14.3"
+            ],
+            "details": "Build E2E tests simulating real-world usage scenarios across all major workflows. Implement load testing for caching mechanisms under high concurrency. Create stress tests for scoring algorithms with large datasets. Add automated test data generation and cleanup procedures.",
+            "status": "pending",
+            "testStrategy": "End-to-end workflow validation, load testing under concurrency, stress testing with large datasets, automated test data management"
+          },
+          {
+            "id": 5,
+            "title": "Implement Coverage Reporting and Backward Compatibility Tests",
+            "description": "Set up comprehensive test coverage reporting and create backward compatibility tests to ensure API stability",
+            "dependencies": [
+              "14.1",
+              "14.2",
+              "14.3",
+              "14.4"
+            ],
+            "details": "Configure Jest coverage reporting with >90% threshold enforcement. Create backward compatibility tests ensuring existing API contracts remain functional. Implement automated coverage trend tracking and regression detection. Add compatibility matrix testing across different Node.js versions and TypeScript configurations.",
+            "status": "pending",
+            "testStrategy": "Coverage threshold enforcement, backward compatibility validation, API contract testing, multi-version compatibility verification"
+          }
+        ]
+      },
+      {
+        "id": 15,
+        "title": "Clean Up and Documentation",
+        "description": "Remove advanced/ directory, update documentation, and finalize implementation",
+        "details": "Remove advanced/ directory after confirming all functionality migrated. Update README and API documentation. Create migration guide for external consumers. Add code examples for new module structure. Update JSDoc comments throughout codebase. Create architectural decision records (ADRs) documenting design choices. Add contribution guidelines for new structure. Implement automated documentation generation using TypeDoc.",
+        "testStrategy": "Directory removal verification, documentation accuracy validation, example code testing, link verification in documentation",
+        "priority": "medium",
+        "dependencies": [
+          14
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Verify Migration Completion and Remove Advanced Directory",
+            "description": "Confirm all functionality from advanced/ directory has been successfully migrated to new module structure, then safely remove the directory",
+            "dependencies": [],
+            "details": "Run comprehensive tests to verify all advanced functionality is working in new locations. Check for any remaining imports or references to advanced/ directory. Create backup of advanced/ directory before removal. Remove advanced/ directory and update any remaining file references.",
+            "status": "pending",
+            "testStrategy": "Directory removal verification, import reference validation, functionality regression testing, backup restoration testing"
+          },
+          {
+            "id": 2,
+            "title": "Update Core Documentation and API References",
+            "description": "Update README.md and API documentation to reflect new module structure and removed advanced directory",
+            "dependencies": [
+              "15.1"
+            ],
+            "details": "Update README.md with new project structure overview. Revise API documentation to reflect consolidated modules. Update installation and usage examples. Remove references to advanced/ directory from all documentation files. Update package.json scripts and configuration references.",
+            "status": "pending",
+            "testStrategy": "Documentation accuracy validation, link verification, example code testing, configuration validation"
+          },
+          {
+            "id": 3,
+            "title": "Create Migration Guide and Code Examples",
+            "description": "Develop comprehensive migration guide for external consumers and create practical code examples",
+            "dependencies": [
+              "15.2"
+            ],
+            "details": "Create MIGRATION.md with step-by-step upgrade instructions. Document breaking changes and required code modifications. Provide before/after code examples for common use cases. Create migration script templates for automated transitions. Add FAQ section for common migration issues.",
+            "status": "pending",
+            "testStrategy": "Migration guide accuracy testing, code example validation, migration script functionality verification"
+          },
+          {
+            "id": 4,
+            "title": "Update JSDoc Comments and Create ADRs",
+            "description": "Enhance JSDoc comments throughout codebase and create architectural decision records",
+            "dependencies": [
+              "15.2"
+            ],
+            "details": "Update JSDoc comments for all public APIs with new module structure. Add comprehensive parameter and return type documentation. Create ADRs documenting key architectural decisions made during consolidation. Document rationale for module structure choices and trade-offs considered.",
+            "status": "pending",
+            "testStrategy": "JSDoc comment completeness validation, ADR accuracy review, documentation generation testing"
+          },
+          {
+            "id": 5,
+            "title": "Implement Automated Documentation Generation",
+            "description": "Set up TypeDoc for automated documentation generation and create contribution guidelines",
+            "dependencies": [
+              "15.4"
+            ],
+            "details": "Configure TypeDoc with appropriate settings for new module structure. Create typedoc.json configuration file. Set up automated documentation generation in CI/CD pipeline. Create CONTRIBUTING.md with guidelines for new structure. Add documentation build scripts to package.json.",
+            "status": "pending",
+            "testStrategy": "TypeDoc generation testing, CI/CD pipeline validation, contribution guideline accuracy verification, build script functionality testing"
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2025-08-06T17:02:17.098Z",
+      "updated": "2025-08-07T22:00:20.993Z",
+      "description": "Tasks for openai-reorganization context"
+    }
+  }
+}

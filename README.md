@@ -49,6 +49,101 @@ Transform your CRM workflows with AI-powered automation. Instead of clicking thr
 ### 🔧 **Advanced Capabilities**
 - **Batch Processing**: Handle bulk operations with error tracking
 - **Flexible Filtering**: Text, numeric, date, boolean, and relationship filters
+
+## 🔌 ChatGPT/OpenAI Integration
+
+The Attio MCP Server now includes OpenAI-compatible endpoints for integration with ChatGPT and other OpenAI-based systems.
+
+### Available OpenAI Endpoints
+
+#### `GET /openai/tools`
+Lists available OpenAI-compliant tools.
+
+**Response:**
+```json
+{
+  "tools": [
+    {
+      "name": "search",
+      "description": "Search Attio records",
+      "parameters": {
+        "query": "string - Search query"
+      }
+    },
+    {
+      "name": "fetch",
+      "description": "Fetch detailed record information",
+      "parameters": {
+        "id": "string - Record ID"
+      }
+    }
+  ]
+}
+```
+
+#### `POST /openai/execute`
+Execute search or fetch operations.
+
+**Search Request:**
+```json
+{
+  "tool": "search",
+  "arguments": {
+    "query": "AI companies"
+  }
+}
+```
+
+**Search Response:**
+```json
+{
+  "result": [
+    {
+      "id": "company_123",
+      "title": "TechCorp AI",
+      "text": "AI software company with 50+ employees",
+      "url": "https://app.attio.com/companies/123"
+    }
+  ]
+}
+```
+
+**Fetch Request:**
+```json
+{
+  "tool": "fetch",
+  "arguments": {
+    "id": "company_123"
+  }
+}
+```
+
+**Fetch Response:**
+```json
+{
+  "result": {
+    "id": "company_123",
+    "title": "TechCorp AI",
+    "text": "Detailed company information...",
+    "url": "https://app.attio.com/companies/123",
+    "metadata": {
+      "employees": 75,
+      "industry": "AI/ML",
+      "founded": "2020"
+    }
+  }
+}
+```
+
+#### `GET /health`
+Health check endpoint for monitoring.
+
+### Testing OpenAI Integration
+
+Run the integration test to verify OpenAI endpoints:
+```bash
+node test/integration/test-openai-phase2.js
+```
 - **Data Export**: JSON serialization for integrations
 - **Real-time Updates**: Live data synchronization with Attio
 

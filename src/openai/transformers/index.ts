@@ -126,6 +126,10 @@ export function extractAttributeValue(attribute: any): string {
   if (attribute.value !== undefined) return String(attribute.value);
   if (attribute.text) return attribute.text;
   if (attribute.name) return attribute.name;
+  
+  // Handle email_address, phone_number fields
+  if (attribute.email_address) return attribute.email_address;
+  if (attribute.phone_number) return attribute.phone_number;
 
   // For arrays, join values
   if (Array.isArray(attribute)) {

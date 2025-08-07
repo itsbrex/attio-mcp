@@ -1,0 +1,241 @@
+<context>
+# Overview
+The Attio MCP Server is being transformed into a ChatGPT-compatible connector that bridges OpenAI's ChatGPT interface with Attio's CRM API. Phases 1 and 2 have been completed, establishing SSE transport and OpenAI-compliant tools. The remaining work focuses on OAuth authentication, security hardening, and comprehensive testing/documentation to achieve production readiness.
+
+# Core Features
+## Completed Features (Phases 1-2)
+- SSE (Server-Sent Events) transport layer for real-time communication
+- OpenAI-compliant search and fetch tools
+- Message wrapping and protocol adaptation
+- Basic API integration with Attio CRM
+- Universal tool architecture for CRUD operations
+
+## Remaining Features (Phases 3-4)
+- OAuth 2.0 authentication with dynamic client registration
+- Comprehensive security middleware and threat protection
+- Production-grade testing suite with >80% coverage
+- Complete documentation for deployment and usage
+- Performance optimization and monitoring
+
+# User Experience
+## User Personas
+- **ChatGPT Users**: Need seamless access to Attio CRM data through natural language
+- **System Administrators**: Require secure, scalable deployment options
+- **Developers**: Need clear API documentation and integration guides
+- **Security Teams**: Require audit logs and compliance features
+
+## Key User Flows
+- OAuth authentication flow for secure access
+- Natural language CRM queries through ChatGPT
+- Real-time data synchronization
+- Error handling and recovery
+</context>
+<PRD>
+# Technical Architecture
+
+## Phase 3: OAuth Authentication & Security Layer
+### System Components
+- OAuth 2.0 authorization server with PKCE support
+- Dynamic client registration endpoint
+- Token management system (access/refresh tokens)
+- Security middleware layer
+- Audit logging system
+- Rate limiting per authenticated user
+
+### Data Models
+- Client registrations (client_id, client_secret, redirect_uris)
+- OAuth tokens (access_token, refresh_token, expiry)
+- Authorization codes (temporary codes for token exchange)
+- User sessions (session management and timeout)
+- Audit logs (security events, access patterns)
+
+### APIs and Integrations
+- `/oauth/authorize` - Authorization endpoint
+- `/oauth/token` - Token exchange endpoint
+- `/oauth/register` - Dynamic client registration
+- `/oauth/revoke` - Token revocation
+- Integration with existing Attio API key system
+- Session management with Redis/in-memory store
+
+### Infrastructure Requirements
+- Secure token storage (encrypted at rest)
+- SSL/TLS for all OAuth endpoints
+- Rate limiting infrastructure
+- Audit log storage system
+- Session management backend
+
+## Phase 4: Testing & Documentation
+### System Components
+- Comprehensive test suite (unit, integration, e2e)
+- Performance benchmarking framework
+- Security testing infrastructure
+- Documentation generation system
+- CI/CD pipeline enhancements
+
+### Testing Infrastructure
+- Unit test coverage tracking
+- Integration test environment
+- E2E test automation with OpenAI platform
+- Security penetration testing tools
+- Load testing framework
+
+### Documentation Components
+- User guides and tutorials
+- API reference documentation
+- Deployment guides (Docker, cloud platforms)
+- Security best practices
+- Troubleshooting resources
+
+# Development Roadmap
+
+## Phase 3: OAuth & Security Implementation
+### MVP Requirements
+1. Basic OAuth 2.0 flow implementation
+2. Token generation and validation
+3. Integration with Attio API keys
+4. Essential security middleware
+5. Basic audit logging
+
+### Core Security Features
+1. Input sanitization and validation
+2. Prompt injection detection
+3. Rate limiting per user
+4. CORS policy enforcement
+5. Session timeout management
+
+### Advanced Security Features
+1. Dynamic client registration
+2. Token refresh mechanism
+3. Advanced threat detection
+4. Data exfiltration prevention
+5. Comprehensive audit trails
+
+## Phase 4: Production Readiness
+### Testing Requirements
+1. Unit tests for all components (>80% coverage)
+2. Integration tests for complete flows
+3. E2E validation with ChatGPT
+4. Security penetration testing
+5. Performance benchmarking
+
+### Documentation Requirements
+1. Quick start guide
+2. API reference documentation
+3. Deployment guides
+4. Security configuration
+5. Troubleshooting guide
+
+### Deployment & Operations
+1. Docker containerization
+2. Cloud deployment templates
+3. Monitoring and alerting
+4. Backup and recovery procedures
+5. Scaling guidelines
+
+# Logical Dependency Chain
+
+## Foundation (Must be completed first)
+1. OAuth server core implementation
+2. Token management system
+3. Basic security middleware
+
+## Building Upon Foundation
+1. Dynamic client registration (depends on OAuth server)
+2. Advanced security features (depends on basic security)
+3. Integration with Attio API (depends on token management)
+4. Audit logging (depends on security middleware)
+
+## Testing & Validation Layer
+1. Unit tests (can start with foundation)
+2. Integration tests (requires OAuth + security)
+3. E2E tests (requires full implementation)
+4. Security tests (requires all security features)
+5. Performance tests (requires optimized code)
+
+## Documentation & Deployment
+1. API documentation (after implementation stabilizes)
+2. User guides (after features are complete)
+3. Deployment guides (after containerization)
+4. Operations guide (after monitoring setup)
+
+# Risks and Mitigations
+
+## Technical Challenges
+### Risk: OAuth Implementation Complexity
+- **Mitigation**: Use established OAuth libraries (e.g., node-oauth2-server)
+- **Mitigation**: Follow OAuth 2.0 RFC standards strictly
+- **Mitigation**: Implement PKCE for additional security
+
+### Risk: Security Vulnerabilities
+- **Mitigation**: Regular security audits and penetration testing
+- **Mitigation**: Implement defense-in-depth strategy
+- **Mitigation**: Use security-focused libraries and frameworks
+- **Mitigation**: Continuous monitoring and alerting
+
+### Risk: Performance at Scale
+- **Mitigation**: Implement caching strategies
+- **Mitigation**: Use connection pooling
+- **Mitigation**: Horizontal scaling architecture
+- **Mitigation**: Load testing before production
+
+## Integration Challenges
+### Risk: ChatGPT Platform Changes
+- **Mitigation**: Abstract OpenAI interfaces
+- **Mitigation**: Version API endpoints
+- **Mitigation**: Maintain backward compatibility
+- **Mitigation**: Regular testing against OpenAI platform
+
+### Risk: Attio API Rate Limits
+- **Mitigation**: Implement request queuing
+- **Mitigation**: Add caching layer
+- **Mitigation**: Batch operations where possible
+- **Mitigation**: Monitor API usage patterns
+
+## Resource Constraints
+### Risk: Testing Coverage Goals
+- **Mitigation**: Focus on critical path testing first
+- **Mitigation**: Use test generation tools
+- **Mitigation**: Implement continuous testing
+- **Mitigation**: Prioritize security and integration tests
+
+# Appendix
+
+## Research Findings
+- OpenAI requires OAuth 2.0 for production ChatGPT connectors
+- PKCE (Proof Key for Code Exchange) recommended for additional security
+- Rate limiting essential for preventing abuse
+- Audit logging required for compliance in many industries
+
+## Technical Specifications
+### OAuth 2.0 Configuration
+- Authorization Code Flow with PKCE
+- Token expiry: 1 hour (access), 30 days (refresh)
+- Supported scopes: read, write, admin
+- Client types: public, confidential
+
+### Security Requirements
+- TLS 1.2+ for all connections
+- Token encryption using AES-256
+- Session timeout: 30 minutes idle
+- Max request size: 1MB
+- Rate limit: 60 requests/minute per user
+
+### Performance Targets
+- OAuth flow completion: <3 seconds
+- Token validation: <100ms
+- API response time: <500ms p95
+- Concurrent users: 1000+
+- Uptime target: 99.9%
+
+## Implementation Priorities
+1. **Critical Path**: OAuth implementation → Security middleware → Token management
+2. **Testing Priority**: Security tests → Integration tests → Unit tests → E2E tests
+3. **Documentation Priority**: Security guide → Deployment guide → API reference → User guide
+
+## Success Metrics
+- Zero security vulnerabilities in production
+- >80% test coverage across all modules
+- <500ms response time for 95% of requests
+- Successful integration with ChatGPT platform
+- Complete documentation coverage
+</PRD>

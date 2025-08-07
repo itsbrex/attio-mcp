@@ -1,0 +1,33 @@
+# Task ID: 9
+# Title: Integration Test Suite
+# Status: pending
+# Dependencies: 4, 5, 6, 7
+# Priority: high
+# Description: Create comprehensive integration tests for complete OAuth flows and system interactions
+# Details:
+Implement end-to-end OAuth 2.0 flows testing including authorization code flow with PKCE. Test dynamic client registration workflows and token refresh mechanisms. Create integration tests for Attio API interactions and security middleware integration. Test session management across multiple requests and user scenarios. Implement database transaction testing and rollback mechanisms.
+
+# Test Strategy:
+Full OAuth flow validation from authorization to token usage. Multi-user concurrent session testing. API integration testing with rate limiting scenarios.
+
+# Subtasks:
+## 1. Create OAuth flow integration tests [pending]
+### Dependencies: None
+### Description: Develop comprehensive tests for complete OAuth authorization and token flows
+### Details:
+- Test authorization code flow end-to-end
+- Test PKCE flow with code challenges
+- Test token refresh flow
+- Test error handling scenarios
+- Test redirect URI validation
+
+## 2. Test ChatGPT connector integration [pending]
+### Dependencies: None
+### Description: Create integration tests for SSE transport and OpenAI tool execution
+### Details:
+- Test SSE connection establishment
+- Test OpenAI tool invocation through SSE
+- Test message wrapping and unwrapping
+- Test error propagation through SSE
+- Test connection recovery and reconnection
+
