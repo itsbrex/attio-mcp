@@ -159,7 +159,8 @@ export class LRUMemoryCache<K = string, V = any> extends BaseCache<K, V> impleme
       }
       
       // Set in cache with TTL
-      const success = this.cache.set(key, entry, { ttl });
+      this.cache.set(key, entry, { ttl });
+      const success = true;
       
       if (success) {
         // Update stats
@@ -263,7 +264,9 @@ export class LRUMemoryCache<K = string, V = any> extends BaseCache<K, V> impleme
     const entry = this.cache.get(key);
     if (!entry) return undefined;
     
-    const ttl = this.cache.getTtl(key) || 0;
+    // Get remaining TTL based on cache's internal TTL tracking
+    const remaining = this.cache.getRemainingTTL(key);
+    const ttl = remaining || 0;
     const now = Date.now();
     
     return {
@@ -285,9 +288,10 @@ export class LRUMemoryCache<K = string, V = any> extends BaseCache<K, V> impleme
     if (!entry) return false;
     
     // Re-set with new TTL
-    return this.cache.set(key, entry, { 
+    this.cache.set(key, entry, { 
       ttl: ttl ?? this.config.defaultTTL 
     });
+    return true;
   }
   
   /**
@@ -363,7 +367,9 @@ export class LRUMemoryCache<K = string, V = any> extends BaseCache<K, V> impleme
     const exported: Array<[K, CacheEntry<V>]> = [];
     
     for (const [key, entry] of this.cache.entries()) {
-      const ttl = this.cache.getTtl(key) || 0;
+      // Get remaining TTL based on cache's internal TTL tracking
+    const remaining = this.cache.getRemainingTTL(key);
+    const ttl = remaining || 0;
       const now = Date.now();
       
       exported.push([key, {
@@ -474,7 +480,7 @@ export class LRUMemoryCache<K = string, V = any> extends BaseCache<K, V> impleme
     switch (reason) {
       case 'evict':
         return EvictionReason.SIZE;
-      case 'expire':
+      case 'expire' as any:
         return EvictionReason.TTL;
       case 'delete':
         return EvictionReason.MANUAL;

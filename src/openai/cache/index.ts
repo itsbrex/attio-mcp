@@ -5,6 +5,10 @@
 
 // Core interfaces and types
 export {
+  BaseCache
+} from './interface.js';
+
+export type {
   ICache,
   ICacheFactory,
   CacheConfig,
@@ -13,23 +17,23 @@ export {
   CacheOperationOptions,
   CacheEvent,
   CacheEventHandler,
-  CacheStrategy,
-  EvictionReason,
-  BaseCache
+  EvictionReason
 } from './interface.js';
+
+export { CacheStrategy } from './interface.js';
 
 // LRU cache implementation
 export {
   LRUMemoryCache,
-  LRUCacheConfig,
   createLRUCache
+} from './lru-cache.js';
+
+export type {
+  LRUCacheConfig
 } from './lru-cache.js';
 
 // Serialization utilities
 export {
-  ISerializer,
-  SerializationOptions,
-  SerializationResult,
   JSONSerializer,
   BufferSerializer,
   CompositeSerializer,
@@ -38,24 +42,32 @@ export {
   Serializers
 } from './serialization.js';
 
+export type {
+  ISerializer,
+  SerializationOptions,
+  SerializationResult
+} from './serialization.js';
+
 // Metrics and monitoring
 export {
   CacheMetricsCollector,
   MetricsWindow,
   MetricType,
+  defaultMetricsCollector
+} from './metrics.js';
+
+export type {
   MetricDataPoint,
   MetricSummary,
   PerformanceMetric,
   MemoryMetric,
   AlertConfig,
-  Alert,
-  defaultMetricsCollector
+  Alert
 } from './metrics.js';
 
 // Factory and utilities
 export {
   CacheFactory,
-  IRedisLikeCache,
   RedisLikeMemoryCache,
   HybridCache,
   cacheFactory,
@@ -64,9 +76,14 @@ export {
   createHybridCache
 } from './factory.js';
 
+export type {
+  IRedisLikeCache
+} from './factory.js';
+
 // Default cache instances with configuration
-import { createCache, CacheStrategy } from './factory.js';
-import { CacheConfig } from './interface.js';
+import { createCache } from './factory.js';
+import { CacheStrategy } from './interface.js';
+import type { CacheConfig, CacheStats } from './interface.js';
 
 /**
  * Default cache configurations

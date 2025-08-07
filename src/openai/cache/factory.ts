@@ -414,7 +414,8 @@ export class HybridCache<K = string, V = any> extends BaseCache<K, V> {
   dispose(): void {
     this.l1Cache.dispose();
     this.l2Cache.dispose();
-    super.dispose();
+    // Clean up event handlers from base class
+    this.eventHandlers.clear();
   }
 }
 
@@ -450,12 +451,12 @@ export class CacheFactory implements ICacheFactory {
     
     const cache = new Implementation(config || {}) as ICache<K, V>;
     
-    // Attach metrics collector
-    this.attachMetrics(cache);
+    // Attach metrics collector (cast to string key type for metrics)
+    this.attachMetrics(cache as ICache<string, any>);
     
     // Store instance for management
     const instanceId = `${strategy}_${Date.now()}`;
-    this.instances.set(instanceId, cache);
+    this.instances.set(instanceId, cache as ICache<string, any>);
     
     return cache;
   }
@@ -554,15 +555,20 @@ export class CacheFactory implements ICacheFactory {
       this.metricsCollector.increment('cache.deletes');
     });
     
-    cache.on(CacheEvent.EVICT, (event) => {
+    cache.on(CacheEvent.EVICT, (event: any) => {
       this.metricsCollector.increment(`cache.evictions.${event.reason}`);
     });
     
     // Periodically collect cache stats
-    setInterval(() => {
+    const interval = setInterval(() => {
       const stats = cache.getStats();
       this.metricsCollector.recordCacheStats(stats);
     }, MetricsWindow.MINUTE);
+    
+    // Don't block Node.js exit
+    if (interval.unref) {
+      interval.unref();
+    }
   }
 }
 
