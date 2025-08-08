@@ -4,13 +4,13 @@
  */
 
 import { features } from '../../config/features.js';
-import { 
-  ScoringAlgorithm, 
-  createScorer, 
-  HybridScorer,
+import {
   BM25Scorer,
+  createScorer,
+  HybridScorer,
+  ScoringAlgorithm,
+  SemanticScorer,
   TFIDFScorer,
-  SemanticScorer 
 } from './scoring-algorithms.js';
 
 export interface ScoringFactors {
@@ -62,7 +62,7 @@ export class RelevanceScorer {
       completeness: 0.2,
       engagement: 0.2,
     };
-    
+
     // Initialize scoring algorithm
     this.algorithm = algorithm;
     this.scorer = createScorer(algorithm);
@@ -92,7 +92,7 @@ export class RelevanceScorer {
 
     // Update corpus statistics if requested
     if (options?.updateCorpus && results.length > 0) {
-      const documents = results.map(r => this.extractTextFromData(r.data));
+      const documents = results.map((r) => this.extractTextFromData(r.data));
       if (this.scorer instanceof HybridScorer) {
         this.scorer.updateCorpus(documents);
       } else if (this.scorer instanceof BM25Scorer) {
@@ -103,18 +103,18 @@ export class RelevanceScorer {
     }
 
     const queryTerms = this.tokenize(query.toLowerCase());
-    
-    const scoredResults = results.map(result => {
+
+    const scoredResults = results.map((result) => {
       // Calculate algorithm-based score
       const documentText = this.extractTextFromData(result.data);
       const algorithmScore = this.scorer.score(query, documentText);
-      
+
       // Calculate traditional factors
       const factors = this.calculateFactors(result, queryTerms);
-      
+
       // Combine algorithm score with other factors
       const combinedScore = this.combineScores(algorithmScore, factors);
-      
+
       return {
         ...result,
         score: combinedScore,
@@ -139,17 +139,23 @@ export class RelevanceScorer {
     const factors: Partial<ScoringFactors> = {};
 
     // Text match score
-    factors.textMatch = this.calculateTextMatchScore(result.data, queryTerms);
+    factors.textMatch = this.calculateTextMatchScore(
+      result?.data ?? {},
+      queryTerms
+    );
 
     // Recency score (if timestamp available)
-    if (result.data.updated_at || result.data.created_at) {
+    if (
+      (result as any)?.data?.updated_at ||
+      (result as any)?.data?.created_at
+    ) {
       factors.recency = this.calculateRecencyScore(
-        result.data.updated_at || result.data.created_at
+        (result as any).data.updated_at || (result as any).data.created_at
       );
     }
 
     // Completeness score
-    factors.completeness = this.calculateCompletenessScore(result.data);
+    factors.completeness = this.calculateCompletenessScore(result?.data ?? {});
 
     // Engagement score (placeholder for future implementation)
     factors.engagement = 0.5; // Default neutral score
@@ -160,10 +166,7 @@ export class RelevanceScorer {
   /**
    * Calculate text match score using TF-IDF-like approach
    */
-  private calculateTextMatchScore(
-    data: any,
-    queryTerms: string[]
-  ): number {
+  private calculateTextMatchScore(data: any, queryTerms: string[]): number {
     if (!data || queryTerms.length === 0) {
       return 0;
     }
@@ -178,7 +181,7 @@ export class RelevanceScorer {
 
       const fieldText = String(fieldValue).toLowerCase();
       const fieldTerms = this.tokenize(fieldText);
-      
+
       // Calculate term frequency
       let matchCount = 0;
       for (const queryTerm of queryTerms) {
@@ -190,7 +193,8 @@ export class RelevanceScorer {
       }
 
       if (matchCount > 0) {
-        const termFrequency = matchCount / Math.max(queryTerms.length, fieldTerms.length);
+        const termFrequency =
+          matchCount / Math.max(queryTerms.length, fieldTerms.length);
         totalScore += termFrequency * weight;
         fieldCount++;
       }
@@ -223,8 +227,13 @@ export class RelevanceScorer {
     if (!data) return 0;
 
     const importantFields = [
-      'name', 'email', 'phone', 'company',
-      'title', 'description', 'website',
+      'name',
+      'email',
+      'phone',
+      'company',
+      'title',
+      'description',
+      'website',
     ];
 
     let filledCount = 0;
@@ -276,7 +285,7 @@ export class RelevanceScorer {
       .toLowerCase()
       .replace(/[^\w\s]/g, ' ')
       .split(/\s+/)
-      .filter(term => term.length > 1);
+      .filter((term) => term.length > 1);
   }
 
   /**
@@ -284,9 +293,9 @@ export class RelevanceScorer {
    */
   private extractTextFromData(data: any): string {
     if (!data) return '';
-    
+
     const textParts: string[] = [];
-    
+
     // Extract text from important fields
     for (const [field, weight] of this.fieldWeights.entries()) {
       const value = this.getFieldValue(data, field);
@@ -298,21 +307,24 @@ export class RelevanceScorer {
         }
       }
     }
-    
+
     return textParts.join(' ');
   }
 
   /**
    * Combine algorithm score with other factors
    */
-  private combineScores(algorithmScore: number, factors: Partial<ScoringFactors>): number {
+  private combineScores(
+    algorithmScore: number,
+    factors: Partial<ScoringFactors>
+  ): number {
     // Weight algorithm score heavily (60%)
     const algorithmWeight = 0.6;
     const factorWeight = 0.4;
-    
+
     // Calculate factor-based score
     const factorScore = this.calculateFinalScore(factors);
-    
+
     // Combine scores
     return algorithmScore * algorithmWeight + factorScore * factorWeight;
   }
@@ -323,7 +335,7 @@ export class RelevanceScorer {
   private getFieldValue(obj: any, path: string): any {
     const parts = path.split('.');
     let value = obj;
-    
+
     for (const part of parts) {
       if (value && typeof value === 'object') {
         value = value[part];
@@ -331,7 +343,7 @@ export class RelevanceScorer {
         return undefined;
       }
     }
-    
+
     return value;
   }
 
@@ -347,7 +359,9 @@ export class RelevanceScorer {
   /**
    * Update factor weights
    */
-  public updateFactorWeights(weights: Partial<typeof this.defaultWeights>): void {
+  public updateFactorWeights(
+    weights: Partial<typeof this.defaultWeights>
+  ): void {
     this.defaultWeights = { ...this.defaultWeights, ...weights };
   }
 
