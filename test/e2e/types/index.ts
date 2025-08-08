@@ -1,6 +1,6 @@
 /**
  * E2E Test Type Definitions
- * 
+ *
  * Comprehensive type definitions for E2E testing to replace 'any' types
  * with proper TypeScript interfaces for better type safety.
  */
@@ -77,12 +77,12 @@ export interface NoteTestData extends TestObjectData {
 /**
  * Union type for all test data types
  */
-export type AnyTestData = 
-  | CompanyTestData 
-  | PersonTestData 
-  | ListTestData 
-  | TaskTestData 
-  | NoteTestData 
+export type AnyTestData =
+  | CompanyTestData
+  | PersonTestData
+  | ListTestData
+  | TaskTestData
+  | NoteTestData
   | TestObjectData;
 
 /**

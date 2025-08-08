@@ -2,12 +2,12 @@
  * Tests for cache integration in OpenAI search and fetch operations
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { search } from '../../src/openai/search.js';
-import { fetch } from '../../src/openai/fetch.js';
-import { features } from '../../src/config/features.js';
-import { searchCache, recordCache } from '../../src/openai/advanced/index.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cacheManager } from '../../src/config/cache-config.js';
+import { features } from '../../src/config/features.js';
+import { recordCache, searchCache } from '../../src/openai/advanced/index.js';
+import { fetch } from '../../src/openai/fetch.js';
+import { search } from '../../src/openai/search.js';
 
 // Mock the executeToolRequest function
 vi.mock('../../src/handlers/tools/dispatcher.js', () => ({

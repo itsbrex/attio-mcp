@@ -3,10 +3,10 @@
  * Manages complex multi-stage data transformation workflows
  */
 
-import { dataTransformer, TransformationPipeline } from './data-transformer.js';
 import { features } from '../../config/features.js';
-import { advancedErrorHandler } from './error-handler.js';
 import { searchCache } from './cache.js';
+import { dataTransformer, TransformationPipeline } from './data-transformer.js';
+import { advancedErrorHandler } from './error-handler.js';
 
 export interface PipelineStage {
   name: string;

@@ -4,7 +4,14 @@
     "module": "NodeNext",
     "rootDir": "./src",
     "moduleResolution": "NodeNext",
+    "baseUrl": "./src",
     "paths": {
+      "@api/*": ["openai/api/*"],
+      "@transform/*": ["openai/transform/*"],
+      "@scoring/*": ["openai/scoring/*"],
+      "@performance/*": ["openai/performance/*"],
+      "@error/*": ["openai/error/*"],
+      "@cache/*": ["openai/cache/*"],
       "*": ["./node_modules/@types/*"]
     },
     "resolveJsonModule": true,
@@ -23,3 +30,4 @@
   "include": ["src/**/*"],
   "exclude": ["node_modules", "__tests__"]
 }
+

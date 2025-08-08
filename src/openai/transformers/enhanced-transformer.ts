@@ -3,10 +3,10 @@
  * Integrates advanced data transformation capabilities into existing transformers
  */
 
-import { dataTransformer } from '../advanced/data-transformer.js';
 import { features } from '../../config/features.js';
 import { debug } from '../../utils/logger.js';
-import type { OpenAISearchResult, OpenAIFetchResult } from '../types.js';
+import { dataTransformer } from '../advanced/data-transformer.js';
+import type { OpenAIFetchResult, OpenAISearchResult } from '../types.js';
 
 /**
  * Enhanced transformer wrapper that adds advanced features
@@ -190,7 +190,9 @@ export class EnhancedTransformer {
    */
   public createBatchTransformer() {
     return {
-      toSearchResults: async (records: any[]): Promise<OpenAISearchResult[]> => {
+      toSearchResults: async (
+        records: any[]
+      ): Promise<OpenAISearchResult[]> => {
         const results: OpenAISearchResult[] = [];
 
         for (const record of records) {
