@@ -276,16 +276,16 @@ describe('OpenAI Search Integration', () => {
       vi.mocked(executeToolRequest).mockResolvedValueOnce(mockResults);
 
       const scorer = new RelevanceScorer();
-      const results = await scorer.scoreResults(
+      const scored = await scorer.scoreResults(
         mockResults.data,
         'Johnathan Smith',
         'people'
       );
       const results = await search('Johnathan Smith', 'people');
 
-      if (results.length > 0 && results[0].score) {
+      if (results.length > 0 && (results[0] as any).score) {
         // Should still match with reasonable score
-        expect(results[0].score).toBeGreaterThan(0.5);
+        expect((results[0] as any).score).toBeGreaterThan(0.5);
       }
     });
   });

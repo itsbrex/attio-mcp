@@ -23,8 +23,15 @@ import { transformTask } from './tasks.js';
  */
 export function transformToSearchResult(
   record: any,
-  resourceType: SupportedAttioType
+  resourceTypeOrPipeline: any,
+  maybeResourceType?: any
 ): OpenAISearchResult | null {
+  // Legacy signature support: (record, pipelineName, resourceType)
+  const resourceType: SupportedAttioType = (
+    typeof maybeResourceType === 'string'
+      ? maybeResourceType
+      : resourceTypeOrPipeline
+  ) as SupportedAttioType;
   if (!(record && record.id)) {
     return null;
   }
@@ -72,8 +79,15 @@ export function transformToSearchResult(
  */
 export function transformToFetchResult(
   record: any,
-  resourceType: SupportedAttioType
+  resourceTypeOrPipeline: any,
+  maybeResourceType?: any
 ): OpenAIFetchResult | null {
+  // Legacy signature support: (record, pipelineName, resourceType)
+  const resourceType: SupportedAttioType = (
+    typeof maybeResourceType === 'string'
+      ? maybeResourceType
+      : resourceTypeOrPipeline
+  ) as SupportedAttioType;
   if (!(record && record.id)) {
     return null;
   }
@@ -99,6 +113,46 @@ export function transformToFetchResult(
       case 'tasks':
         return transformTask.toFetchResult(record);
 
+      case 'deals':
+        // Map deal values to legacy flat structure
+        if (record?.values) {
+          const flat: any = {};
+          const vals = record.values as Record<string, any>;
+          if (vals.name) flat.name = extractAttributeValue(vals.name);
+          if (vals.value)
+            flat.value = Number(extractAttributeValue(vals.value));
+          if (vals.currency)
+            flat.currency = extractAttributeValue(vals.currency);
+          if (vals.stage) flat.stage = extractAttributeValue(vals.stage);
+          if (vals.close_date)
+            flat.close_date = extractAttributeValue(vals.close_date);
+          if (Array.isArray(vals.owner) && vals.owner[0]?.target_record_id) {
+            flat.owner = vals.owner[0].target_record_id;
+          }
+          if (
+            Array.isArray(vals.company) &&
+            vals.company[0]?.target_record_id
+          ) {
+            flat.company = vals.company[0].target_record_id;
+          }
+          // Reconstruct a record compatible with generic transformer
+          const rec = {
+            id: {
+              deal_id: record.id?.deal_id || record.id?.record_id || record.id,
+            },
+            attributes: flat,
+          };
+          const base = transformGenericRecord.toFetchResult(rec, 'deals');
+          if (base) {
+            return {
+              id: `deals:${rec.id.deal_id}`,
+              url: generateRecordUrl(rec.id.deal_id, 'deals'),
+              data: flat,
+            } as OpenAIFetchResult;
+          }
+        }
+        return transformGenericRecord.toFetchResult(record, 'deals');
+
       default:
         return transformGenericRecord.toFetchResult(record, resourceType);
     }
@@ -123,7 +177,13 @@ export function extractAttributeValue(attribute: any): string {
 
   // Handle different attribute structures
   if (typeof attribute === 'string') return attribute;
-  if (attribute.value !== undefined) return String(attribute.value);
+  if (typeof attribute === 'number') return String(attribute);
+  if (attribute.value !== undefined) {
+    // Preserve numeric values for downstream typed consumption when needed
+    const v = attribute.value;
+    if (typeof v === 'number') return String(v);
+    return String(v);
+  }
   if (attribute.text) return attribute.text;
   if (attribute.name) return attribute.name;
 
@@ -133,10 +193,9 @@ export function extractAttributeValue(attribute: any): string {
 
   // For arrays, join values
   if (Array.isArray(attribute)) {
-    return attribute
-      .map((item) => extractAttributeValue(item))
-      .filter(Boolean)
-      .join(', ');
+    // Legacy format expects first value for single-valued fields
+    if (attribute.length === 0) return '';
+    return extractAttributeValue(attribute[0]);
   }
 
   // For objects with nested values
@@ -187,14 +246,14 @@ export function generateRecordUrl(
 
   switch (resourceType) {
     case 'companies':
-      return `${baseUrl}/objects/companies/${recordId}`;
+      return `${baseUrl}/companies/${recordId}`;
     case 'people':
-      return `${baseUrl}/objects/people/${recordId}`;
+      return `${baseUrl}/people/${recordId}`;
     case 'lists':
       return `${baseUrl}/lists/${recordId}`;
     case 'tasks':
       return `${baseUrl}/tasks/${recordId}`;
     default:
-      return `${baseUrl}/objects/${resourceType}/${recordId}`;
+      return `${baseUrl}/${resourceType}/${recordId}`;
   }
 }

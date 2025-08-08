@@ -10,7 +10,7 @@ import type { OpenAIFetchResult, OpenAISearchResult } from '../../types.js';
 
 export const transformGenericRecord = {
   toSearchResult(record: any, resourceType: string): OpenAISearchResult {
-    const id = record.id?.record_id || record.id;
+    const id = record.id?.record_id || record.id?.deal_id || record.id;
 
     const titleCandidates = [
       'name',
@@ -53,7 +53,7 @@ export const transformGenericRecord = {
         break;
       }
     }
-    textParts.push(`Type: ${resourceType}`);
+    // Legacy outputs avoid adding synthetic 'Type:' line
 
     const email = extractAttributeValue(record.attributes?.email_addresses);
     if (email) textParts.push(`Email: ${email}`);
@@ -62,15 +62,21 @@ export const transformGenericRecord = {
 
     return {
       id: `${resourceType}:${id}`,
-      title: title || `${resourceType} Record`,
-      text: textParts.join(' • ') || 'No details available',
+      title:
+        title ||
+        (resourceType === 'deals'
+          ? extractAttributeValue(record.attributes?.name) || 'Deal'
+          : `${resourceType} Record`),
+      text:
+        textParts.join('\n') ||
+        (resourceType === 'deals' ? '' : 'No details available'),
       url: generateRecordUrl(id, resourceType),
     };
   },
 
   toFetchResult(record: any, resourceType: string): OpenAIFetchResult {
     const searchResult = this.toSearchResult(record, resourceType);
-    const metadata: Record<string, any> = { _type: resourceType };
+    const metadata: Record<string, any> = {};
 
     if (record.attributes && typeof record.attributes === 'object') {
       const attributes: Record<string, any> = {};
@@ -105,7 +111,7 @@ export const transformGenericRecord = {
 
     return {
       ...searchResult,
-      metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+      data: Object.keys(metadata).length > 0 ? metadata : undefined,
     };
   },
 };

@@ -11,20 +11,19 @@ import type { OpenAIFetchResult, OpenAISearchResult } from '../../types.js';
 export const transformTask = {
   toSearchResult(task: any): OpenAISearchResult {
     const id = task.id?.task_id || task.id?.record_id || task.id;
+    const attrs = task.values || task.attributes || {};
     const content = extractAttributeValue(
-      task.content || task.attributes?.content
+      task.content || attrs.name || attrs.content
     );
-    const status = extractAttributeValue(
-      task.status || task.attributes?.status
-    );
+    const status = extractAttributeValue(task.status || attrs.status);
     const assignee = extractAttributeValue(
-      task.assignee?.name || task.attributes?.assignee
+      task.assignee?.name || attrs.assignee
     );
 
     const textParts: string[] = [];
     if (status) textParts.push(`Status: ${status}`);
     if (assignee) textParts.push(`Assigned to: ${assignee}`);
-    const dueDate = task.deadline_at || task.attributes?.due_date;
+    const dueDate = task.deadline_at || attrs.due_date;
     if (dueDate)
       textParts.push(`Due: ${new Date(dueDate).toLocaleDateString()}`);
     if (task.linked_records && task.linked_records.length > 0) {
@@ -37,7 +36,7 @@ export const transformTask = {
     return {
       id: `tasks:${id}`,
       title: content || 'Untitled Task',
-      text: textParts.join(' • ') || 'No details available',
+      text: textParts.join('\n') || content || 'No details available',
       url: generateRecordUrl(id, 'tasks'),
     };
   },
@@ -45,9 +44,9 @@ export const transformTask = {
   toFetchResult(task: any): OpenAIFetchResult {
     const searchResult = this.toSearchResult(task);
     const metadata: Record<string, any> = {};
-    const attrs = task.attributes || task.values || {};
+    const attrs = task.values || task.attributes || {};
 
-    if (task.values) {
+    if (attrs) {
       const valueFields = [
         'name',
         'status',
@@ -57,7 +56,7 @@ export const transformTask = {
         'description',
       ];
       for (const field of valueFields) {
-        if (attrs[field]) {
+        if (attrs[field] !== undefined) {
           const value = extractAttributeValue(attrs[field]);
           if (value) metadata[field] = value;
         }

@@ -3,14 +3,14 @@
  * Retrieves detailed information for a specific record
  */
 
+import crypto from 'crypto';
 import { getAttioClient } from '../api/attio-client.js';
 import { executeToolRequest } from '../handlers/tools/dispatcher.js';
 import { debug, warn } from '../utils/logger.js';
+import { withErrorHandling } from './advanced/error-recovery.js';
+import { features, recordCache } from './advanced/index.js';
 import { transformToFetchResult } from './transformers/index.js';
 import type { OpenAIFetchResult, SupportedAttioType } from './types.js';
-import { recordCache, features } from './advanced/index.js';
-import { withErrorHandling } from './advanced/error-recovery.js';
-import crypto from 'crypto';
 
 /**
  * Fetch detailed information for a specific record
@@ -64,7 +64,18 @@ export async function fetch(id: string): Promise<OpenAIFetchResult> {
       }
     );
 
-    if (result.toolResult?.type === 'text') {
+    // Legacy return: { data: {...} } vs toolResult
+    if ((result as any).data) {
+      const record = (result as any).data;
+      const transformed = transformToFetchResult(record, resourceType);
+      if (transformed) {
+        if (features.isEnabled('enableCache')) {
+          recordCache.set(cacheKey, transformed);
+          debug('OpenAI', 'Cached fetch result', { id, cacheKey }, 'fetch');
+        }
+        return transformed;
+      }
+    } else if (result.toolResult?.type === 'text') {
       // Parse the detailed response
       const record = parseDetailResponse(
         result.toolResult.content,
@@ -96,7 +107,9 @@ export async function fetch(id: string): Promise<OpenAIFetchResult> {
         }
       );
 
-      if (detailsResult.toolResult?.type === 'text') {
+      if ((detailsResult as any).data) {
+        Object.assign(record, (detailsResult as any).data);
+      } else if (detailsResult.toolResult?.type === 'text') {
         const additionalDetails = parseDetailResponse(
           detailsResult.toolResult.content,
           resourceType,
@@ -174,7 +187,9 @@ function parseRecordId(id: string): {
  * Check if a string is a valid resource type
  */
 function isValidResourceType(type: string): boolean {
-  return ['companies', 'people', 'lists', 'tasks', 'records'].includes(type);
+  return ['companies', 'people', 'lists', 'tasks', 'deals', 'records'].includes(
+    type
+  );
 }
 
 /**
@@ -263,10 +278,62 @@ async function fetchDirect(
         : await (client as any).request({ method: 'GET', url: endpoint });
     const record = response.data.data || response.data;
 
-    const transformed = transformToFetchResult(record, resourceType);
-    if (transformed) {
-      return transformed;
+    // Legacy-aligned direct mappings per type
+    if (resourceType === 'people') {
+      const id = record.id?.person_id || record.id?.record_id || recordId;
+      const vals = record.values || {};
+      const name = vals.name?.[0]?.value || vals.name || '';
+      const emails = Array.isArray(vals.email_addresses)
+        ? vals.email_addresses
+            .map((e: any) => e.email_address || e.value)
+            .filter(Boolean)
+        : [];
+      const phones = Array.isArray(vals.phone_numbers)
+        ? vals.phone_numbers
+            .map((p: any) => p.phone_number || p.value)
+            .filter(Boolean)
+        : [];
+      const jobTitle =
+        vals.job_title?.[0]?.value || vals.job_title || undefined;
+      const data: Record<string, any> = { name };
+      if (emails.length) data.email_addresses = emails;
+      if (phones.length) data.phone_numbers = phones;
+      if (jobTitle) data.job_title = jobTitle;
+      return {
+        id: `people:${id}`,
+        title: name,
+        text: name,
+        url: buildUrl('people', id),
+        data,
+      } as OpenAIFetchResult;
     }
+
+    if (resourceType === 'companies') {
+      const id = record.id?.company_id || record.id?.record_id || recordId;
+      const vals = record.values || {};
+      const name = vals.name?.[0]?.value || vals.name || '';
+      const domain =
+        vals.domain?.[0]?.value || vals.domains?.[0]?.value || undefined;
+      const employeeCount = vals.employee_count?.[0]?.value;
+      const industry = vals.industry?.[0]?.value || undefined;
+      const data: Record<string, any> = {};
+      if (domain) data.domain = domain;
+      if (typeof employeeCount === 'number')
+        data.employee_count = employeeCount;
+      if (industry) data.industry = industry;
+      if (name) data.name = name;
+      return {
+        id: `companies:${id}`,
+        title: name,
+        text: name,
+        url: buildUrl('companies', id),
+        data,
+      } as OpenAIFetchResult;
+    }
+
+    // Default to generic transformation
+    const transformed = transformToFetchResult(record, resourceType);
+    if (transformed) return transformed;
 
     throw new Error(`Failed to transform record: ${recordId}`);
   } catch (error: any) {
@@ -275,4 +342,8 @@ async function fetchDirect(
     }
     throw error;
   }
+}
+
+function buildUrl(type: string, id: string): string {
+  return `https://app.attio.com/${type}/${id}`;
 }

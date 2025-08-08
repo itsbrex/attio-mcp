@@ -49,18 +49,18 @@ export class AdvancedCache<T = any> {
   /**
    * Get value from cache
    */
-  public get(key: string): T | undefined {
+  public get(key: string): T | undefined | null {
     if (!features.isEnabled('enableCache')) {
       return undefined;
     }
 
     const entry = this.cache.get(key);
-    
+
     if (!entry) {
       if (this.options.enableStats) {
         this.stats.misses++;
       }
-      return undefined;
+      return undefined; // absent -> undefined
     }
 
     // Check if entry has expired
@@ -70,7 +70,7 @@ export class AdvancedCache<T = any> {
       if (this.options.enableStats) {
         this.stats.misses++;
       }
-      return undefined;
+      return null; // expired -> null (stale)
     }
 
     // Update hit count
@@ -103,7 +103,7 @@ export class AdvancedCache<T = any> {
     };
 
     this.cache.set(key, entry);
-    
+
     if (this.options.enableStats) {
       this.stats.sets++;
     }
@@ -118,7 +118,7 @@ export class AdvancedCache<T = any> {
     }
 
     const value = this.get(key);
-    return value !== undefined;
+    return value !== undefined && value !== null;
   }
 
   /**

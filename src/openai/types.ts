@@ -62,6 +62,7 @@ export type SupportedAttioType =
   | 'people'
   | 'lists'
   | 'tasks'
+  | 'deals'
   | 'records';
 
 /**

@@ -11,22 +11,26 @@ import type { OpenAIFetchResult, OpenAISearchResult } from '../../types.js';
 export const transformList = {
   toSearchResult(list: any): OpenAISearchResult {
     const id = list.id?.list_id || list.id?.record_id || list.id;
-    const name = list.name || extractAttributeValue(list.attributes?.name);
+    const attrs = list.values || list.attributes || {};
+    const name = list.name || extractAttributeValue(attrs.name);
     const description =
-      list.description || extractAttributeValue(list.attributes?.description);
+      list.description || extractAttributeValue(attrs.description);
 
     const textParts: string[] = [];
-    if (description) textParts.push(description);
-    if (list.entry_count !== undefined)
-      textParts.push(`${list.entry_count} entries`);
-    if (list.parent_object) textParts.push(`Type: ${list.parent_object} list`);
-    if (list.created_by?.name)
-      textParts.push(`Created by: ${list.created_by.name}`);
+    if (name) textParts.push(name);
+    if (attrs.entries?.[0]?.value !== undefined)
+      textParts.push(`Entries: ${extractAttributeValue(attrs.entries)}`);
+    if (attrs.created_at)
+      textParts.push(`Created: ${extractAttributeValue(attrs.created_at)}`);
 
     return {
       id: `lists:${id}`,
       title: name || 'Unnamed List',
-      text: textParts.join(' • ') || 'No description available',
+      text:
+        textParts.join('\n') ||
+        description ||
+        name ||
+        'No description available',
       url: generateRecordUrl(id, 'lists'),
     };
   },
@@ -34,9 +38,9 @@ export const transformList = {
   toFetchResult(list: any): OpenAIFetchResult {
     const searchResult = this.toSearchResult(list);
     const metadata: Record<string, any> = {};
-    const attrs = list.attributes || list.values || {};
+    const attrs = list.values || list.attributes || {};
 
-    if (list.values) {
+    if (attrs) {
       const valueFields = [
         'name',
         'entries',
@@ -46,7 +50,7 @@ export const transformList = {
         'status',
       ];
       for (const field of valueFields) {
-        if (attrs[field]) {
+        if (attrs[field] !== undefined) {
           const value = extractAttributeValue(attrs[field]);
           if (value) metadata[field] = value;
         }
@@ -54,7 +58,8 @@ export const transformList = {
     }
 
     if (list.parent_object) metadata.parent_object = list.parent_object;
-    if (list.entry_count !== undefined) metadata.entry_count = list.entry_count;
+    if (attrs.entries?.[0]?.value !== undefined)
+      metadata.entries = Number(extractAttributeValue(attrs.entries));
     if (list.api_slug) metadata.api_slug = list.api_slug;
     if (list.workspace_id) metadata.workspace_id = list.workspace_id;
     if (list.access_level) metadata.access_level = list.access_level;
