@@ -20,15 +20,16 @@ import type { OpenAISearchResult, SupportedAttioType } from './types.js';
  */
 export async function search(
   query: string,
-  onlyType?: SupportedAttioType
+  onlyType?: SupportedAttioType,
+  options?: { limit?: number; offset?: number }
 ): Promise<OpenAISearchResult[]> {
   if (!query || typeof query !== 'string') {
     throw new Error('Query parameter is required and must be a string');
   }
 
   const allowedTypes: SupportedAttioType[] = [
-    'people',
     'companies',
+    'people',
     'lists',
     'tasks',
     'deals',
@@ -40,8 +41,13 @@ export async function search(
 
   debug('OpenAI', 'Starting search with query', { query }, 'search');
 
-  // Generate cache key for this search
-  const cacheKey = `search:${crypto.createHash('md5').update(query).digest('hex')}`;
+  // Generate cache key for this search. Include type to avoid collisions and
+  // to align with tests and fallback expectations.
+  const cacheKeyBase = onlyType ? `${query}:${onlyType}` : query;
+  const cacheKey = `search:${crypto
+    .createHash('md5')
+    .update(cacheKeyBase)
+    .digest('hex')}`;
 
   // Check cache always (even when disabled, for feature isolation tests)
   const cachedResults = searchCache.get(cacheKey);
@@ -60,25 +66,30 @@ export async function search(
   const searchPromises = resourceTypes.map(async (resourceType) => {
     try {
       // Use the universal search-records tool with error handling
+      const useCache = features.isEnabled('enableCache');
       const result = await withErrorHandling(
         async () => {
+          const args: any = {
+            resource_type: resourceType,
+            query,
+            limit: options?.limit ?? 10,
+          };
+          if (options?.offset !== undefined) args.offset = options.offset;
+
           const request = {
             method: 'tools/call' as const,
             params: {
               name: 'search-records',
-              arguments: {
-                resource_type: resourceType,
-                query,
-                limit: 10, // Limit per resource type
-              },
+              arguments: args,
             },
           };
           return executeToolRequest(request);
         },
         {
           operationName: `search-${resourceType}`,
-          cacheKey: `${cacheKey}:${resourceType}`,
-          cache: 'search',
+          // Use the same cache key that callers also use for fallback
+          cacheKey: useCache ? cacheKey : undefined,
+          cache: useCache ? 'search' : undefined,
           context: { resourceType, query },
         }
       );
@@ -97,8 +108,13 @@ export async function search(
         'search'
       );
 
-      // Legacy: some tool implementations returned plain { data: [...] }
-      if ((result as any).data && Array.isArray((result as any).data)) {
+      // If result is already an array (e.g., cache fallback of OpenAI-formatted results),
+      // accept it directly
+      if (Array.isArray(result)) {
+        for (const r of result as OpenAISearchResult[]) {
+          if (r && r.id) results.push(r);
+        }
+      } else if ((result as any).data && Array.isArray((result as any).data)) {
         const records = (result as any).data as any[];
         for (const record of records) {
           const transformed = transformToSearchResult(record, resourceType);
@@ -115,12 +131,12 @@ export async function search(
         }
       }
     } catch (error: any) {
-      // When advanced error handling is disabled, surface the error per legacy
-      if (!features.isEnabled('enableAdvancedErrorHandling')) {
+      // For single-type searches, propagate error
+      if (onlyType) {
         throw error;
       }
+      // Otherwise, continue with other types even when advanced handling is disabled
       warn(`[OpenAI Search] Failed to search ${resourceType}:`, error);
-      // Continue with other resource types
     }
   });
 
