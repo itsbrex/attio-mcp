@@ -367,11 +367,18 @@ HIGH-LEVEL ARCHITECTURE
 - **Message Wrapper**: Protocol adaptation between different formats
 - Enables integration with ChatGPT and other OpenAI-compatible systems
 
-### 5. OpenAI Integration (`src/openai/`)
-- **search.ts**: OpenAI-compliant search across all Attio records
-- **fetch.ts**: OpenAI-compliant detailed record fetching
-- **transformers/**: Object-specific data transformers for different record types
-- Converts Attio data to OpenAI's expected format
+### 5. OpenAI Integration (`src/openai/`) - REORGANIZED
+- **api/**: Core API operations (fetch.ts, search.ts)
+- **transform/**: Modularized transformation system
+  * **base/**: Core transformers (companies, people, lists, tasks, generic)
+  * **helpers.ts**: Shared transformation utilities
+  * **pipelines/**: Advanced transformation pipelines
+- **cache/**: Unified caching system with LRU implementation
+- **error/**: Consolidated error handling system
+- **scoring/**: Advanced relevance scoring algorithms
+- **performance/**: Performance monitoring and optimization
+- **advanced/**: Legacy compatibility layer (being phased out)
+- Path aliases configured: `@api/*`, `@transform/*`, `@cache/*`, etc.
 
 ### 6. Type System (`src/types/`)
 - **api-types.ts**: Core Attio API type definitions
@@ -410,6 +417,73 @@ Required environment variables:
 - `ATTIO_API_KEY`: Your Attio API authentication key
 - `ATTIO_WORKSPACE_ID`: Your Attio workspace identifier
 - Optional: `ATTIO_DEFAULT_DEAL_STAGE`, `ATTIO_DEFAULT_DEAL_OWNER`, `ATTIO_DEFAULT_CURRENCY`
+
+## Recent Updates (2025-08-08)
+
+### OpenAI Module Reorganization (Phase 3)
+Major refactoring of the OpenAI integration layer following screaming architecture principles:
+
+**Completed Tasks:**
+- ✅ Created business-centric module structure (api/, transform/, cache/, error/, scoring/, performance/)
+- ✅ Implemented barrel exports for clean module boundaries
+- ✅ Configured TypeScript path aliases (@api/*, @transform/*, etc.)
+- ✅ Established soft module boundaries between layers
+- ✅ Migrated transformers to transform/base/ directory
+- ✅ Consolidated error handling system
+- ✅ Unified cache implementation with LRU cache
+- ✅ Added advanced relevance scoring algorithms
+
+**Key Architectural Changes:**
+- Module organization by business domain rather than technical concerns
+- Clear separation between public APIs and internal implementations
+- Path aliases for improved import ergonomics
+- Barrel exports to enforce module boundaries
+- Legacy code maintained in `advanced/` for backward compatibility
+
+**Breaking Changes:**
+- Transformer imports must now use `transform/base/*` paths
+- Direct imports from `transformers/` are deprecated
+- Cache system now uses unified interface in `cache/`
+
+### OAuth & Security Foundation (Phase 3 - In Progress)
+- Added OAuth server implementation (`src/auth/oauth-server.ts`)
+- Enhanced security middleware (`src/auth/security-middleware.ts`)
+- Branch: `feature/phase3-oauth-security`
+
+## OpenAI Architecture Guidelines
+
+### Module Structure
+The OpenAI integration follows a screaming architecture pattern:
+```
+src/openai/
+├── api/           # API operations (fetch, search)
+├── transform/     # Data transformation
+│   ├── base/      # Core transformers
+│   ├── helpers.ts # Shared utilities
+│   └── pipelines/ # Advanced pipelines
+├── cache/         # Caching layer
+├── error/         # Error handling
+├── scoring/       # Relevance scoring
+└── performance/   # Performance monitoring
+```
+
+### Import Guidelines
+- Use path aliases: `import { fetch } from '@api/fetch'`
+- Import from barrel exports: `import { CompanyTransformer } from '@transform'`
+- Never import from internal paths unless necessary
+- Legacy imports from `advanced/` should be migrated
+
+### Testing OpenAI Features
+```bash
+# Run OpenAI-specific tests
+npm test -- openai/
+
+# Test transformers
+npm test -- transform/
+
+# Integration tests with real API
+npm run test:integration -- openai/
+```
 
 ## Task Master AI Instructions
 **Import Task Master's development workflow commands and guidelines, treat as if import is in the main CLAUDE.md file.**
