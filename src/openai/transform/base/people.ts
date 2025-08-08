@@ -73,9 +73,9 @@ export const transformPerson = {
     );
     if (location) data.location = location;
 
+    const searchResult = this.toSearchResult(person);
     return {
-      id: `people:${id}`,
-      url: generateRecordUrl(id, 'people'),
+      ...searchResult,
       data: Object.keys(data).length > 0 ? data : undefined,
     } as unknown as OpenAIFetchResult;
   },

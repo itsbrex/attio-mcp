@@ -38,7 +38,7 @@ export const transformTask = {
 
     return {
       id: `tasks:${id}`,
-      title: content || 'Untitled Task',
+      title: content || extractAttributeValue(attrs.name) || 'Untitled Task',
       text: textParts.join('\n') || content || 'No details available',
       url: generateRecordUrl(id, 'tasks'),
     };
