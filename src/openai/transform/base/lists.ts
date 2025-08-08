@@ -12,7 +12,7 @@ export const transformList = {
   toSearchResult(list: any): OpenAISearchResult {
     const id = list.id?.list_id || list.id?.record_id || list.id;
     const attrs = list.values || list.attributes || {};
-    const name = list.name || extractAttributeValue(attrs.name);
+    const name = extractAttributeValue(attrs.name) || list.name;
     const description =
       list.description || extractAttributeValue(attrs.description);
 

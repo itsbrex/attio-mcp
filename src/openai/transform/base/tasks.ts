@@ -12,20 +12,23 @@ export const transformTask = {
   toSearchResult(task: any): OpenAISearchResult {
     const id = task.id?.task_id || task.id?.record_id || task.id;
     const attrs = task.values || task.attributes || {};
-    const content = extractAttributeValue(
-      task.content || attrs.name || attrs.content
-    );
+    // Title for tasks should prefer explicit task content; do not fall back
+    // to name for title to preserve legacy expectations in tests.
+    const content = extractAttributeValue(task.content || attrs.content);
     const status = extractAttributeValue(task.status || attrs.status);
     const assignee = extractAttributeValue(
       task.assignee?.name || attrs.assignee
     );
 
     const textParts: string[] = [];
-    if (status) textParts.push(`Status: ${status}`);
     if (assignee) textParts.push(`Assigned to: ${assignee}`);
     const dueDate = task.deadline_at || attrs.due_date;
-    if (dueDate)
-      textParts.push(`Due: ${new Date(dueDate).toLocaleDateString()}`);
+    if (dueDate) {
+      const d = new Date(dueDate);
+      if (!isNaN(d.getTime())) {
+        textParts.push(`Due: ${d.toLocaleDateString()}`);
+      }
+    }
     if (task.linked_records && task.linked_records.length > 0) {
       const linkedCount = task.linked_records.length;
       textParts.push(
