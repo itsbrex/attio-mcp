@@ -3,9 +3,9 @@
  * Combines error handling with cache fallback capabilities
  */
 
-import { advancedErrorHandler, ErrorCategory } from './error-handler.js';
-import { searchCache, recordCache, attributeCache } from './cache.js';
 import { features } from '../../config/features.js';
+import { attributeCache, recordCache, searchCache } from './cache.js';
+import { advancedErrorHandler, ErrorCategory } from './error-handler.js';
 
 /**
  * Execute search operation with cache fallback on errors
@@ -15,30 +15,31 @@ export async function executeSearchWithFallback<T>(
   cacheKey: string,
   context?: Record<string, any>
 ): Promise<T> {
-  if (!features.isEnabled('enableAdvancedErrorHandling') || !features.isEnabled('enableCache')) {
+  if (!features.isEnabled('enableAdvancedErrorHandling')) {
     return operation();
   }
+  // If cache is disabled, still use advanced retry logic without cache fallback
+  if (!features.isEnabled('enableCache')) {
+    return advancedErrorHandler.executeWithRetry(operation, context);
+  }
 
-  return advancedErrorHandler.executeWithCustomRecovery(
-    operation,
-    {
-      maxRetries: 3,
-      retryDelay: 1000,
-      backoffMultiplier: 2,
-      fallbackAction: async () => {
-        // Try to get from cache on error
-        const cached = searchCache.get(cacheKey);
-        if (cached) {
-          if (features.isEnabled('enableEnhancedLogging')) {
-            console.log('[ErrorRecovery] Falling back to cached search results');
-          }
-          return cached as T;
+  return advancedErrorHandler.executeWithCustomRecovery(operation, {
+    maxRetries: 3,
+    retryDelay: 1000,
+    backoffMultiplier: 2,
+    fallbackAction: async () => {
+      // Try to get from cache on error
+      const cached = searchCache.get(cacheKey);
+      if (cached) {
+        if (features.isEnabled('enableEnhancedLogging')) {
+          console.log('[ErrorRecovery] Falling back to cached search results');
         }
-        throw new Error('No cached results available for fallback');
-      },
-      context,
-    }
-  );
+        return cached as T;
+      }
+      throw new Error('No cached results available for fallback');
+    },
+    context,
+  });
 }
 
 /**
@@ -49,30 +50,30 @@ export async function executeFetchWithFallback<T>(
   cacheKey: string,
   context?: Record<string, any>
 ): Promise<T> {
-  if (!features.isEnabled('enableAdvancedErrorHandling') || !features.isEnabled('enableCache')) {
+  if (!features.isEnabled('enableAdvancedErrorHandling')) {
     return operation();
   }
+  if (!features.isEnabled('enableCache')) {
+    return advancedErrorHandler.executeWithRetry(operation, context);
+  }
 
-  return advancedErrorHandler.executeWithCustomRecovery(
-    operation,
-    {
-      maxRetries: 2,
-      retryDelay: 1500,
-      backoffMultiplier: 1.5,
-      fallbackAction: async () => {
-        // Try to get from cache on error
-        const cached = recordCache.get(cacheKey);
-        if (cached) {
-          if (features.isEnabled('enableEnhancedLogging')) {
-            console.log('[ErrorRecovery] Falling back to cached record data');
-          }
-          return cached as T;
+  return advancedErrorHandler.executeWithCustomRecovery(operation, {
+    maxRetries: 2,
+    retryDelay: 1500,
+    backoffMultiplier: 1.5,
+    fallbackAction: async () => {
+      // Try to get from cache on error
+      const cached = recordCache.get(cacheKey);
+      if (cached) {
+        if (features.isEnabled('enableEnhancedLogging')) {
+          console.log('[ErrorRecovery] Falling back to cached record data');
         }
-        throw new Error('No cached record available for fallback');
-      },
-      context,
-    }
-  );
+        return cached as T;
+      }
+      throw new Error('No cached record available for fallback');
+    },
+    context,
+  });
 }
 
 /**
@@ -83,30 +84,30 @@ export async function executeAttributeOperationWithFallback<T>(
   cacheKey: string,
   context?: Record<string, any>
 ): Promise<T> {
-  if (!features.isEnabled('enableAdvancedErrorHandling') || !features.isEnabled('enableCache')) {
+  if (!features.isEnabled('enableAdvancedErrorHandling')) {
     return operation();
   }
+  if (!features.isEnabled('enableCache')) {
+    return advancedErrorHandler.executeWithRetry(operation, context);
+  }
 
-  return advancedErrorHandler.executeWithCustomRecovery(
-    operation,
-    {
-      maxRetries: 2,
-      retryDelay: 1000,
-      backoffMultiplier: 1.5,
-      fallbackAction: async () => {
-        // Try to get from cache on error
-        const cached = attributeCache.get(cacheKey);
-        if (cached) {
-          if (features.isEnabled('enableEnhancedLogging')) {
-            console.log('[ErrorRecovery] Falling back to cached attribute data');
-          }
-          return cached as T;
+  return advancedErrorHandler.executeWithCustomRecovery(operation, {
+    maxRetries: 2,
+    retryDelay: 1000,
+    backoffMultiplier: 1.5,
+    fallbackAction: async () => {
+      // Try to get from cache on error
+      const cached = attributeCache.get(cacheKey);
+      if (cached) {
+        if (features.isEnabled('enableEnhancedLogging')) {
+          console.log('[ErrorRecovery] Falling back to cached attribute data');
         }
-        throw new Error('No cached attributes available for fallback');
-      },
-      context,
-    }
-  );
+        return cached as T;
+      }
+      throw new Error('No cached attributes available for fallback');
+    },
+    context,
+  });
 }
 
 /**
@@ -143,16 +144,22 @@ export function configureCacheFallbacks(): void {
   });
 
   // Set fallback for service unavailable errors
-  advancedErrorHandler.setFallbackAction(ErrorCategory.SERVICE_UNAVAILABLE, async () => {
-    if (features.isEnabled('enableEnhancedLogging')) {
-      console.log('[ErrorRecovery] Service unavailable - attempting cache fallback');
+  advancedErrorHandler.setFallbackAction(
+    ErrorCategory.SERVICE_UNAVAILABLE,
+    async () => {
+      if (features.isEnabled('enableEnhancedLogging')) {
+        console.log(
+          '[ErrorRecovery] Service unavailable - attempting cache fallback'
+        );
+      }
+      return {
+        data: [],
+        fromCache: true,
+        error:
+          'Service temporarily unavailable - returning cached data if available',
+      };
     }
-    return {
-      data: [],
-      fromCache: true,
-      error: 'Service temporarily unavailable - returning cached data if available',
-    };
-  });
+  );
 }
 
 /**
@@ -172,37 +179,58 @@ export async function withErrorHandling<T>(
   }
 
   const startTime = Date.now();
-  
+
   try {
     // If cache is specified, use appropriate fallback method
     if (options?.cache && options?.cacheKey) {
       switch (options.cache) {
         case 'search':
-          return await executeSearchWithFallback(operation, options.cacheKey, options.context);
+          return await executeSearchWithFallback(
+            operation,
+            options.cacheKey,
+            options.context
+          );
         case 'record':
-          return await executeFetchWithFallback(operation, options.cacheKey, options.context);
+          return await executeFetchWithFallback(
+            operation,
+            options.cacheKey,
+            options.context
+          );
         case 'attribute':
-          return await executeAttributeOperationWithFallback(operation, options.cacheKey, options.context);
+          return await executeAttributeOperationWithFallback(
+            operation,
+            options.cacheKey,
+            options.context
+          );
       }
     }
 
     // Otherwise use standard retry logic
-    return await advancedErrorHandler.executeWithRetry(operation, options?.context);
+    return await advancedErrorHandler.executeWithRetry(
+      operation,
+      options?.context
+    );
   } catch (error) {
     const duration = Date.now() - startTime;
-    
+
     if (features.isEnabled('enableEnhancedLogging')) {
-      console.error(`[ErrorRecovery] Operation ${options?.operationName || 'unknown'} failed after ${duration}ms`, {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        context: options?.context,
-      });
+      console.error(
+        `[ErrorRecovery] Operation ${options?.operationName || 'unknown'} failed after ${duration}ms`,
+        {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          context: options?.context,
+        }
+      );
     }
-    
+
     throw error;
   }
 }
 
 // Initialize cache fallbacks on module load
-if (features.isEnabled('enableAdvancedErrorHandling') && features.isEnabled('enableCache')) {
+if (
+  features.isEnabled('enableAdvancedErrorHandling') &&
+  features.isEnabled('enableCache')
+) {
   configureCacheFallbacks();
 }
