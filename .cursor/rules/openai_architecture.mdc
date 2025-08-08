@@ -1,0 +1,43 @@
+---
+description: Enforce OpenAI module architecture, barrel exports, and import path rules (no extra deps)
+globs: src/openai/**/*
+alwaysApply: true
+---
+
+- **Module boundaries (soft checks)**
+  - `api` only re-exports and consumes public types; no direct access to `scoring` internals
+  - `transform` exposes `base/` and `pipelines/` via its barrel; avoid deep imports like `transform/base/foo` from outside `transform`
+  - `scoring` is independent of `api`; only `search` should depend on `scoring` via `@scoring/*`
+  - `performance` is cross-cutting; no module should import it for business logic
+
+- **Barrel exports**
+  - Each module has a single public entry at `index.ts`
+  - Use explicit `.js` extensions for NodeNext ESM in relative re-exports
+  - Prefer path aliases for consumers: `@api/*`, `@transform/*`, `@scoring/*`, `@performance/*`, `@error/*`, `@cache/*`
+
+- **Import rules (guidance)**
+  - Do not import across modules bypassing barrels (e.g., from `transform` internals directly in `api`)
+  - Avoid circular imports across module barrels
+  - New files should import via aliases once moved to new structure
+
+- **DO examples**
+  ```ts
+  // ✅ api: re-export search/fetch via barrel
+  export * from '../fetch.js';
+  export * from '../search.js';
+
+  // ✅ consumer
+  import { runSearch } from '@api/search';
+  ```
+
+- **DON'T examples**
+  ```ts
+  // ❌ deep import into transform internals from api
+  import { internalStep } from '../transform/pipelines/internal-step.js';
+  ```
+
+- **Maintenance**
+  - Update this rule when adding new modules (e.g., `cache/redis`, `error/categories`)
+  - Keep barrels tree-shake friendly (named exports preferred)
+  - Ensure TypeScript stays green: `bunx tsc -p tsconfig.json --noEmit`
+
