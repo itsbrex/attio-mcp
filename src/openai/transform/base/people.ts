@@ -48,20 +48,25 @@ export const transformPerson = {
 
     const name = extractAttributeValue(attributes.name || person.name);
     if (name) data.name = name;
+    // Legacy shape: expose arrays where available
     const emailRaw = attributes.email_addresses;
-    const email = Array.isArray(emailRaw)
-      ? emailRaw[0]?.email_address ||
-        emailRaw[0]?.value ||
-        extractAttributeValue(emailRaw)
-      : extractAttributeValue(emailRaw);
-    if (email) data.email = email;
+    const emailList = Array.isArray(emailRaw)
+      ? emailRaw.map((e: any) => e?.email_address || e?.value).filter(Boolean)
+      : [];
+    if (emailList.length) {
+      data.email_addresses = emailList as string[];
+      // Legacy single field for compatibility
+      data.email = emailList[0];
+    }
     const phoneRaw = attributes.phone_numbers;
-    const phone = Array.isArray(phoneRaw)
-      ? phoneRaw[0]?.phone_number ||
-        phoneRaw[0]?.value ||
-        extractAttributeValue(phoneRaw)
-      : extractAttributeValue(phoneRaw);
-    if (phone) data.phone = phone;
+    const phoneList = Array.isArray(phoneRaw)
+      ? phoneRaw.map((p: any) => p?.phone_number || p?.value).filter(Boolean)
+      : [];
+    if (phoneList.length) {
+      data.phone_numbers = phoneList as string[];
+      // Legacy single field for compatibility
+      data.phone = phoneList[0];
+    }
     const title = extractAttributeValue(
       attributes.job_title || person.job_title
     );

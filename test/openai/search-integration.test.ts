@@ -322,8 +322,8 @@ describe('OpenAI Search Integration', () => {
         },
       ];
 
-      // Pre-populate cache
-      const cacheKey = `search:${crypto.createHash('md5').update('cached:people').digest('hex')}`;
+      // Pre-populate cache (include pagination params in cache key)
+      const cacheKey = `search:${crypto.createHash('md5').update('cached:people:def:0').digest('hex')}`;
       searchCache.set(cacheKey, cachedResults, 3600000);
 
       // Mock API failure

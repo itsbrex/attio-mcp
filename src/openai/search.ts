@@ -41,9 +41,14 @@ export async function search(
 
   debug('OpenAI', 'Starting search with query', { query }, 'search');
 
-  // Generate cache key for this search. Include type to avoid collisions and
-  // to align with tests and fallback expectations.
-  const cacheKeyBase = onlyType ? `${query}:${onlyType}` : query;
+  // Generate cache key. Include type and pagination args to avoid collisions
+  // and ensure pagination returns correct pages.
+  const cacheKeyBase = [
+    query,
+    onlyType || 'all',
+    options?.limit ?? 'def',
+    options?.offset ?? 0,
+  ].join(':');
   const cacheKey = `search:${crypto
     .createHash('md5')
     .update(cacheKeyBase)
@@ -173,7 +178,15 @@ export async function search(
 
   // Limit total results
   const maxResults = 20;
-  const finalResults = scoredResults.slice(0, maxResults);
+  // De-duplicate by id to avoid repeated items from multiple sources
+  const seen = new Set<string>();
+  const deduped = scoredResults.filter((r) => {
+    if (!r?.id) return false;
+    if (seen.has(r.id)) return false;
+    seen.add(r.id);
+    return true;
+  });
+  const finalResults = deduped.slice(0, maxResults);
 
   // Cache results if enabled
   if (features.isEnabled('enableCache')) {

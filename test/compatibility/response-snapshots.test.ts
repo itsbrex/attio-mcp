@@ -253,12 +253,24 @@ describe('Response Snapshot Tests', () => {
           "data": {
             "company": "Acme Corp",
             "email": "john@example.com",
+            "email_addresses": [
+              "john@example.com",
+            ],
             "location": "San Francisco, CA",
             "name": "John Doe",
             "phone": "+1234567890",
+            "phone_numbers": [
+              "+1234567890",
+            ],
             "title": "CEO",
           },
           "id": "people:person-123",
+          "text": "John Doe
+        Email: john@example.com
+        Title: CEO
+        Phone: +1234567890
+        Location: San Francisco, CA",
+          "title": "John Doe",
           "url": "https://app.attio.com/people/person-123",
         }
       `);
@@ -296,6 +308,12 @@ describe('Response Snapshot Tests', () => {
             "name": "Acme Corp",
           },
           "id": "companies:company-456",
+          "text": "Acme Corp
+        Domain: acme.com
+        Industry: Technology
+        Employees: 500
+        Description: Leading tech company",
+          "title": "Acme Corp",
           "url": "https://app.attio.com/companies/company-456",
         }
       `);
@@ -321,6 +339,8 @@ describe('Response Snapshot Tests', () => {
             "name": "Jane Doe",
           },
           "id": "people:person-minimal",
+          "text": "Jane Doe",
+          "title": "Jane Doe",
           "url": "https://app.attio.com/people/person-minimal",
         }
       `);
@@ -414,6 +434,10 @@ describe('Response Snapshot Tests', () => {
             "name": "Transform Corp",
           },
           "id": "companies:transform-company",
+          "text": "Transform Corp
+        Domain: transform.com
+        Employees: 100",
+          "title": "Transform Corp",
           "url": "https://app.attio.com/companies/transform-company",
         }
       `);

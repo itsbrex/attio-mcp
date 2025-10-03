@@ -74,9 +74,9 @@ export const transformCompany = {
     );
     if (founded) data.founded_date = founded;
 
+    const searchResult = this.toSearchResult(company);
     return {
-      id: `companies:${id}`,
-      url: generateRecordUrl(id, 'companies'),
+      ...searchResult,
       data: Object.keys(data).length > 0 ? data : undefined,
     } as unknown as OpenAIFetchResult;
   },
