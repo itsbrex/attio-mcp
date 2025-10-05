@@ -724,10 +724,19 @@ For E2E and integration tests, you need:
 ```bash
 # Required for E2E/Integration tests
 ATTIO_API_KEY=your_64_character_api_key_here
+ATTIO_WORKSPACE_ID=your_workspace_id_here
+
+# Optional: Use test workspace to prevent production changes
+ATTIO_USE_TEST_WORKSPACE=false  # Set to "true" to use test workspace
+ATTIO_TEST_API_KEY=your_test_api_key_here
+ATTIO_TEST_WORKSPACE_ID=your_test_workspace_id_here
+
 PORT=3000
 LOG_LEVEL=debug
 NODE_ENV=development
 ```
+
+**🔒 Test Workspace Safety**: Set `ATTIO_USE_TEST_WORKSPACE=true` to automatically use test credentials (`ATTIO_TEST_API_KEY` and `ATTIO_TEST_WORKSPACE_ID`) instead of production. Simply toggle back to `false` to return to production. This prevents accidental changes to your production data during testing.
 
 2. **Verify API key** format (must be exactly 64 characters)
 3. **Run tests** to validate setup:

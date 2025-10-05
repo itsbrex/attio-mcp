@@ -26,11 +26,27 @@ export interface ServerContext {
  */
 export const configSchema = z.object({
   ATTIO_API_KEY: z.string().min(1).optional().describe('Attio API key'),
+  ATTIO_TEST_API_KEY: z
+    .string()
+    .min(1)
+    .optional()
+    .describe('Attio test API key (used when ATTIO_USE_TEST_WORKSPACE=true)'),
   ATTIO_WORKSPACE_ID: z
     .string()
     .min(1)
     .optional()
     .describe('Attio workspace ID'),
+  ATTIO_TEST_WORKSPACE_ID: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      'Attio test workspace ID (used when ATTIO_USE_TEST_WORKSPACE=true)'
+    ),
+  ATTIO_USE_TEST_WORKSPACE: z
+    .string()
+    .optional()
+    .describe('Set to "true" to use test workspace instead of production'),
   ALLOWED_ORIGINS: z
     .string()
     .optional()
@@ -52,9 +68,18 @@ export async function createServer(context?: ServerContext) {
 
   // For backward compatibility: if no context provided (STDIO mode),
   // create one that reads from environment variables
+  // If ATTIO_USE_TEST_WORKSPACE=true, use test credentials to prevent production changes
+  const useTestWorkspace =
+    process.env.ATTIO_USE_TEST_WORKSPACE?.toLowerCase() === 'true';
   const ctx: ServerContext = context || {
-    getApiKey: () => process.env.ATTIO_API_KEY,
-    getWorkspaceId: () => process.env.ATTIO_WORKSPACE_ID,
+    getApiKey: () =>
+      useTestWorkspace
+        ? process.env.ATTIO_TEST_API_KEY
+        : process.env.ATTIO_API_KEY,
+    getWorkspaceId: () =>
+      useTestWorkspace
+        ? process.env.ATTIO_TEST_WORKSPACE_ID
+        : process.env.ATTIO_WORKSPACE_ID,
   };
 
   // Set the global context so lazy client can access it

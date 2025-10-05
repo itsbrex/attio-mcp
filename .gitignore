@@ -71,3 +71,6 @@ logs.backup/
 logs/*.log
 tsconfig.tsbuildinfo
 .github/claude-cache/
+
+.env.development
+.specstory
