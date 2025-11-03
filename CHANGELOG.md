@@ -17,9 +17,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 
-## [1.1.0] - 2025-10-01
+## [1.1.10] - 2025-10-23
 
-This release focuses on developer experience improvements with intelligent prompts, comprehensive tool standardization, and enhanced search capabilities.
+### Fixed
+
+- **Release pipeline wireit configuration** (#898) - Fixed build configuration blocking NPM releases
+  - **Problem**: `lint:tools` script used direct command instead of wireit, causing Release Pipeline validation failures
+  - **Solution**: Updated package.json to use `"lint:tools": "wireit"` as required by wireit configuration
+  - **Result**: Release Pipeline can now complete successfully and publish to NPM
+- **Person creation now supports optional email addresses** (#895) - Removed unnecessary validation requiring `email_addresses` for person records
+  - **Problem**: MCP server enforced `email_addresses` as required when Attio API only requires `name`
+  - **Solution**: Updated `PersonCreator` to validate only `name` field (actual API requirement)
+  - **Result**: Users can now create person records without email addresses (e.g., contacts without digital presence)
+  - Updated data normalizer to handle cases where neither name nor email is provided
+  - Added comprehensive unit tests for person creation without email
+  - Updated E2E fixtures to include truly minimal person (name only)
+  - Modified `PersonMockFactory` to support optional email addresses
+
+## [1.1.2] - 2025-10-08
+
+### Fixed
+
+- **Multi-token search query logic** - Fixed fallback search to require ALL tokens in multi-word queries instead of ANY token
+  - **Problem**: Multi-word searches (e.g., "Alpha Beta Company") returned 100+ records matching ANY token ("Alpha" OR "Beta" OR "Company"), pushing exact matches out of results
+  - **Solution**: Multi-token queries now use AND-of-OR structure - each token must match somewhere (in name OR domains), but all tokens must match (cross-field flexibility with precision)
+  - **Result**: Multi-word name searches now return exact matches in top results instead of being buried at position #101+
+  - Single-token queries unchanged (still use simple `$contains`)
+  - This improves precision for company/people searches with multi-word names
+- **records_search relevance** (#885) - Added client-side scoring with uFuzzy and LRU caching so exact domain/name/email matches rank first while repeated queries stay within the 3 s budget
+- **Deal search fast path optimization** (#885) - Extended fast path optimization to deals with 72-80% performance improvement
+  - Sequential candidate execution: exact match ($eq) → substring match ($contains)
+  - LRU caching with 5-minute TTL delivers 8ms cached responses (99.9% faster than ~2.8s cold searches)
+  - Created `DealSearchStrategy` following same pattern as companies/people
+  - Removed obsolete `searchDeals()` and `queryDealRecords()` methods (100+ lines)
+  - Fixed original bug where deals only supported exact name matches
+- **Notes search functionality - Partial fix with API limitation** (#888)
+  - Created `NoteSearchStrategy` following established search strategy pattern
+  - **API Limitation Discovered**: Attio Notes API `/v2/notes` endpoint returns empty array when called without filters
+    - Confirmed via direct API testing: `GET /v2/notes` returns `{"data": []}`
+    - API requires `parent_object` and/or `parent_record_id` filters to return notes
+    - This prevents searching across all notes in a workspace
+  - **What Works**: `list-notes` tool with parent record filtering (e.g., list all notes on a specific company)
+  - **What Doesn't Work**: Global note search without parent filters (e.g., "find all notes containing 'demo'")
+  - **Workaround**: Use `list-notes` with explicit parent filters to search within a specific record's notes
+  - Implemented client-side filtering for title/content when parent filters are provided
+  - Added smart caching (30s TTL) with parent-aware cache keys to prevent cross-contamination
+  - Removed obsolete `searchNotes()` fallback method (85 lines)
+  - **Recommendation**: Request Attio to add workspace-wide notes endpoint or search capability
+
+## [1.1.0] - 2025-10-06
+
+This release enhances developer experience with intelligent prompts, comprehensive tool standardization, and strengthens enterprise readiness with security hardening and validation improvements.
 
 ### Added
 
@@ -60,19 +108,60 @@ This release focuses on developer experience improvements with intelligent promp
     - Enhanced JSON schemas with proper validation and examples
     - Token-efficient descriptions optimized for LLM routing
     - Automated quality gates prevent future regressions
-- Intelligent search query parsing for people and company resources (#781)
+- **Markdown Note Support** (#854, #862) - `create-note` tool now supports markdown formatting via optional `format` parameter ('plaintext' | 'markdown')
+  - Rich formatted notes with headers, lists, and emphasis
+  - Backward compatible with default plaintext format
+  - Full E2E test coverage for markdown creation
+- **Enhanced Phone Validation** (#837, #863) - Structured validation with libphonenumber-js integration
+  - Central validation helpers (`validatePhoneNumber`, `isValidPhoneNumber`, `isPossiblePhoneNumber`)
+  - Actionable `PhoneValidationError` metadata with length/country/format guidance
+  - CLI auto-configures `libphonenumber-js` to use `min` metadata bundle
+  - Server runtime exposes `PHONE_METADATA_SOURCE` for diagnostics
+  - Phone normalization failures include aggregated issue counts and newline-delimited details
+- **Intelligent Search Query Parsing** (#781) - Enhanced search capabilities for people and company resources
+  - International phone format support with multi-level domain extraction
+  - Consistent empty-filter handling across search strategies
+  - Stopword filtering and large query input protection
+- **Phone Number UX Improvements** (#798) - Comprehensive enhancements for phone number handling
+  - Inline tool help with phone format examples and E.164 normalization guidance
+  - Common update patterns documentation (`docs/examples/common-update-patterns.md`)
+  - Field verification configuration guide (`docs/configuration/field-verification.md`)
+  - Enhanced error messages for phone number validation with format examples
+  - Pre-update field validation with automatic normalization
 - Debug documentation for anonymized production placeholders used in diagnostic suites
 
 ### Changed
 
-- Updated `parseQuery` to support international phone formats and robust multi-level domain extraction.
-- Enhanced people/company search strategies to leverage parsed tokens, phone variants, and consistent empty-filter handling.
-- Swapped unit test fixtures/docs to anonymized examples (Alex Rivera / Example Medical Group / +1 555 010 4477).
+- **Phone Number Normalization** (#798, #837) - Automatic transformation from user-friendly `phone_number` to Attio's `original_phone_number` format
+  - Additional fields (label, type, extension, is_primary) preserved during normalization
+  - `AttributeAwareNormalizer` now rejects invalid phone inputs with `UniversalValidationError`
+  - Precise length/country/format guidance instead of silent pass-through
+- **Warning Suppression** (#798) - Update verification now filters out cosmetic formatting differences (e.g., `"Demo"` vs `Demo`)
+- **Search Query Parsing** (#781) - Updated `parseQuery` to support international phone formats and robust multi-level domain extraction
+  - Enhanced people/company search strategies leverage parsed tokens and phone variants
+  - Swapped unit test fixtures/docs to anonymized examples (Alex Rivera / Example Medical Group / +1 555 010 4477)
 
 ### Fixed
 
-- Eliminated redundant `$or` filters and US-only phone assumptions in query filter builders
-- Hardened token processing to ignore stopwords and guard against large query inputs
+- **Query Builder Issues** (#781) - Eliminated redundant `$or` filters and US-only phone assumptions in query filter builders
+- **Token Processing** (#781) - Hardened token processing to ignore stopwords and guard against large query inputs
+- **Phone Number Field Confusion** (#798) - Users can now use `phone_number` (user-friendly) which auto-converts to `original_phone_number` (Attio API format)
+
+### Security
+
+- **XSS Prevention** (#840, #841, #845) - Comprehensive protection against reflected XSS attacks
+  - Replaced regex-based HTML sanitization with `sanitize-html` library (CodeQL alert #121)
+  - URL scheme filtering (javascript:, data:, vbscript:, file:)
+  - Hardened prompt handlers against XSS injection
+  - Security test suite with 11 test cases covering XSS, protocol injection, double-encoding, and edge cases
+- **Stack Trace Protection** (#841, #844) - Enhanced error handling to prevent sensitive information exposure
+  - Stack traces no longer exposed in client-facing errors
+  - File paths and system information sanitized
+  - Correlation IDs for debugging without exposing internals
+- **Enhanced Error Context** (#844) - Safe metadata enrichment without information leakage
+  - Field type metadata preserved in error responses
+  - Network information (localhost, ports, connection strings) sanitized
+  - Error type consistency across all response formats
 
 ## [1.0.0] - 2025-09-27
 
@@ -112,9 +201,6 @@ This milestone release transforms the MCP server from partial Attio coverage to 
 
 ### Security
 
-- **XSS Prevention in Prompt Error Responses** (#836, #840) - Fixed code scanning alert #121: Replaced regex-based HTML sanitization with `sanitize-html` library
-  - Comprehensive URL scheme filtering (javascript:, data:, vbscript:, file:)
-  - Added security test suite with 11 test cases covering XSS, protocol injection, double-encoding, and edge cases
 - **Prototype Pollution** (#751) - Fixed config loader vulnerability
 - **Input Validation** (#752, #753) - Tightened LinkedIn and URL validation for secure data handling
 - **Credential Protection** (#42 series) - CodeQL-driven log scrubbing to protect Attio API credentials
@@ -338,8 +424,8 @@ Users upgrading from v0.1.x should note:
 
 [Unreleased]: https://github.com/kesslerio/attio-mcp-server/compare/v1.1.0...HEAD
 [1.1.0]: https://github.com/kesslerio/attio-mcp-server/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/kesslerio/attio-mcp-server/compare/v0.1.3...v1.0.0
-[0.1.3]: https://github.com/kesslerio/attio-mcp-server/compare/v0.1.2...v0.1.3
+[1.0.0]: https://github.com/kesslerio/attio-mcp-server/compare/v0.2.0...v1.0.0
+[0.2.0]: https://github.com/kesslerio/attio-mcp-server/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/kesslerio/attio-mcp-server/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/kesslerio/attio-mcp-server/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/kesslerio/attio-mcp-server/releases/tag/v0.1.0

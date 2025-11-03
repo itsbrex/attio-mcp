@@ -87,6 +87,11 @@ if (!isMain) {
     // Set server mode flag to enable background intervals (performance tracking, etc.)
     process.env.MCP_SERVER_MODE = 'true';
 
+    // Use reduced libphonenumber metadata in CLI runtime to minimize bundle size
+    if (!process.env.ATTIO_PHONE_METADATA) {
+      process.env.ATTIO_PHONE_METADATA = 'min';
+    }
+
     // Dynamic imports to avoid loading modules during help/version
     const { StdioServerTransport } = await import(
       '@modelcontextprotocol/sdk/server/stdio.js'
@@ -99,7 +104,7 @@ if (!isMain) {
     try {
       // Create the configured MCP server
       console.error('[mcp:cli] Creating server instance');
-      const mcpServer = await createServer();
+      const mcpServer = createServer();
 
       // Handle EPIPE errors gracefully (broken pipe during shutdown)
       process.stdout.on('error', (error: NodeJS.ErrnoException) => {

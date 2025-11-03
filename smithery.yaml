@@ -1,14 +1,34 @@
-name: Attio MCP
-description: Connect Attio CRM to MCP clients
-keywords: [attio, crm, contacts, companies, deals]
+name: Attio
+description: AI-powered access to Attio CRM. Manage contacts, companies, deals, tasks, and notes. Search records, update pipelines, and automate workflows for sales and GTM teams.
+keywords:
+  [attio, crm, contacts, companies, deals, sales, pipeline, gtm, tasks, notes]
 
-runtime: "typescript"
+runtime: 'typescript'
 
 startCommand:
   type: http
+  # Explicit config schema for Smithery hosted deployments (Issue #891)
+  # This ensures config parameters from UI are properly passed to the server
+  configSchema:
+    type: object
+    properties:
+      ATTIO_API_KEY:
+        type: string
+        description: Your Attio API key (required for all tools except health-check)
+      ATTIO_WORKSPACE_ID:
+        type: string
+        description: Optional Attio workspace ID for workspace-specific operations
+      ATTIO_MCP_TOOL_MODE:
+        type: string
+        enum: ['full', 'search']
+        description: 'Tool mode: "full" (all 33 tools) or "search" (search/fetch/health-check only)'
+      debug:
+        type: boolean
+        description: Enable debug logging to stderr for troubleshooting
 
+# Configuration for Smithery deployment
 # Empty example config so scans never block on secrets
 exampleConfig:
-  ATTIO_API_KEY: ""
-  ATTIO_WORKSPACE_ID: ""
+  ATTIO_API_KEY: ''
+  ATTIO_WORKSPACE_ID: ''
   debug: false

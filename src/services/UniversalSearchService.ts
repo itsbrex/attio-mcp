@@ -37,6 +37,7 @@ import {
 // Import resource-specific search functions
 import { advancedSearchCompanies } from '../objects/companies/index.js';
 import { advancedSearchPeople } from '../objects/people/index.js';
+import { advancedSearchDeals } from '../objects/deals/index.js';
 import { searchLists } from '../objects/lists.js';
 import { listObjectRecords } from '../objects/records/index.js';
 import { listTasks } from '../objects/tasks.js';
@@ -81,8 +82,10 @@ import {
   ISearchStrategy,
   CompanySearchStrategy,
   PeopleSearchStrategy,
+  DealSearchStrategy,
   TaskSearchStrategy,
   ListSearchStrategy,
+  NoteSearchStrategy,
   StrategyDependencies,
 } from './search-strategies/index.js';
 import { SearchUtilities } from './search-utilities/SearchUtilities.js';
@@ -97,6 +100,9 @@ const ensureAdvancedSearchCompanies = () =>
 
 const ensureAdvancedSearchPeople = () =>
   ensureFunctionAvailability(advancedSearchPeople, 'advancedSearchPeople');
+
+const ensureAdvancedSearchDeals = () =>
+  ensureFunctionAvailability(advancedSearchDeals, 'advancedSearchDeals');
 
 /**
  * UniversalSearchService provides centralized record search functionality
@@ -129,6 +135,14 @@ export class UniversalSearchService {
       getFieldValue: SearchUtilities.getFieldValue.bind(SearchUtilities),
     };
 
+    const dealDependencies: StrategyDependencies = {
+      advancedSearchFunction: await ensureAdvancedSearchDeals(),
+      createDateFilter: SearchUtilities.createDateFilter,
+      mergeFilters: SearchUtilities.mergeFilters,
+      rankByRelevance: SearchUtilities.rankByRelevance.bind(SearchUtilities),
+      getFieldValue: SearchUtilities.getFieldValue.bind(SearchUtilities),
+    };
+
     const listDependencies: StrategyDependencies = {
       listFunction: (query?: string, limit?: number, offset?: number) =>
         searchLists(query || '', limit, offset),
@@ -147,6 +161,12 @@ export class UniversalSearchService {
       getFieldValue: SearchUtilities.getFieldValue.bind(SearchUtilities),
     };
 
+    const noteDependencies: StrategyDependencies = {
+      noteFunction: (query?: Record<string, unknown>) => listNotes(query || {}),
+      rankByRelevance: SearchUtilities.rankByRelevance.bind(SearchUtilities),
+      getFieldValue: SearchUtilities.getFieldValue.bind(SearchUtilities),
+    };
+
     // Initialize strategies
     this.strategies.set(
       UniversalResourceType.COMPANIES,
@@ -157,12 +177,20 @@ export class UniversalSearchService {
       new PeopleSearchStrategy(peopleDependencies)
     );
     this.strategies.set(
+      UniversalResourceType.DEALS,
+      new DealSearchStrategy(dealDependencies)
+    );
+    this.strategies.set(
       UniversalResourceType.LISTS,
       new ListSearchStrategy(listDependencies)
     );
     this.strategies.set(
       UniversalResourceType.TASKS,
       new TaskSearchStrategy(taskDependencies)
+    );
+    this.strategies.set(
+      UniversalResourceType.NOTES,
+      new NoteSearchStrategy(noteDependencies)
     );
   }
 
@@ -474,23 +502,10 @@ export class UniversalSearchService {
       });
     }
 
-    // Fallback for resources without strategies (RECORDS, DEALS, NOTES)
+    // Fallback for resources without strategies (RECORDS only)
     switch (resource_type) {
       case UniversalResourceType.RECORDS:
         return this.searchRecords_ObjectType(limit, offset, filters);
-
-      case UniversalResourceType.DEALS:
-        return this.searchDeals(limit, offset, query);
-
-      case UniversalResourceType.NOTES:
-        return this.searchNotes(
-          perfId,
-          apiStart,
-          query,
-          filters,
-          limit,
-          offset
-        );
 
       default:
         throw new Error(
@@ -526,197 +541,6 @@ export class UniversalSearchService {
       pageSize: limit,
       page: Math.floor((offset || 0) / (limit || 10)) + 1,
     });
-  }
-
-  /**
-   * Search deals using query endpoint with filtering support
-   */
-  private static async searchDeals(
-    limit?: number,
-    offset?: number,
-    query?: string
-  ): Promise<AttioRecord[]> {
-    return this.queryDealRecords({ limit, offset, query });
-  }
-
-  /**
-   * Query deal records using the proper Attio API endpoint
-   */
-  private static async queryDealRecords(params: {
-    limit?: number;
-    offset?: number;
-    query?: string;
-  }): Promise<AttioRecord[]> {
-    const { limit = 10, offset = 0, query } = params;
-    const client = getLazyAttioClient();
-    try {
-      // First try exact match if query provided
-      if (query && query.trim()) {
-        try {
-          const exactMatchResponse = await client.post(
-            '/objects/deals/records/query',
-            {
-              filter: {
-                $and: [
-                  {
-                    path: [['deals', 'name']],
-                    constraints: {
-                      value: query.trim(),
-                    },
-                  },
-                ],
-              },
-              limit: Math.min(limit || 10, 100),
-              offset: offset || 0,
-            }
-          );
-
-          const exactResults = exactMatchResponse?.data?.data || [];
-          if (exactResults.length > 0) {
-            return exactResults;
-          }
-        } catch {
-          createScopedLogger('UniversalSearchService', 'dealExactMatch').debug(
-            'Exact match failed, trying client-side filtering'
-          );
-        }
-      }
-
-      // Fetch all deals for client-side filtering
-      const allDealsResponse = await client.post(
-        '/objects/deals/records/query',
-        {
-          limit: 100,
-          offset: 0,
-        }
-      );
-
-      let allDeals = allDealsResponse?.data?.data || [];
-
-      // Apply client-side filtering if query provided
-      if (query && query.trim()) {
-        const queryLower = query.trim().toLowerCase();
-        allDeals = allDeals.filter((deal: AttioRecord) => {
-          const nameField = deal.values?.name;
-          const name =
-            Array.isArray(nameField) && nameField[0]?.value
-              ? String(nameField[0].value)
-              : '';
-          return name.toLowerCase().includes(queryLower);
-        });
-      }
-
-      // Apply pagination to filtered results
-      const start = offset || 0;
-      const end = start + (limit || 10);
-      return allDeals.slice(start, end);
-    } catch (error: unknown) {
-      createScopedLogger('UniversalSearchService', 'dealQuery').error(
-        'Failed to query deal records',
-        error
-      );
-      if (error && typeof error === 'object' && 'response' in error) {
-        const httpError = error as { response: { status: number } };
-        if (httpError.response.status === 404) {
-          createScopedLogger('UniversalSearchService', 'dealQuery').error(
-            'Deal query endpoint not found, falling back to empty results'
-          );
-          return [];
-        }
-      }
-      createScopedLogger('UniversalSearchService', 'dealQuery').warn(
-        'Deal query failed with unexpected error, returning empty results'
-      );
-      return [];
-    }
-  }
-
-  /**
-   * Search notes with filtering and pagination
-   */
-  private static async searchNotes(
-    perfId: string,
-    apiStart: number,
-    query?: string,
-    filters?: Record<string, unknown>,
-    limit?: number,
-    offset?: number
-  ): Promise<AttioRecord[]> {
-    try {
-      // Build query parameters for Attio Notes API
-      const queryParams: Record<string, unknown> = {};
-
-      // Apply filters (mapped from universal filter names)
-      if (filters) {
-        if (filters.parent_object || filters.linked_record_type) {
-          queryParams.parent_object =
-            filters.parent_object || filters.linked_record_type;
-        }
-        if (filters.parent_record_id || filters.linked_record_id) {
-          queryParams.parent_record_id =
-            filters.parent_record_id || filters.linked_record_id;
-        }
-      }
-
-      // Add pagination parameters
-      if (limit) queryParams.limit = limit;
-      if (offset) queryParams.offset = offset;
-
-      // Call Notes API
-      const response = await listNotes(queryParams);
-      const notes = response.data || [];
-
-      // Log performance metrics
-      enhancedPerformanceTracker.markTiming(
-        perfId,
-        'attioApi',
-        performance.now() - apiStart
-      );
-
-      // Normalize notes to AttioRecord format
-      const normalizedNotes = notes.map((note) =>
-        normalizeNoteResponse(note)
-      ) as AttioRecord[];
-
-      // Apply query-based filtering if query provided
-      let results = normalizedNotes;
-      if (query && query.trim()) {
-        const queryLower = query.toLowerCase().trim();
-        results = normalizedNotes.filter((record) => {
-          const title = record.values?.title?.toString()?.toLowerCase() || '';
-          const contentMarkdown =
-            record.values?.content_markdown?.toString()?.toLowerCase() || '';
-          const contentPlaintext =
-            record.values?.content_plaintext?.toString()?.toLowerCase() || '';
-
-          return (
-            title.includes(queryLower) ||
-            contentMarkdown.includes(queryLower) ||
-            contentPlaintext.includes(queryLower)
-          );
-        });
-      }
-
-      enhancedPerformanceTracker.markTiming(
-        perfId,
-        'serialization',
-        performance.now() - apiStart
-      );
-
-      return results;
-    } catch (error: unknown) {
-      createScopedLogger(
-        'UniversalSearchService',
-        'searchNotes',
-        OperationType.API_CALL
-      ).error('Failed to search notes', error);
-      enhancedPerformanceTracker.markTiming(
-        perfId,
-        'other',
-        performance.now() - apiStart
-      );
-      return [];
-    }
   }
 
   // Query API methods remain unchanged

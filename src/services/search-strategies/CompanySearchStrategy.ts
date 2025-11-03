@@ -131,25 +131,22 @@ export class CompanySearchStrategy extends BaseSearchStrategy {
         offset
       );
     } else {
-      const parsedFilters = buildCompanyQueryFilters(query, matchType);
+      // For simple text queries without special fields/filters,
+      // use searchObject which includes fast path optimization
+      const { searchObject } = await import('../../api/operations/search.js');
+      const { ResourceType } = await import('../../types/attio.js');
 
-      if (
-        parsedFilters?.filters?.length &&
-        this.dependencies.advancedSearchFunction
-      ) {
-        return this.dependencies.advancedSearchFunction(
-          parsedFilters,
-          limit,
-          offset
-        );
-      }
+      // Calculate total records needed: offset + limit
+      const start = offset || 0;
+      const effectiveLimit = limit ? start + limit : undefined;
 
-      // Auto-detect domain-like queries and search domains field specifically
-      if (this.looksLikeDomain(query)) {
-        return this.searchByDomain(query, limit, offset);
-      }
+      const results = await searchObject(ResourceType.COMPANIES, query, {
+        limit: effectiveLimit,
+      });
 
-      return this.searchByName(query, matchType, limit, offset);
+      // Apply offset to slice the results
+      const end = limit ? start + limit : undefined;
+      return results.slice(start, end);
     }
   }
 

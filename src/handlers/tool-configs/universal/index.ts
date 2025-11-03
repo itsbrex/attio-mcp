@@ -23,6 +23,11 @@ import {
   batchSearchToolDefinition,
 } from './batch-search.js';
 import { openAiToolConfigs, openAiToolDefinitions } from '../openai/index.js';
+import { formatToolDescription } from '@/handlers/tools/standards/index.js';
+import {
+  smitheryDiagnosticsToolDefinition,
+  smitheryDiagnosticsConfig,
+} from './smithery-diagnostics.js';
 
 /**
  * Simple no-auth health-check tool to support unauthenticated capability scanning
@@ -30,7 +35,15 @@ import { openAiToolConfigs, openAiToolDefinitions } from '../openai/index.js';
  */
 export const healthCheckToolDefinition = {
   name: 'aaa-health-check',
-  description: 'Returns server status without requiring any credentials.',
+  description: formatToolDescription({
+    capability:
+      'Run a lightweight health probe that echoes deployment metadata.',
+    boundaries: 'query Attio APIs, mutate data, or require credentials.',
+    constraints:
+      'Accepts optional echo text; returns JSON payload as text for MCP clients.',
+    recoveryHint:
+      'If unavailable, review Smithery sandbox logs or restart the server process.',
+  }),
   inputSchema: {
     type: 'object',
     properties: {},
@@ -55,12 +68,13 @@ export const healthCheckConfig = {
       needs_api_key: true,
     } as const;
 
-    // Return MCP-shaped response so dispatching skips extra formatting
+    // Return MCP-compliant text response (not JSON type)
+    // MCP SDK expects content type to be 'text', not 'json'
     return {
       content: [
         {
-          type: 'json',
-          data: payload,
+          type: 'text',
+          text: JSON.stringify(payload, null, 2),
         },
       ],
       isError: false,
@@ -68,7 +82,20 @@ export const healthCheckConfig = {
   },
   formatResult: (res: Record<string, unknown>): string => {
     const content = res?.content as Array<Record<string, unknown>> | undefined;
-    const data = (content?.[0]?.data ?? res) as Record<string, unknown>;
+    const textContent = content?.[0]?.text as string | undefined;
+
+    // Parse JSON from text content if available
+    let data: Record<string, unknown>;
+    if (textContent) {
+      try {
+        data = JSON.parse(textContent) as Record<string, unknown>;
+      } catch {
+        data = res;
+      }
+    } else {
+      data = res;
+    }
+
     const parts: string[] = ['✅ Server healthy'];
     if (data?.echo) parts.push(`echo: ${String(data.echo)}`);
     if (data?.environment) parts.push(`env: ${String(data.environment)}`);
@@ -96,6 +123,7 @@ export * from './shared-handlers.js';
 export const universalToolConfigs = {
   // Ensure health-check is listed first alphabetically for best-guess scanners
   'aaa-health-check': healthCheckConfig,
+  'smithery-debug-config': smitheryDiagnosticsConfig,
   ...coreOperationsToolConfigs,
   ...advancedOperationsToolConfigs,
   records_search_batch: batchSearchConfig,
@@ -108,6 +136,7 @@ export const universalToolConfigs = {
 export const universalToolDefinitions = {
   // Ensure health-check is listed first alphabetically for best-guess scanners
   'aaa-health-check': healthCheckToolDefinition,
+  'smithery-debug-config': smitheryDiagnosticsToolDefinition,
   ...coreOperationsToolDefinitions,
   ...advancedOperationsToolDefinitions,
   records_search_batch: batchSearchToolDefinition,
