@@ -20,6 +20,7 @@ export enum UniversalResourceType {
   TASKS = 'tasks',
   DEALS = 'deals',
   NOTES = 'notes',
+  LOCATIONS = 'locations',
 }
 
 /**

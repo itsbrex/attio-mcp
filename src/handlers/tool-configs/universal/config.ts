@@ -11,6 +11,7 @@ export const MappingDefaults: Record<
   [UniversalResourceType.RECORDS]: { strictMode: true },
   [UniversalResourceType.NOTES]: { strictMode: true },
   [UniversalResourceType.LISTS]: { strictMode: false },
+  [UniversalResourceType.LOCATIONS]: { strictMode: false },
 };
 
 export const strictModeFor = (rt: UniversalResourceType) =>

@@ -184,6 +184,11 @@ const RESOURCE_FIELD_PRIORITIES: Record<
     secondaryFields: ['description', 'content'],
     fallbackFields: ['id', 'created_at'],
   },
+  [UniversalResourceType.LOCATIONS]: {
+    primaryFields: ['tenant_name', 'address', 'full_address'],
+    secondaryFields: ['building_name', 'street_address', 'suite'],
+    fallbackFields: ['city', 'state', 'location_type'],
+  },
 };
 
 /**

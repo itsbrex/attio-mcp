@@ -102,7 +102,8 @@ export async function runDiscovery(
     log.info(`Found ${objects.length} objects in Attio workspace`);
 
     // Process each object
-    for (const objectSlug of objects) {
+    for (const object of objects) {
+      const objectSlug = object.api_slug;
       try {
         const attributeMappings = await getObjectAttributes(objectSlug, apiKey);
         const attributeCount = Object.keys(attributeMappings).length;
@@ -117,6 +118,22 @@ export async function runDiscovery(
             ...config.mappings.attributes.objects[objectSlug],
             ...attributeMappings,
           };
+
+          // Also update the top-level objects mapping
+          // Add both singular and plural forms for flexibility
+          if (object.singular_noun) {
+            const singularKey =
+              object.singular_noun.charAt(0).toUpperCase() +
+              object.singular_noun.slice(1);
+            config.mappings.objects[singularKey] = objectSlug;
+          }
+
+          if (object.plural_noun) {
+            const pluralKey =
+              object.plural_noun.charAt(0).toUpperCase() +
+              object.plural_noun.slice(1);
+            config.mappings.objects[pluralKey] = objectSlug;
+          }
 
           log.info(`Discovered ${attributeCount} attributes for ${objectSlug}`);
         }

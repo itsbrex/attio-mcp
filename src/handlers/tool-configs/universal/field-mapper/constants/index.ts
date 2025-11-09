@@ -14,6 +14,7 @@ import { TASKS_FIELD_MAPPING } from './tasks.js';
 import { RECORDS_FIELD_MAPPING } from './records.js';
 import { NOTES_FIELD_MAPPING } from './notes.js';
 import { LISTS_FIELD_MAPPING } from './lists.js';
+import { LOCATIONS_FIELD_MAPPING } from './locations.js';
 
 // Re-export individual mappings
 export {
@@ -24,6 +25,7 @@ export {
   RECORDS_FIELD_MAPPING,
   NOTES_FIELD_MAPPING,
   LISTS_FIELD_MAPPING,
+  LOCATIONS_FIELD_MAPPING,
 };
 
 /**
@@ -41,4 +43,5 @@ export const RESOURCE_TYPE_MAPPINGS: Record<
   [UniversalResourceType.RECORDS]: RECORDS_FIELD_MAPPING,
   [UniversalResourceType.NOTES]: NOTES_FIELD_MAPPING,
   [UniversalResourceType.LISTS]: LISTS_FIELD_MAPPING,
+  [UniversalResourceType.LOCATIONS]: LOCATIONS_FIELD_MAPPING,
 };

@@ -29,6 +29,8 @@ export const RESOURCE_TYPE_MAPPINGS: Record<string, UniversalResourceType> = {
   tasks: UniversalResourceType.TASKS,
   note: UniversalResourceType.NOTES,
   notes: UniversalResourceType.NOTES,
+  location: UniversalResourceType.LOCATIONS,
+  locations: UniversalResourceType.LOCATIONS,
   // Common typos and variations
   comapny: UniversalResourceType.COMPANIES,
   compnay: UniversalResourceType.COMPANIES,
@@ -36,6 +38,8 @@ export const RESOURCE_TYPE_MAPPINGS: Record<string, UniversalResourceType> = {
   peolpe: UniversalResourceType.PEOPLE,
   dela: UniversalResourceType.DEALS,
   dael: UniversalResourceType.DEALS,
+  locaiton: UniversalResourceType.LOCATIONS,
+  locaton: UniversalResourceType.LOCATIONS,
 };
 
 /**

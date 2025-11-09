@@ -24,6 +24,19 @@ interface AttributesCommandArgs {
 }
 
 /**
+ * Interface for an Attio object
+ */
+interface AttioObject {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  api_slug: string;
+  singular_noun: string;
+  plural_noun: string;
+  [key: string]: unknown;
+}
+
+/**
  * Interface for an Attio attribute
  */
 interface AttioAttribute {
@@ -58,19 +71,19 @@ function createAttioClient(apiKey: string) {
  * Gets all available objects from Attio
  *
  * @param apiKey - The Attio API key
- * @returns Array of object slugs
+ * @returns Array of objects with their details
  */
-export async function getAvailableObjects(apiKey: string): Promise<string[]> {
+export async function getAvailableObjects(
+  apiKey: string
+): Promise<AttioObject[]> {
   const client = createAttioClient(apiKey);
 
   try {
     const response = await client.get('/objects');
-    const objects = response.data.data || [];
+    const objects: AttioObject[] = response.data.data || [];
 
-    // Extract API slugs from the objects
-    return objects
-      .filter((obj: Record<string, unknown>) => obj.api_slug)
-      .map((obj: Record<string, unknown>) => obj.api_slug);
+    // Return the full object details
+    return objects.filter((obj) => obj.api_slug);
   } catch (error: unknown) {
     throw handleAxiosError(error, 'get objects');
   }
@@ -157,20 +170,30 @@ export async function discoverAttributes(
     }
 
     // Prepare the objects to process
-    let objectsToProcess: string[] = [];
+    let objectsToProcess: Array<{
+      api_slug: string;
+      singular_noun?: string;
+      plural_noun?: string;
+    }> = [];
 
     if (argv.all) {
       spinner.text = 'Fetching available objects...';
-      objectsToProcess = await getAvailableObjects(apiKey);
+      const availableObjects = await getAvailableObjects(apiKey);
+      objectsToProcess = availableObjects.map((obj) => ({
+        api_slug: obj.api_slug,
+        singular_noun: obj.singular_noun,
+        plural_noun: obj.plural_noun,
+      }));
       spinner.succeed(
         `Found ${objectsToProcess.length} objects in Attio workspace`
       );
     } else if (argv.object) {
-      objectsToProcess = [argv.object];
+      objectsToProcess = [{ api_slug: argv.object }];
     }
 
     // Process each object
-    for (const objectSlug of objectsToProcess) {
+    for (const objectInfo of objectsToProcess) {
+      const objectSlug = objectInfo.api_slug;
       spinner.start(`Discovering attributes for ${chalk.cyan(objectSlug)}...`);
 
       try {
@@ -192,6 +215,22 @@ export async function discoverAttributes(
               ...config.mappings.attributes.objects[objectSlug],
               ...attributeMappings,
             };
+          }
+
+          // Also update the top-level objects mapping
+          // Add both singular and plural forms for flexibility
+          if (objectInfo.singular_noun) {
+            const singularKey =
+              objectInfo.singular_noun.charAt(0).toUpperCase() +
+              objectInfo.singular_noun.slice(1);
+            config.mappings.objects[singularKey] = objectSlug;
+          }
+
+          if (objectInfo.plural_noun) {
+            const pluralKey =
+              objectInfo.plural_noun.charAt(0).toUpperCase() +
+              objectInfo.plural_noun.slice(1);
+            config.mappings.objects[pluralKey] = objectSlug;
           }
 
           spinner.succeed(

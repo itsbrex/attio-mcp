@@ -271,7 +271,11 @@ export class ResourceMapper {
     }
 
     // Standard objects use /objects/{type}/attributes
-    if (['companies', 'people', 'deals', 'tasks'].includes(normalized)) {
+    if (
+      ['companies', 'people', 'deals', 'tasks', 'locations'].includes(
+        normalized
+      )
+    ) {
       return `/objects/${normalized}/attributes`;
     }
 
