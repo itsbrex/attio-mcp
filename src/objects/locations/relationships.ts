@@ -75,14 +75,22 @@ export async function getLocationCompany(
     if (Array.isArray(companyRef) && companyRef.length > 0) {
       // Handle array of references
       const firstRef = companyRef[0];
-      if (typeof firstRef === 'object' && firstRef?.target_record_id) {
-        companyId = firstRef.target_record_id;
+      if (
+        typeof firstRef === 'object' &&
+        firstRef &&
+        'target_record_id' in firstRef
+      ) {
+        companyId = (firstRef as any).target_record_id;
       } else if (typeof firstRef === 'string') {
         companyId = firstRef;
       }
-    } else if (typeof companyRef === 'object' && companyRef?.target_record_id) {
+    } else if (
+      typeof companyRef === 'object' &&
+      companyRef &&
+      'target_record_id' in companyRef
+    ) {
       // Handle single reference object
-      companyId = companyRef.target_record_id;
+      companyId = (companyRef as any).target_record_id;
     } else if (typeof companyRef === 'string') {
       // Handle simple string ID
       companyId = companyRef;
@@ -136,7 +144,7 @@ export async function linkLocationToCompany(
 
   try {
     // Update the location with the company reference
-    const updatedLocation = await updateRecord('locations', locationId, {
+    const updatedLocation = await updateObjectRecord('locations', locationId, {
       company: [
         {
           target_object: 'companies',
@@ -175,7 +183,7 @@ export async function unlinkLocationFromCompany(
 
   try {
     // Clear the company reference
-    const updatedLocation = await updateRecord('locations', locationId, {
+    const updatedLocation = await updateObjectRecord('locations', locationId, {
       company: [],
     });
 
@@ -240,7 +248,7 @@ export async function getLocationPeople(
 
     // Fetch all person records
     const people = await Promise.all(
-      peopleIds.map((id) => getRecordDetails('people', id))
+      peopleIds.map((id) => getObjectRecord('people', id))
     );
 
     debug('LocationRelationships', 'Retrieved people for location', {
@@ -299,7 +307,7 @@ export async function getLocationDeals(
 
     // Fetch all deal records
     const deals = await Promise.all(
-      dealIds.map((id) => getRecordDetails('deals', id))
+      dealIds.map((id) => getObjectRecord('deals', id))
     );
 
     debug('LocationRelationships', 'Retrieved deals for location', {

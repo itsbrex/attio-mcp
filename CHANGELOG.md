@@ -7,11 +7,116 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking Changes
+
 ### Added
 
 ### Changed
 
+- **Clarified npm package name confusion** (#903) - Updated all documentation to clearly indicate correct package name
+  - **Problem**: GitHub repository is named `attio-mcp-server`, but npm package is named `attio-mcp` (renamed in June 2025)
+  - **Old package**: `attio-mcp-server@0.0.2` (abandoned, February 2025) - only 4 legacy tools
+  - **Current package**: `attio-mcp@1.2.0` (actively maintained) - 34 universal tools
+  - **Impact**: Users installing `npm install attio-mcp-server` got outdated v0.0.2 instead of current v1.2.0
+  - **Solution**: Added prominent warnings in README and documentation about correct package name
+  - **Note**: Old package owned by different npm user, cannot be deprecated by maintainers
+  - **Result**: Clear installation instructions prevent users from installing wrong package
+
 ### Fixed
+
+### Security
+
+### Deprecated
+
+## [1.2.0] - 2025-11-03
+
+This release introduces intelligent workspace member auto-resolution for actor-reference filtering, enabling natural filtering syntax with emails and names instead of requiring manual UUID lookups. The update includes critical fixes for filter transformation, client initialization, and exact matching behavior.
+
+### Breaking Changes
+
+- **Array equals operator rejected for reference attributes** (#904 Phase 2) - Arrays with `equals` operator (e.g., `{owner: {$eq: ["uuid1", "uuid2"]}}`) now throw `FilterValidationError`. This addresses PR feedback [HIGH] issue where translator allowed arrays to pass through generating invalid `$eq: [...]` structure. Use 'in' operator instead (coming soon) or filter by single value.
+
+- **Mixed-type arrays rejected in reference filters** (#904) - Arrays combining UUIDs and names (e.g., `["uuid-123", "John Doe"]`) now throw `FilterValidationError`. This prevents silent failures where UUIDs would never match when using the `name` field. Use separate filters or ensure all array elements are the same type.
+
+### Added
+
+- **Auto-resolution of workspace member emails/names to UUIDs** (#904 Phase 2) - Owner/assignee filters now transparently convert email addresses and names to workspace member UUIDs
+  - **Problem**: Attio API requires workspace member UUIDs for actor-reference filters, but users naturally want to filter by email or name
+  - **Solution**: Automatically resolve email/name values to UUIDs via workspace members search API before building filter structure
+  - **User Experience**:
+    - **BEFORE**: User must manually search workspace members by email, extract UUID, then use UUID in filter
+    - **AFTER**: User filters by email/name directly (e.g., `owner="martin@shapescale.com"` or `owner="Martin Kessler"`), auto-resolved to UUID transparently
+  - **Input Flexibility**:
+    - **User Input**: Accepts UUID, email address, or full name
+    - **API Payload**: Always uses `referenced_actor_id` (workspace member UUID) after resolution
+    - **Examples**: `owner="uuid-123"` OR `owner="martin@shapescale.com"` OR `owner="Martin Kessler"` all work
+  - **Features**:
+    - Per-request caching prevents duplicate API calls for same email/name within single filter transformation
+    - Exact matching: Post-filters Attio's fuzzy search results to ensure exact email/name matches only
+    - Clear error messages when member not found or multiple matches (with member list)
+    - Works in both AND and OR filter logic, and with/without resourceType (slug-based fallback)
+    - Comprehensive unit test coverage (14 resolver tests + 7 integration tests)
+  - **Result**: Natural filtering syntax like `owner="martin@shapescale.com"` or `owner="Martin Kessler"` just works, no manual UUID lookup required
+
+- **Deal filtering documentation** (#904) - Enhanced `records_search` tool discoverability with deal-specific examples
+  - Added "deals" to `records_search` tool description (was missing from capability list)
+  - Documented `filters` parameter structure with format examples and deal-specific use cases
+  - Added schema examples for filtering deals by stage, owner, and value (single and multi-condition)
+  - Improves LLM's ability to discover and correctly use deal filtering capabilities
+
+### Changed
+
+### Fixed
+
+- **Auto-resolution: Exact email and name matching** (#904 Phase 2) - Fixed auto-resolver returning "ambiguous match" errors for exact email/name searches
+  - **Problem**: Attio `/workspace_members?search=` API does fuzzy matching, returning all members from same domain or with similar names
+    - Email search: `martin@shapescale.com` returned all 5 `@shapescale.com` members
+    - Name search: `Martin Kessler` returned all 5 workspace members (extreme fuzzy matching)
+  - **Impact**: Auto-resolution threw "Ambiguous workspace member" errors even for exact email addresses and unique names
+  - **Solution**: Added post-filtering logic to extract exact matches from fuzzy search results
+    - Email filtering: Exact case-insensitive email match (e.g., `martin@shapescale.com`)
+    - Name filtering: Exact case-insensitive full name match constructed from `first_name + last_name` (e.g., `Martin Kessler`)
+  - **Result**: `owner="martin@shapescale.com"` and `owner="Martin Kessler"` now correctly resolve to single member, not ambiguous match error
+  - Added unit tests covering both email and name fuzzy result filtering scenarios
+
+- **Client initialization validation failures** (#904 Phase 2) - Eliminated repeated client validation errors in logs
+  - **Problem**: `resolveAttioClient()` attempted `createAttioClient(apiKey)` first, which failed `assertAxiosInstance` validation, then fell back to `getAttioClient()` which succeeded
+  - **Impact**: Repeated errors in logs (`createAttioClient failed: returned invalid Axios client instance`) despite API calls working correctly via cached client fallback
+  - **Solution**: Reordered resolution priority to use `getAttioClient()` first (proven code path handling caching, environment detection, and strategy pattern)
+  - **Result**: Clean logs with no validation failures, immediate success on first attempt, uses battle-tested code path from rest of codebase
+
+- **Critical: Filter transformation bug** (#904) - Fixed `condition: "equals"` incorrectly mapping to `$equals` instead of Attio's required `$eq` operator
+  - **Problem**: Filter transformer converted `equals` condition to `$equals` operator, but Attio API requires `$eq` (verified in search.ts:189-191)
+  - **Impact**: ALL resource types affected (companies, people, deals, tasks, records) - filtering with `equals` condition failed with "Invalid operator: $equals" error
+  - **Solution**: Updated 3 locations in `src/utils/filters/translators.ts` (lines 382, 400, 499) to generate `$eq` instead of `$equals`
+  - **Result**: Filtering now works correctly for all resource types with `equals` condition
+  - Updated test suites to expect correct `$eq` operator
+- **CRITICAL FIX: Actor-reference filtering** (#904 Phase 2) - Fixed actor-reference attributes to use correct Attio API filter structure
+  - **Production Issue**: API rejected all filters for actor-reference attributes (owner, assignee, created_by, modified_by):
+    - `{"owner": {"name": {"$eq": "..."}}}` → "Invalid field 'name' for attribute of type 'actor-reference'"
+    - `{"owner": {"email": {"$eq": "..."}}}` → "Invalid field 'email' for attribute of type 'actor-reference'"
+    - `{"owner": {"record_id": {"$eq": "..."}}}` → "Invalid field 'record_id' for attribute of type 'actor-reference'"
+  - **Root Cause**: Actor-reference attributes require a completely different filter structure per Attio API documentation
+  - **Impact**: ALL filtering by owner, assignee, created_by, modified_by was completely broken
+  - **Solution** (discovered via Context7 API documentation search):
+    - Actor-reference attributes use direct property matching, not operator nesting
+    - **API Payload Structure**: `{owner: {referenced_actor_type: "workspace-member", referenced_actor_id: "uuid"}}`
+    - **NOT**: `{owner: {name: {$eq: "..."}}}` or `{owner: {email: {$eq: "..."}}}` or `{owner: {record_id: {$eq: "..."}}}`
+    - Updated filter translator to detect actor-reference types and build special structure (3 locations in translators.ts)
+    - Applied to both AND and OR logic, and list-entry contexts
+    - **User Input Flexibility** (with auto-resolution): Users can provide UUID, email address, or full name - all are automatically resolved to workspace member UUID before building API payload
+    - Added `assignee_id` to KNOWN_REFERENCE_SLUGS for proper detection without resourceType
+    - Updated 22 unit tests to expect correct actor-reference structure
+  - **Slug-based Fallback Behavior** (when resourceType unavailable):
+    - `assignee_id` and `workspace_member` slugs always require email field (workspace-member type)
+    - Other reference slugs (owner, assignee, company, person) use heuristic detection: UUID → record_id, otherwise → name
+    - Cannot detect actor-reference type without resourceType, so uses standard nested structure
+  - **Result**:
+    - **User Input**: `owner="Martin Kessler"` OR `owner="martin@shapescale.com"` OR `owner="uuid-123"`
+    - **API Payload**: `{"owner": {"referenced_actor_type": "workspace-member", "referenced_actor_id": "d28a35f1-..."}}` → ✅ SUCCESS
+    - E2E test passed 100% (TC-AO03)
+    - All 147 filter tests passing (no regressions)
+  - Enhanced error messages to guide users when invalid value types provided
 
 ### Security
 
@@ -422,7 +527,9 @@ Users upgrading from v0.1.x should note:
 - Troubleshooting guides
 - Development and contribution guidelines
 
-[Unreleased]: https://github.com/kesslerio/attio-mcp-server/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/kesslerio/attio-mcp-server/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/kesslerio/attio-mcp-server/compare/v1.1.10...v1.2.0
+[1.1.10]: https://github.com/kesslerio/attio-mcp-server/compare/v1.1.0...v1.1.10
 [1.1.0]: https://github.com/kesslerio/attio-mcp-server/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/kesslerio/attio-mcp-server/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/kesslerio/attio-mcp-server/compare/v0.1.2...v0.2.0

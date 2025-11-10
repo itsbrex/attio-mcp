@@ -4,7 +4,7 @@
  */
 
 import type { AttioRecord } from '../../types/attio.js';
-import type { ListEntryFilters } from '../../objects/lists.js';
+import type { ListEntryFilters } from '../../api/operations/types.js';
 import { listObjectRecords } from '../../objects/records/index.js';
 import { debug } from '../../utils/logger.js';
 
@@ -35,7 +35,7 @@ export async function advancedSearchLocations(
 
   try {
     // Use listObjectRecords to search
-    const results = await listObjectRecords('locations', { limit, offset });
+    const results = await listObjectRecords('locations', {});
 
     debug('LocationSearch', 'Advanced search completed', {
       resultCount: results.length,
@@ -43,7 +43,16 @@ export async function advancedSearchLocations(
       offset,
     });
 
-    return results;
+    // Apply limit and offset manually if specified
+    let filteredResults = results;
+    if (offset) {
+      filteredResults = filteredResults.slice(offset);
+    }
+    if (limit) {
+      filteredResults = filteredResults.slice(0, limit);
+    }
+
+    return filteredResults;
   } catch (error: unknown) {
     // Log and re-throw errors
     debug('LocationSearch', 'Advanced search failed', {

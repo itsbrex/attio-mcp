@@ -4,7 +4,8 @@
  */
 
 import type { AttioRecord } from '../../../types/attio.js';
-import { UpdateStrategy } from './UpdateStrategy.js';
+import type { UpdateStrategy } from './BaseUpdateStrategy.js';
+import type { UniversalResourceType } from '../../../handlers/tool-configs/universal/types.js';
 import { validateLocationFields } from '../../../objects/locations/attributes.js';
 import { shouldUseMockData } from '../../create/index.js';
 import { getObjectRecord } from '../../../objects/records/index.js';
@@ -13,7 +14,7 @@ import { updateObjectRecord } from '../../../objects/records/index.js';
 /**
  * Update strategy for location records
  */
-export class LocationUpdateStrategy extends UpdateStrategy {
+export class LocationUpdateStrategy implements UpdateStrategy {
   /**
    * Execute location update with validation
    */
@@ -62,14 +63,15 @@ export class LocationUpdateStrategy extends UpdateStrategy {
   }
 
   /**
-   * Update a record (delegate to UpdateStrategy base)
+   * Update a record (implements UpdateStrategy interface)
    */
   async update(
     recordId: string,
-    updates: Record<string, unknown>,
-    resourceType: string
+    values: Record<string, unknown>,
+    resourceType: UniversalResourceType,
+    _context?: Record<string, unknown>
   ): Promise<AttioRecord> {
-    return this.execute(resourceType, recordId, updates);
+    return this.execute(resourceType, recordId, values);
   }
 
   /**

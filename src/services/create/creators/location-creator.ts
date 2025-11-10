@@ -53,7 +53,7 @@ export class LocationCreator extends BaseCreator {
 
     // Process the response
     const record = await this.processResponse(
-      response,
+      response.data,
       context,
       transformedData
     );

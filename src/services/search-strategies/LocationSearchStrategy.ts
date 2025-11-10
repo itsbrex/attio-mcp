@@ -136,8 +136,8 @@ export class LocationSearchStrategy extends BaseSearchStrategy {
       );
 
       // Apply sorting if needed
-      if (sort && this.dependencies.rankByRelevance) {
-        return this.dependencies.rankByRelevance(results, query, sort);
+      if (sort === SortType.RELEVANCE && this.dependencies.rankByRelevance) {
+        return this.dependencies.rankByRelevance(results, query, fields || []);
       }
 
       return results;
