@@ -1,9 +1,9 @@
 {
   "version": "1.0",
   "metadata": {
-    "generated": "2025-11-10T00:20:38.708Z",
+    "generated": "2025-11-10T18:43:13.761Z",
     "description": "Default attribute mappings for Attio MCP Server - Official Attio CRM attributes only",
-    "lastDiscovery": "2025-11-10T00:20:38.708Z"
+    "lastDiscovery": "2025-11-10T18:43:13.757Z"
   },
   "mappings": {
     "attributes": {
@@ -169,7 +169,9 @@
           "Remove": "remove",
           "Add to Sequence": "add_to_sequence",
           "Account IQ": "account_iq",
-          "Decision Makers": "decision_makers"
+          "Decision Makers": "decision_makers",
+          "Year Founded": "year_founded",
+          "Crunchbase": "crunchbase"
         },
         "people": {
           "Name": "name",
@@ -375,7 +377,16 @@
           "Kondo Location": "kondo_location",
           "Associated locations": "associated_locations",
           "Role Function": "role_function",
-          "The Swarm Connector": "the_swarm_connector"
+          "The Swarm Connector": "the_swarm_connector",
+          "Email": "email",
+          "Kondo Latest Message Content": "kondo_latest_message_content",
+          "Kondo Latest Message Timestamp": "kondo_latest_message_timestamp",
+          "Kondo Conversation History": "kondo_conversation_history",
+          "Kondo Conversation Starred": "kondo_conversation_starred",
+          "Kondo Conversation Status": "kondo_conversation_status",
+          "Kondo Conversation State": "kondo_conversation_state",
+          "Kondo URL": "kondo_url",
+          "Kondo Note": "kondo_note"
         },
         "deals": {
           "Name": "name",

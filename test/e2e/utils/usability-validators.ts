@@ -57,7 +57,7 @@ export async function runUsabilityChecks(): Promise<UsabilitySummary> {
 
     const msg = resp?.error || resp?.content?.[0]?.text || '';
     const mentionsValidTypes =
-      /Must be one of: .*records, .*lists, .*people, .*companies, .*tasks, .*deals, .*notes/i.test(
+      /Must be one of: .*records, .*lists, .*people, .*companies, .*tasks, .*deals, .*notes, .*locations/i.test(
         String(msg)
       );
     results.push({

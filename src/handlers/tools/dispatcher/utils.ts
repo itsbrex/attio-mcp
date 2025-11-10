@@ -22,6 +22,7 @@ export function canonicalizeResourceType(rt: unknown): string {
     'tasks',
     'deals',
     'notes',
+    'locations',
   ];
 
   if (!validTypes.includes(value)) {

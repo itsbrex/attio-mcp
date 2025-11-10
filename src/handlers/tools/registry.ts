@@ -134,7 +134,7 @@ export function findToolConfig(toolName: string): ToolConfigResult | undefined {
 
   // Search in resource-specific tools first
   for (const resourceType of Object.values(ResourceType)) {
-    const resourceConfig = TOOL_CONFIGS[resourceType];
+    const resourceConfig = (TOOL_CONFIGS as any)[resourceType];
     if (!resourceConfig) {
       if (debugMode) {
         log.debug(`No config found for resource type: ${resourceType}`);
@@ -185,7 +185,12 @@ export function findToolConfig(toolName: string): ToolConfigResult | undefined {
     }
 
     for (const [toolType, config] of Object.entries(resourceConfig)) {
-      if (config && config.name === canonicalToolName) {
+      if (
+        config &&
+        typeof config === 'object' &&
+        'name' in config &&
+        (config as ToolConfig).name === canonicalToolName
+      ) {
         if (debugMode) {
           log.info('Found tool in resource config', {
             toolName: canonicalToolName,

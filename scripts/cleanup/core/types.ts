@@ -64,7 +64,12 @@ export interface AttioRecord {
   [key: string]: any;
 }
 
-export type ResourceType = 'companies' | 'people' | 'deals' | 'tasks';
+export type ResourceType =
+  | 'companies'
+  | 'people'
+  | 'deals'
+  | 'tasks'
+  | 'locations';
 
 export interface FetchResult {
   records: AttioRecord[];

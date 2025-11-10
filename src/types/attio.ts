@@ -425,6 +425,7 @@ export enum ResourceType {
   RECORDS = 'records',
   TASKS = 'tasks',
   WORKSPACE_MEMBERS = 'workspace_members',
+  LOCATIONS = 'locations',
 }
 
 /**

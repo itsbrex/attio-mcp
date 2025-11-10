@@ -107,6 +107,7 @@ export enum ResourceType {
   LISTS = 'lists',
   DEALS = 'deals',
   RECORDS = 'records',
+  LOCATIONS = 'locations',
 }
 
 // MCP Response type (text-based)

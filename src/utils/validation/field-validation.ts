@@ -180,6 +180,22 @@ const RESOURCE_SPECIFIC_FIELDS: Record<ResourceType, string[]> = {
     'workspace_member_id',
     'workspace_id',
   ],
+
+  [ResourceType.LOCATIONS]: [
+    ...COMMON_SAFE_FIELDS,
+    'name',
+    'address',
+    'city',
+    'state',
+    'country',
+    'postal_code',
+    'latitude',
+    'longitude',
+    'type',
+    'parent_location',
+    'timezone',
+    'capacity',
+  ],
 };
 
 /**
