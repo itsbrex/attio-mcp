@@ -1,9 +1,9 @@
 {
   "version": "1.0",
   "metadata": {
-    "generated": "2025-11-10T18:43:13.761Z",
+    "generated": "2025-11-10T19:01:50.539Z",
     "description": "Default attribute mappings for Attio MCP Server - Official Attio CRM attributes only",
-    "lastDiscovery": "2025-11-10T18:43:13.757Z"
+    "lastDiscovery": "2025-11-10T19:01:50.539Z"
   },
   "mappings": {
     "attributes": {

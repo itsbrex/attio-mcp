@@ -319,7 +319,7 @@ describe('Universal Core Operations Search Tests', () => {
         // We only test get details here to avoid duplication
       }
 
-      expect(vi.mocked(handleUniversalGetDetails)).toHaveBeenCalledTimes(7);
+      expect(vi.mocked(handleUniversalGetDetails)).toHaveBeenCalledTimes(8);
     });
   });
 
