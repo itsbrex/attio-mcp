@@ -60,6 +60,7 @@ import {
   PersonCreator,
   TaskCreator,
   NoteCreator,
+  LocationCreator,
 } from './creators/index.js';
 
 /**
@@ -92,6 +93,7 @@ export class AttioCreateService implements CreateService {
     PEOPLE: 'people',
     TASKS: 'tasks',
     NOTES: 'notes',
+    LOCATIONS: 'locations',
   } as const;
 
   constructor() {
@@ -112,6 +114,10 @@ export class AttioCreateService implements CreateService {
     this.creators.set(
       AttioCreateService.SUPPORTED_RESOURCE_TYPES.NOTES,
       new NoteCreator()
+    );
+    this.creators.set(
+      AttioCreateService.SUPPORTED_RESOURCE_TYPES.LOCATIONS,
+      new LocationCreator()
     );
 
     // Create shared context for all creators

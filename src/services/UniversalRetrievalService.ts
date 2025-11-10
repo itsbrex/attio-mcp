@@ -330,6 +330,9 @@ export class UniversalRetrievalService {
       case UniversalResourceType.NOTES:
         return this.retrieveNoteRecord(record_id);
 
+      case UniversalResourceType.LOCATIONS:
+        return await getObjectRecord('locations', record_id);
+
       default:
         throw new Error(
           `Unsupported resource type for get details: ${resource_type}`

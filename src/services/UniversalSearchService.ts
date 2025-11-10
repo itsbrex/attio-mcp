@@ -38,6 +38,7 @@ import {
 import { advancedSearchCompanies } from '../objects/companies/index.js';
 import { advancedSearchPeople } from '../objects/people/index.js';
 import { advancedSearchDeals } from '../objects/deals/index.js';
+import { advancedSearchLocations } from '../objects/locations/index.js';
 import { searchLists } from '../objects/lists.js';
 import { listObjectRecords } from '../objects/records/index.js';
 import { listTasks } from '../objects/tasks.js';
@@ -83,6 +84,7 @@ import {
   CompanySearchStrategy,
   PeopleSearchStrategy,
   DealSearchStrategy,
+  LocationSearchStrategy,
   TaskSearchStrategy,
   ListSearchStrategy,
   NoteSearchStrategy,
@@ -103,6 +105,12 @@ const ensureAdvancedSearchPeople = () =>
 
 const ensureAdvancedSearchDeals = () =>
   ensureFunctionAvailability(advancedSearchDeals, 'advancedSearchDeals');
+
+const ensureAdvancedSearchLocations = () =>
+  ensureFunctionAvailability(
+    advancedSearchLocations,
+    'advancedSearchLocations'
+  );
 
 /**
  * UniversalSearchService provides centralized record search functionality
@@ -167,6 +175,14 @@ export class UniversalSearchService {
       getFieldValue: SearchUtilities.getFieldValue.bind(SearchUtilities),
     };
 
+    const locationDependencies: StrategyDependencies = {
+      advancedSearchFunction: await ensureAdvancedSearchLocations(),
+      createDateFilter: SearchUtilities.createDateFilter,
+      mergeFilters: SearchUtilities.mergeFilters,
+      rankByRelevance: SearchUtilities.rankByRelevance.bind(SearchUtilities),
+      getFieldValue: SearchUtilities.getFieldValue.bind(SearchUtilities),
+    };
+
     // Initialize strategies
     this.strategies.set(
       UniversalResourceType.COMPANIES,
@@ -179,6 +195,10 @@ export class UniversalSearchService {
     this.strategies.set(
       UniversalResourceType.DEALS,
       new DealSearchStrategy(dealDependencies)
+    );
+    this.strategies.set(
+      UniversalResourceType.LOCATIONS,
+      new LocationSearchStrategy(locationDependencies)
     );
     this.strategies.set(
       UniversalResourceType.LISTS,

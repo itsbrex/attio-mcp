@@ -16,3 +16,4 @@ export { DealSearchStrategy } from './DealSearchStrategy.js';
 export { TaskSearchStrategy } from './TaskSearchStrategy.js';
 export { ListSearchStrategy } from './ListSearchStrategy.js';
 export { NoteSearchStrategy } from './NoteSearchStrategy.js';
+export { LocationSearchStrategy } from './LocationSearchStrategy.js';

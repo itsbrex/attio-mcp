@@ -217,6 +217,10 @@ export class UniversalDeleteService {
         return { success: result.success, record_id };
       }
 
+      case UniversalResourceType.LOCATIONS:
+        await deleteObjectRecord('locations', record_id);
+        return { success: true, record_id };
+
       default:
         throw new Error(
           `Unsupported resource type for delete: ${resource_type}`

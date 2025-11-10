@@ -1,9 +1,9 @@
 {
   "version": "1.0",
   "metadata": {
-    "generated": "2025-11-09T23:29:56.665Z",
+    "generated": "2025-11-10T00:20:38.708Z",
     "description": "Default attribute mappings for Attio MCP Server - Official Attio CRM attributes only",
-    "lastDiscovery": "2025-11-09T23:29:56.657Z"
+    "lastDiscovery": "2025-11-10T00:20:38.708Z"
   },
   "mappings": {
     "attributes": {
@@ -372,7 +372,10 @@
           "Kondo LinkedIn UID": "kondo_linkedin_uid",
           "Kondo LinkedIn URL": "kondo_linkedin_url",
           "Kondo Headline": "kondo_headline",
-          "Kondo Location": "kondo_location"
+          "Kondo Location": "kondo_location",
+          "Associated locations": "associated_locations",
+          "Role Function": "role_function",
+          "The Swarm Connector": "the_swarm_connector"
         },
         "deals": {
           "Name": "name",
@@ -405,7 +408,8 @@
           "Insight Framework": "insight_framework",
           "Call Insight SPICED": "call_insight_spiced",
           "Call Insight MEDDICC": "call_insight_meddicc",
-          "Call Insight Summary": "call_insight_summary"
+          "Call Insight Summary": "call_insight_summary",
+          "Associated locations": "location"
         },
         "users": {
           "Person": "person",
@@ -463,7 +467,6 @@
           "Zip Code": "zip_code",
           "Time in Building": "time_in_building_8",
           "Occupancy Type": "occupancy_type",
-          "Num. Employees": "num_employees",
           "NAICS": "naics",
           "SIC": "sic",
           "Building Rating": "building_rating",
@@ -488,7 +491,9 @@
           "Location Established": "location_established",
           "Break Date": "break_date",
           "Break Type": "break_type",
-          "Full Address": "full_address"
+          "Full Address": "full_address",
+          "Deals": "associated_deals",
+          "Num. Employees": "num_employees"
         }
       },
       "custom": {}

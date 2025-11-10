@@ -162,6 +162,20 @@ class UniversalMetadataFacade {
         break;
       }
 
+      case UniversalResourceType.LOCATIONS: {
+        if (record_id) {
+          result = await this.recordService.getAttributesForRecord(
+            resource_type,
+            record_id
+          );
+        } else {
+          result = await this.discoverAttributesForResourceType(resource_type, {
+            categories,
+          });
+        }
+        break;
+      }
+
       default:
         throw new Error(
           `Unsupported resource type for get attributes: ${resource_type}`
@@ -247,6 +261,9 @@ class UniversalMetadataFacade {
       }
 
       case UniversalResourceType.TASKS:
+        return this.discoverAttributesForResourceType(resource_type, options);
+
+      case UniversalResourceType.LOCATIONS:
         return this.discoverAttributesForResourceType(resource_type, options);
 
       default:

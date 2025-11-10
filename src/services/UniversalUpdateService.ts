@@ -661,6 +661,18 @@ export class UniversalUpdateService {
         );
         break;
       }
+      case UniversalResourceType.LOCATIONS: {
+        const { LocationUpdateStrategy } = await import(
+          './update/strategies/LocationUpdateStrategy.js'
+        );
+        const strategy = new LocationUpdateStrategy();
+        updatedRecord = await strategy.update(
+          record_id,
+          attioPayload.values,
+          resource_type
+        );
+        break;
+      }
       default: {
         updatedRecord = await this.handleUnsupportedResourceType(
           resource_type as unknown as string,

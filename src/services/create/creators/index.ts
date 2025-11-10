@@ -15,3 +15,4 @@ export { CompanyCreator } from './company-creator.js';
 export { PersonCreator } from './person-creator.js';
 export { TaskCreator } from './task-creator.js';
 export { NoteCreator } from './note-creator.js';
+export { LocationCreator } from './location-creator.js';
