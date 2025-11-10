@@ -1,0 +1,92 @@
+import type { AttioRecord } from '../../../types/attio.js';
+import type {
+  CreateStrategy,
+  CreateStrategyParams,
+} from './BaseCreateStrategy.js';
+import { getCreateService } from '../../create/index.js';
+import { getFieldSuggestions } from '../../../handlers/tool-configs/universal/field-mapper.js';
+import {
+  UniversalValidationError,
+  ErrorType,
+} from '../../../handlers/tool-configs/universal/schemas.js';
+import {
+  getFormatErrorHelp,
+  convertAttributeFormats,
+} from '../../../utils/attribute-format-helpers.js';
+import { createObjectRecord } from '../../../objects/records/index.js';
+
+export class LocationCreateStrategy implements CreateStrategy<AttioRecord> {
+  async create(params: CreateStrategyParams): Promise<AttioRecord> {
+    const { values, resourceType } = params;
+    try {
+      // Apply format conversions
+      const corrected = convertAttributeFormats('locations', values);
+
+      // Since locations is a custom object, we use the generic createObjectRecord
+      // rather than a specific createLocation method
+      const result = await createObjectRecord('locations', corrected);
+
+      if (!result) {
+        throw new UniversalValidationError(
+          'Location creation failed: createObjectRecord returned null/undefined',
+          ErrorType.API_ERROR,
+          { field: 'result' }
+        );
+      }
+
+      // Type guard for expected structure
+      const hasRecordId =
+        typeof (
+          (result as Record<string, unknown>)?.id as Record<string, unknown>
+        )?.record_id === 'string' &&
+        (
+          ((result as Record<string, unknown>).id as Record<string, unknown>)
+            .record_id as string
+        ).length > 0;
+      if (!hasRecordId) {
+        throw new UniversalValidationError(
+          'Location creation failed: Invalid record structure',
+          ErrorType.API_ERROR,
+          { field: 'id' }
+        );
+      }
+      return result as AttioRecord;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('Cannot find attribute')) {
+        const match = msg.match(/slug\/ID "([^"]+)"/);
+        if (match && match[1]) {
+          const suggestion = getFieldSuggestions(resourceType, match[1]);
+          const enhanced = getFormatErrorHelp('locations', match[1], msg);
+          throw new UniversalValidationError(enhanced, ErrorType.USER_ERROR, {
+            suggestion,
+            field: match[1],
+          });
+        }
+      }
+      if (msg.includes('uniqueness constraint')) {
+        throw new UniversalValidationError(
+          'Uniqueness constraint violation for locations',
+          ErrorType.USER_ERROR,
+          {
+            suggestion:
+              'Try searching for existing records first or use different unique values',
+          }
+        );
+      }
+      // Check for missing required fields specific to locations
+      if (msg.includes('tenant_name') || msg.includes('address')) {
+        throw new UniversalValidationError(
+          `Location creation failed: ${msg}`,
+          ErrorType.USER_ERROR,
+          {
+            suggestion:
+              'Locations require tenant_name and address fields. Make sure these are provided.',
+            field: msg.includes('tenant_name') ? 'tenant_name' : 'address',
+          }
+        );
+      }
+      throw err;
+    }
+  }
+}

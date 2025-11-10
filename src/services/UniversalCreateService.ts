@@ -467,6 +467,16 @@ export class UniversalCreateService {
         })) as AttioRecord;
       }
 
+      case UniversalResourceType.LOCATIONS: {
+        const { LocationCreateStrategy } = await import(
+          './create/strategies/LocationCreateStrategy.js'
+        );
+        return (await new LocationCreateStrategy().create({
+          resourceType: resource_type,
+          values: mappedData,
+        })) as AttioRecord;
+      }
+
       default:
         return this.handleUnsupportedResourceType(resource_type, params);
     }
