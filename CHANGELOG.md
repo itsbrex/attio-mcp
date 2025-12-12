@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-12-12] - Daily Update
+
+### Fixed
+
+- **Daily changelog workflow missing approvals** (#1005) - Fixed automation to require proper approval process
+- **Claude PR Review false positives from missing dynamic import detection** (#1003) - Ring 1 scope now includes dynamically imported modules to prevent false positive "missing dependency" errors
+- **Enhance uniqueness constraint violation errors** (#1000) - Improved error messaging for uniqueness constraint violations
+- **Changelog and personal-name field clears** (#991) - Fixed issues with clearing changelog and personal-name attributes
+
 ### Breaking Changes
 
 ### Added
