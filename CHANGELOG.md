@@ -11,6 +11,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+## [2025-12-16] - Daily Update
+
+### Added
+
+- **Attio Skill Generator Meta-Skill** (#1024) - New meta-skill for generating workspace schema documentation
+  - Automatically generates Claude Skills from Attio workspace schemas
+  - Supports companies, people, and deals objects with experimental custom object support
+  - Multiple output formats: Claude Skill, Markdown, and JSON
+  - Includes Display Name ↔ API Slug mapping for LLM accuracy
+
+- **Attio MCP Usage Skill** (#1021) - Comprehensive workflow guidance and error prevention skill
+  - Universal workflow patterns (Find or Create, Batch Update, Pipeline Movement, Data Enrichment)
+  - Golden Rules error prevention system with field validation and data type handling
+  - Complete MCP tool reference with signatures and examples
+
+- **Workspace Schema Skills Generation** (#1014) - Auto-generate workspace-specific schema documentation
+  - Generate workspace schema skills using `attio-discover generate-skill` command
+  - Supports Phase 1 objects (companies, people, deals) with experimental custom object support
+  - ZIP packaging support for easy Claude desktop upload
+
+### Fixed
+
+- **@modelcontextprotocol/sdk Version Pinning** (#1026) - Pinned SDK to ~1.24.0 for stability
+  - Resolves compatibility issues with MCP protocol changes
+
+### Changed
+
+- **Offline Test De-duplication** (#1013) - Refactored offline test suite to remove duplicates
+  - Improved test organization and reduced redundant test cases
+
 - **Universal Usage Guide Skill** (#1018) - Hand-crafted skill for workflow patterns and error prevention
   - Universal workflow patterns (Find or Create, Batch Update, Pipeline Movement, Data Enrichment)
   - Golden Rules error prevention system (read-only fields, multi-select arrays, data types, UUID validation)
