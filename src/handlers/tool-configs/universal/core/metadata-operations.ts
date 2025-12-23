@@ -49,6 +49,18 @@ export const getAttributesConfig: UniversalToolConfig<
       : 'record';
 
     if (Array.isArray(attributes)) {
+      // Handle case where attributes is an array of strings (attribute names only)
+      if (attributes.length > 0 && typeof attributes[0] === 'string') {
+        return `${resourceTypeName.charAt(0).toUpperCase() + resourceTypeName.slice(1)} attributes (${attributes.length}):\n${(
+          attributes as string[]
+        )
+          .map((attrName: string, index: number) => {
+            return `${index + 1}. ${attrName}`;
+          })
+          .join('\n')}`;
+      }
+
+      // Handle case where attributes is an array of objects with metadata
       return `${resourceTypeName.charAt(0).toUpperCase() + resourceTypeName.slice(1)} attributes (${attributes.length}):\n${attributes
         .map((attr: Record<string, unknown>, index: number) => {
           const name =
@@ -61,6 +73,21 @@ export const getAttributesConfig: UniversalToolConfig<
 
     if (typeof attributes === 'object' && attributes !== null) {
       if (attributes.all && Array.isArray(attributes.all)) {
+        // Handle case where attributes.all is an array of strings (attribute names only)
+        if (
+          attributes.all.length > 0 &&
+          typeof attributes.all[0] === 'string'
+        ) {
+          return `Available ${resourceTypeName} attributes (${attributes.all.length}):\n${(
+            attributes.all as string[]
+          )
+            .map((attrName: string, index: number) => {
+              return `${index + 1}. ${attrName}`;
+            })
+            .join('\n')}`;
+        }
+
+        // Handle case where attributes.all is an array of objects with metadata
         return `Available ${resourceTypeName} attributes (${(attributes.all as []).length}):\n${(
           attributes.all as Record<string, unknown>[]
         )
@@ -78,6 +105,21 @@ export const getAttributesConfig: UniversalToolConfig<
       }
 
       if (attributes.attributes && Array.isArray(attributes.attributes)) {
+        // Handle case where attributes is an array of strings (attribute names only)
+        if (
+          attributes.attributes.length > 0 &&
+          typeof attributes.attributes[0] === 'string'
+        ) {
+          return `Available ${resourceTypeName} attributes (${attributes.attributes.length}):\n${(
+            attributes.attributes as string[]
+          )
+            .map((attrName: string, index: number) => {
+              return `${index + 1}. ${attrName}`;
+            })
+            .join('\n')}`;
+        }
+
+        // Handle case where attributes is an array of objects with metadata
         return `Available ${resourceTypeName} attributes (${(attributes.attributes as []).length}):\n${(
           attributes.attributes as Record<string, unknown>[]
         )

@@ -95,6 +95,62 @@ describe('Universal Core Operations Attributes Tests', () => {
       expect(formatted).toContain('1. name: "Test Company"');
       expect(formatted).toContain('2. website: "https://test.com"');
     });
+
+    it('should format attributes when returned as object with string array', async () => {
+      // This simulates what getCompanyAttributes returns: { attributes: [...string names...], company: 'name' }
+      const mockAttributes = {
+        attributes: [
+          'name',
+          'website',
+          'industry',
+          'employee_count',
+          'founded_date',
+        ],
+        company: 'Test Company',
+      };
+
+      const { getSingularResourceType } = await import(
+        '../../../../src/handlers/tool-configs/universal/shared-handlers.js'
+      );
+      vi.mocked(getSingularResourceType).mockReturnValue('company');
+
+      const formatted = (getAttributesConfig.formatResult as any)(
+        mockAttributes,
+        UniversalResourceType.COMPANIES
+      );
+      expect(formatted).toContain('Available company attributes (5)');
+      expect(formatted).toContain('1. name');
+      expect(formatted).toContain('2. website');
+      expect(formatted).toContain('3. industry');
+      expect(formatted).toContain('4. employee_count');
+      expect(formatted).toContain('5. founded_date');
+      // Should NOT contain "Unnamed (unknown)"
+      expect(formatted).not.toContain('Unnamed');
+      expect(formatted).not.toContain('unknown');
+    });
+
+    it('should format attributes when returned as direct string array', async () => {
+      // This handles the case where attributes is returned as a direct array of strings
+      const mockAttributes = ['name', 'website', 'industry', 'employee_count'];
+
+      const { getSingularResourceType } = await import(
+        '../../../../src/handlers/tool-configs/universal/shared-handlers.js'
+      );
+      vi.mocked(getSingularResourceType).mockReturnValue('company');
+
+      const formatted = (getAttributesConfig.formatResult as any)(
+        mockAttributes,
+        UniversalResourceType.COMPANIES
+      );
+      expect(formatted).toContain('Company attributes (4)');
+      expect(formatted).toContain('1. name');
+      expect(formatted).toContain('2. website');
+      expect(formatted).toContain('3. industry');
+      expect(formatted).toContain('4. employee_count');
+      // Should NOT contain "Unnamed (unknown)"
+      expect(formatted).not.toContain('Unnamed');
+      expect(formatted).not.toContain('unknown');
+    });
   });
 
   describe('records_discover_attributes tool', () => {
