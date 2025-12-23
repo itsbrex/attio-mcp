@@ -20,6 +20,18 @@
 - **Notes tools**: validate `record_id` with `isValidUUID` before hitting Attio and format responses via the shared `extractNoteFields` helper to normalize nested/flat shapes.
 - **Attio tests**: real API tests require `ATTIO_API_KEY`.
 
+## MCP Resources
+
+Resources capability is **disabled** to prevent context window overflow. All data access should use tools instead:
+- Use `company_search.v1` instead of browsing company resources
+- Use `people_search.v1` instead of browsing people resources
+- Use `get-lists` tool instead of browsing list resources
+- Use universal search/create/update tools for locations (fully supported)
+
+**Supported resource types in tools**: Companies, People, Lists, Records, Deals, Tasks, Notes, Locations
+
+If you need to re-enable resources, see `src/handlers/resources.ts` and `src/server/createServer.ts`.
+
 ## Precedence & Compatibility (with System‑Wide CLAUDE.md)
 
 - **This repo doc overrides** system rules when they conflict.

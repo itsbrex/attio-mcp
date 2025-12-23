@@ -103,6 +103,7 @@ export function createServer(context?: ServerContext) {
 
   // Create MCP server with proper capabilities declaration
   // Note: No API key validation here - it's checked when tools are invoked
+  // Resources capability disabled to prevent context window overflow (see CLAUDE.md)
   const mcpServer = new Server(
     {
       name: 'attio-mcp-server',
@@ -110,7 +111,6 @@ export function createServer(context?: ServerContext) {
     },
     {
       capabilities: {
-        resources: {},
         tools: {},
         prompts: {
           list: {},
@@ -123,7 +123,9 @@ export function createServer(context?: ServerContext) {
   // Register all handlers with the context
   // The handlers will use the context to get API key when needed
   logger.info('Registering handlers');
-  registerResourceHandlers(mcpServer, ctx);
+  // Resource handlers disabled - not used and causing context window issues
+  // To re-enable: uncomment the line below and add resources: {} to capabilities
+  // registerResourceHandlers(mcpServer, ctx);
   registerToolHandlers(mcpServer, ctx);
   registerPromptHandlers(mcpServer, ctx);
 
