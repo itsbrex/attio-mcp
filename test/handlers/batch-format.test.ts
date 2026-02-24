@@ -154,6 +154,42 @@ describe('Batch Format Type Safety', () => {
 
       expect(result).toContain('Found 0 tasks');
     });
+
+    test('formats location batch search results with default fields and quick links', () => {
+      const locationResults = [
+        {
+          id: { record_id: 'loc-1' },
+          web_url: 'https://app.attio.com/acme/custom/locations/record/loc-1',
+          values: {
+            tenant_name: [{ value: 'Acme HQ - Irvine - 10000 sf' }],
+            exp_date: [{ value: '2027-01-01' }],
+            sf_occupied: [{ value: 10000 }],
+            landlord: [{ value: 'Landlord LLC' }],
+            market_2: [{ option: { title: 'Orange County' } }],
+            submarket: [{ option: { title: 'Irvine Spectrum' } }],
+            street_address_1: [{ value: '100 Main St' }],
+            company: [{ target_record_id: 'comp-1' }],
+          },
+        },
+      ];
+
+      const result = formatBatchResult(
+        locationResults as any,
+        BatchOperationType.SEARCH,
+        UniversalResourceType.LOCATIONS
+      );
+
+      expect(result).toContain('Batch search found 1 location');
+      expect(result).toContain('LXD: 2027-01-01');
+      expect(result).toContain('SF Occupied: 10000');
+      expect(result).toContain('Landlord: Landlord LLC');
+      expect(result).toContain('Market: Orange County');
+      expect(result).toContain('Submarket: Irvine Spectrum');
+      expect(result).toContain('Street Address: 100 Main St');
+      expect(result).toContain(
+        'Company URL: https://app.attio.com/acme/company/comp-1'
+      );
+    });
   });
 
   describe('Operation Results', () => {

@@ -139,6 +139,46 @@ describe('Universal Advanced Operations - Search Tests', () => {
       expect(formatted).not.toContain('1. Unnamed');
     });
 
+    it('should include default location search fields and quick links', async () => {
+      const mockResults = [
+        {
+          id: { record_id: 'loc-1' },
+          web_url: 'https://app.attio.com/acme/custom/locations/record/loc-1',
+          values: {
+            tenant_name: [{ value: 'Acme HQ - Irvine - 10000 sf' }],
+            exp_date: [{ value: '2027-01-01' }],
+            sf_occupied: [{ value: 10000 }],
+            landlord: [{ value: 'Landlord LLC' }],
+            market_2: [{ option: { title: 'Orange County' } }],
+            submarket: [{ option: { title: 'Irvine Spectrum' } }],
+            street_address_1: [{ value: '100 Main St' }],
+            company: [{ target_record_id: 'comp-1' }],
+          },
+        },
+      ];
+
+      const formatted = (advancedSearchConfig.formatResult as any)(
+        mockResults,
+        {
+          resource_type: UniversalResourceType.LOCATIONS,
+        }
+      );
+
+      expect(formatted).toContain('LXD: 2027-01-01');
+      expect(formatted).toContain('SF Occupied: 10000');
+      expect(formatted).toContain('Landlord: Landlord LLC');
+      expect(formatted).toContain('Market: Orange County');
+      expect(formatted).toContain('Submarket: Irvine Spectrum');
+      expect(formatted).toContain('Street Address: 100 Main St');
+      expect(formatted).toContain('Company: Acme HQ');
+      expect(formatted).toContain(
+        'Location URL: https://app.attio.com/acme/custom/locations/record/loc-1'
+      );
+      expect(formatted).toContain(
+        'Company URL: https://app.attio.com/acme/company/comp-1'
+      );
+    });
+
     it('should handle advanced search errors', async () => {
       const { mockHandlers } = getMockInstances();
       const mockError = new Error('Filter error');
