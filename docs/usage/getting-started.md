@@ -344,6 +344,10 @@ Document what works best for your team and industry. Share successful prompts wi
 - [Sales Playbook](playbooks/sales-playbook.md) - 25+ optimized prompts with universal tools syntax
 - [Customer Success Playbook](playbooks/customer-success-playbook.md) - Account management automation
 - [Operations Playbook](playbooks/operations-playbook.md) - Data excellence and bulk operations
+- [Workflow Execution Playbook](playbooks/workflow-execution-playbook.md) - Deterministic multi-step automation with dry-run + idempotency
+- [Location Company Resolution Playbook](playbooks/location-company-resolution-playbook.md) - Resolve location/company links and update lease fields
+- [Location People Association Playbook](playbooks/location-people-association-playbook.md) - Sync company people onto location records
+- [Location End-to-End Sync Playbook](playbooks/location-end-to-end-sync-playbook.md) - Full location update + people association workflow
 
 **💪 Power User Resources**
 
