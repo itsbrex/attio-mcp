@@ -240,6 +240,48 @@ export const extractDisplayName = (
 };
 
 /**
+ * Extract display name from a full record with top-level fallbacks.
+ *
+ * Some Attio objects (especially custom objects) can expose the configured
+ * record name/title as top-level fields even when values.name is absent.
+ */
+export const extractRecordDisplayName = (
+  record: Record<string, unknown> | undefined,
+  resourceType?: UniversalResourceType
+): string => {
+  if (!record || typeof record !== 'object') {
+    return 'Unnamed';
+  }
+
+  const values =
+    typeof record.values === 'object' && record.values !== null
+      ? (record.values as Record<string, unknown>)
+      : undefined;
+
+  const fromValues = extractDisplayName(values, resourceType);
+  if (fromValues !== 'Unnamed') {
+    return fromValues;
+  }
+
+  const topLevelCandidates = [
+    'display_name',
+    'name',
+    'title',
+    'record_name',
+    'display_value',
+  ] as const;
+
+  for (const field of topLevelCandidates) {
+    const extracted = extractDisplayValue(record[field]);
+    if (extracted) {
+      return extracted;
+    }
+  }
+
+  return 'Unnamed';
+};
+
+/**
  * Extract multiple display values (useful for validation metadata)
  */
 export const extractMultipleDisplayValues = (

@@ -12,6 +12,7 @@ import {
   safeExtractRecordValues,
   safeExtractFirstValue,
 } from '@/handlers/tool-configs/shared/type-utils.js';
+import { extractRecordDisplayName } from '@/handlers/tool-configs/universal/core/value-extractors.js';
 
 import { validateUniversalToolParams } from '@/handlers/tool-configs/universal/schemas.js';
 import { formatResourceType } from '@/handlers/tool-configs/universal/shared-handlers.js';
@@ -175,11 +176,10 @@ export const advancedSearchConfig: UniversalToolConfig<
           return extracted || undefined;
         };
 
-        const name =
-          coerce(values?.name) ??
-          coerce(values?.full_name) ??
-          coerce(values?.title) ??
-          'Unnamed';
+        const name = extractRecordDisplayName(
+          record,
+          resourceType as UniversalResourceType | undefined
+        );
         const industry = coerce(values?.industry);
         const location = coerce(values?.location);
         const website = coerce(values?.website);

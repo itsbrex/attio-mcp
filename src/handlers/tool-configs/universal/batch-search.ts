@@ -15,8 +15,9 @@ import {
 import { formatResourceType } from '@/handlers/tool-configs/universal/shared-handlers.js';
 import { validateUniversalToolParams } from '@/handlers/tool-configs/universal/schemas.js';
 import { ErrorService } from '@/services/ErrorService.js';
-import { isAttioRecord, type UniversalRecordResult } from '@/types/attio.js';
+import { type UniversalRecordResult } from '@/types/attio.js';
 import { validateBatchOperation } from '@/utils/batch-validation.js';
+import { extractRecordDisplayName } from '@/handlers/tool-configs/universal/core/value-extractors.js';
 
 // Note: Batch processing is now handled by the optimized universalBatchSearch API
 
@@ -123,17 +124,11 @@ export const batchSearchConfig = {
             records
               .slice(0, displayCount)
               .forEach((record: UniversalRecordResult, recordIndex: number) => {
-                const values = isAttioRecord(record)
-                  ? (record.values as Record<string, unknown>)
-                  : (record as Record<string, unknown>);
                 const recordId = record.id as Record<string, unknown>;
-                const name =
-                  (values?.name as Record<string, unknown>[])?.[0]?.value ||
-                  (values?.title as Record<string, unknown>[])?.[0]?.value ||
-                  (typeof values?.name === 'string'
-                    ? values.name
-                    : undefined) ||
-                  'Unnamed';
+                const name = extractRecordDisplayName(
+                  record as Record<string, unknown>,
+                  resourceType
+                );
                 const id =
                   recordId?.record_id || recordId?.list_id || 'unknown';
 

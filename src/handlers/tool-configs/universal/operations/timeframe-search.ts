@@ -10,7 +10,6 @@ import {
   RelativeTimeframe,
 } from '@/handlers/tool-configs/universal/types.js';
 import type { UniversalRecordResult } from '@/types/attio.js';
-import { isAttioRecord } from '@/types/attio.js';
 import { safeExtractTimestamp } from '@/handlers/tool-configs/shared/type-utils.js';
 
 import { validateUniversalToolParams } from '@/handlers/tool-configs/universal/schemas.js';
@@ -22,6 +21,7 @@ import {
 import { getPluralResourceType } from '@/handlers/tool-configs/universal/core/utils.js';
 import { normalizeOperator } from '@/utils/AttioFilterOperators.js';
 import { mapFieldName } from '@/utils/AttioFieldMapper.js';
+import { extractRecordDisplayName } from '@/handlers/tool-configs/universal/core/value-extractors.js';
 
 export const searchByTimeframeConfig: UniversalToolConfig<
   TimeframeSearchParams,
@@ -230,19 +230,11 @@ export const searchByTimeframeConfig: UniversalToolConfig<
       results.length
     } ${resourceTypeName} by ${timeframeName}:\n${results
       .map((record: Record<string, unknown>, index: number) => {
-        const values = isAttioRecord(record as UniversalRecordResult)
-          ? ((record as { values?: Record<string, unknown> }).values as Record<
-              string,
-              unknown
-            >)
-          : (record as Record<string, unknown>);
-        const name =
-          (values?.name as Record<string, unknown>[])?.[0]?.value ||
-          (values?.name as Record<string, unknown>[])?.[0]?.full_name ||
-          (values?.full_name as Record<string, unknown>[])?.[0]?.value ||
-          (values?.title as Record<string, unknown>[])?.[0]?.value ||
-          (typeof values?.name === 'string' ? values.name : undefined) ||
-          'Unnamed';
+        const recordObj = record as Record<string, unknown>;
+        const name = extractRecordDisplayName(
+          recordObj,
+          resourceType as UniversalResourceType | undefined
+        );
         const recordId = (record as { id?: Record<string, unknown> }).id;
         const id =
           recordId?.record_id ||

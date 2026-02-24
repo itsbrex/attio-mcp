@@ -99,6 +99,46 @@ describe('Universal Advanced Operations - Search Tests', () => {
       );
     });
 
+    it('should use custom record-name attributes instead of "Unnamed"', async () => {
+      const mockResults = [
+        {
+          id: { record_id: 'loc-1' },
+          values: {
+            tenant_name: [{ value: 'Acme HQ' }],
+            building_name: [{ value: 'Tower One' }],
+          },
+        },
+      ];
+
+      const formatted = (advancedSearchConfig.formatResult as any)(
+        mockResults,
+        UniversalResourceType.LOCATIONS
+      );
+
+      expect(formatted).toContain('1. Acme HQ');
+      expect(formatted).not.toContain('1. Unnamed');
+    });
+
+    it('should fall back to top-level title when values do not include a name', async () => {
+      const mockResults = [
+        {
+          id: { record_id: 'loc-2' },
+          title: 'Record Display Title',
+          values: {
+            exp_date: [{ value: '2027-01-01' }],
+          },
+        },
+      ];
+
+      const formatted = (advancedSearchConfig.formatResult as any)(
+        mockResults,
+        UniversalResourceType.LOCATIONS
+      );
+
+      expect(formatted).toContain('1. Record Display Title');
+      expect(formatted).not.toContain('1. Unnamed');
+    });
+
     it('should handle advanced search errors', async () => {
       const { mockHandlers } = getMockInstances();
       const mockError = new Error('Filter error');

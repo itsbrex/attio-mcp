@@ -10,13 +10,13 @@ import {
 } from '@/handlers/tool-configs/universal/types.js';
 import { InteractionType } from '@/types/attio.js';
 import type { UniversalRecordResult } from '@/types/attio.js';
-import { isAttioRecord } from '@/types/attio.js';
 
 import { validateUniversalToolParams } from '@/handlers/tool-configs/universal/schemas.js';
 import { UniversalSearchService } from '@/services/UniversalSearchService.js';
 import { ErrorService } from '@/services/ErrorService.js';
 import { getPluralResourceType } from '@/handlers/tool-configs/universal/core/utils.js';
 import { formatResourceType } from '@/handlers/tool-configs/universal/shared-handlers.js';
+import { extractRecordDisplayName } from '@/handlers/tool-configs/universal/core/value-extractors.js';
 
 export const searchByContentConfig: UniversalToolConfig<
   ContentSearchParams,
@@ -119,20 +119,12 @@ export const searchByContentConfig: UniversalToolConfig<
       results.length
     } ${resourceTypeName} with matching ${contentTypeName}:\n${results
       .map((record: Record<string, unknown>, index: number) => {
-        const values = isAttioRecord(record as UniversalRecordResult)
-          ? ((record as { values?: Record<string, unknown> }).values as Record<
-              string,
-              unknown
-            >)
-          : (record as Record<string, unknown>);
+        const recordObj = record as Record<string, unknown>;
         const recordId = (record as { id?: Record<string, unknown> }).id;
-        const name =
-          (values?.name as Record<string, unknown>[])?.[0]?.value ||
-          (values?.name as Record<string, unknown>[])?.[0]?.full_name ||
-          (values?.full_name as Record<string, unknown>[])?.[0]?.value ||
-          (values?.title as Record<string, unknown>[])?.[0]?.value ||
-          (typeof values?.name === 'string' ? values.name : undefined) ||
-          'Unnamed';
+        const name = extractRecordDisplayName(
+          recordObj,
+          resourceType as UniversalResourceType | undefined
+        );
         const id =
           recordId?.record_id ||
           recordId?.list_id ||

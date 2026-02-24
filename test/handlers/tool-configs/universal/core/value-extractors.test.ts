@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 import {
   extractDisplayName,
+  extractRecordDisplayName,
   extractDisplayValue,
   extractMultipleDisplayValues,
 } from '../../../../../src/handlers/tool-configs/universal/core/value-extractors.js';
@@ -80,5 +81,30 @@ describe('value-extractors', () => {
     );
 
     expect(name).toBe('John Doe');
+  });
+
+  it('extracts display name from custom-object name fields like tenant_name', () => {
+    const name = extractRecordDisplayName(
+      {
+        values: {
+          tenant_name: [{ value: 'Apex Logistics' }],
+          address: [{ value: '123 Main St' }],
+        },
+      },
+      UniversalResourceType.LOCATIONS
+    );
+
+    expect(name).toBe('Apex Logistics');
+  });
+
+  it('falls back to top-level record title when values have no name fields', () => {
+    const name = extractRecordDisplayName({
+      title: 'Top Level Record Title',
+      values: {
+        exp_date: [{ value: '2027-06-01' }],
+      },
+    });
+
+    expect(name).toBe('Top Level Record Title');
   });
 });
