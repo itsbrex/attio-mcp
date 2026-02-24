@@ -488,6 +488,50 @@ const toolValidators: Record<string, ToolValidator> = {
   },
 };
 
+// Support both canonical tool names and backward-compatible aliases.
+toolValidators.batch_records = toolValidators.records_batch;
+
+toolValidators.batch_search_records = (p) => {
+  if (!p.resource_type) {
+    throw new UniversalValidationError(
+      'Missing required parameter: resource_type',
+      ErrorType.USER_ERROR,
+      { field: 'resource_type', example: `resource_type: 'companies'` }
+    );
+  }
+
+  if (!Array.isArray(p.queries) || p.queries.length === 0) {
+    throw new UniversalValidationError(
+      'Missing required parameter: queries',
+      ErrorType.USER_ERROR,
+      {
+        field: 'queries',
+        suggestion: 'Provide a non-empty array of query strings',
+        example: `queries: ['Acme', 'Globex']`,
+      }
+    );
+  }
+
+  const invalidQueryIndex = p.queries.findIndex(
+    (query) => typeof query !== 'string' || query.trim().length === 0
+  );
+  if (invalidQueryIndex !== -1) {
+    throw new UniversalValidationError(
+      `Invalid query at index ${invalidQueryIndex}: expected a non-empty string`,
+      ErrorType.USER_ERROR,
+      {
+        field: `queries[${invalidQueryIndex}]`,
+        suggestion: 'Each query must be a non-empty string',
+        example: `queries: ['Acme', 'Globex']`,
+      }
+    );
+  }
+
+  return p;
+};
+
+toolValidators.records_search_batch = toolValidators.batch_search_records;
+
 export function validateUniversalToolParams(
   toolName: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

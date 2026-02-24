@@ -159,6 +159,28 @@ describe('Filter Validation Utilities', () => {
       const invalidFilters = collectInvalidFilters(filters, false);
       expect(invalidFilters).toEqual([]);
     });
+
+    it('should accept and normalize legacy date operator aliases', () => {
+      const filters = [
+        {
+          attribute: { slug: 'exp_date' },
+          condition: 'greater_than' as FilterConditionType,
+          value: '2026-02-24',
+        },
+        {
+          attribute: { slug: 'exp_date' },
+          condition: 'less_than_or_equal_to' as FilterConditionType,
+          value: '2028-02-24',
+        },
+      ];
+
+      const invalidFilters = collectInvalidFilters(filters, true);
+      expect(invalidFilters).toEqual([]);
+      expect(filters[0].condition).toBe(FilterConditionType.GREATER_THAN);
+      expect(filters[1].condition).toBe(
+        FilterConditionType.LESS_THAN_OR_EQUALS
+      );
+    });
   });
 
   describe('formatInvalidFiltersError', () => {

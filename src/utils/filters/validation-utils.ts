@@ -11,7 +11,10 @@ import {
 } from '../../errors/api-errors.js';
 import { ListEntryFilter, ListEntryFilters } from './types.js';
 import { ValidatedListEntryFilters } from '../../api/operations/types.js';
-import { isValidFilterCondition } from '../../types/attio.js';
+import {
+  isValidFilterCondition,
+  normalizeFilterCondition,
+} from '../../types/attio.js';
 
 /**
  * Error message templates for consistent error formatting
@@ -204,14 +207,20 @@ export function collectInvalidFilters(
       return;
     }
 
-    // Validate condition if enabled
-    if (validateConditions && !isValidFilterCondition(filter.condition)) {
-      invalidFilters.push({
-        index,
-        reason: `Invalid condition '${filter.condition}'`,
-        filter,
-      });
-      return;
+    // Validate condition if enabled (with alias normalization)
+    if (validateConditions) {
+      const normalizedCondition = normalizeFilterCondition(filter.condition);
+      if (!normalizedCondition) {
+        invalidFilters.push({
+          index,
+          reason: `Invalid condition '${filter.condition}'`,
+          filter,
+        });
+        return;
+      }
+
+      // Mutate in place so downstream translation consistently uses canonical tokens.
+      filter.condition = normalizedCondition;
     }
   });
 

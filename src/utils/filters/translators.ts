@@ -786,9 +786,19 @@ async function createAndFilterStructure(
         };
       }
     } else {
-      mergedConditions[fieldPath] = {
-        [operator]: filter.value,
-      };
+      const existingConditions = mergedConditions[fieldPath];
+      if (
+        existingConditions &&
+        typeof existingConditions === 'object' &&
+        !Array.isArray(existingConditions)
+      ) {
+        (existingConditions as Record<string, unknown>)[operator] =
+          filter.value;
+      } else {
+        mergedConditions[fieldPath] = {
+          [operator]: filter.value,
+        };
+      }
     }
 
     if (process.env.NODE_ENV === 'development') {

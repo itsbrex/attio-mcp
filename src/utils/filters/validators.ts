@@ -14,7 +14,11 @@
  */
 
 // External dependencies
-import { DateRangePreset, isValidFilterCondition } from '../../types/attio.js';
+import {
+  DateRangePreset,
+  isValidFilterCondition,
+  normalizeFilterCondition,
+} from '../../types/attio.js';
 import { FilterValidationError } from '../../errors/api-errors.js';
 import { isValidISODateString } from '../date-utils.js';
 
@@ -402,8 +406,9 @@ export function validateFilterCondition(
     throw new FilterValidationError('Filter condition is required');
   }
 
-  // Use the isValidFilterCondition from types/attio.js
-  if (!isValidFilterCondition(condition)) {
+  const normalizedCondition = normalizeFilterCondition(condition);
+
+  if (!normalizedCondition || !isValidFilterCondition(normalizedCondition)) {
     const validConditions = Object.values(FilterConditionType);
     throw new FilterValidationError(
       `Invalid filter condition: "${condition}". ` +
@@ -411,7 +416,7 @@ export function validateFilterCondition(
     );
   }
 
-  return condition as FilterConditionType;
+  return normalizedCondition;
 }
 
 /**
@@ -463,10 +468,16 @@ export function validateFilterWithConditions(
 
   const { slug } = filter.attribute;
 
-  if (validateConditions && !isValidFilterCondition(filter.condition)) {
-    throw new FilterValidationError(
-      `Invalid filter condition '${filter.condition}' for attribute '${slug}'. ` +
-        `Valid conditions are: ${Object.values(FilterConditionType).join(', ')}`
-    );
+  if (validateConditions) {
+    const normalizedCondition = normalizeFilterCondition(filter.condition);
+    if (!normalizedCondition || !isValidFilterCondition(normalizedCondition)) {
+      throw new FilterValidationError(
+        `Invalid filter condition '${filter.condition}' for attribute '${slug}'. ` +
+          `Valid conditions are: ${Object.values(FilterConditionType).join(', ')}`
+      );
+    }
+
+    // Normalize for downstream API translation ($gt/$lt/$gte/$lte mapping).
+    filter.condition = normalizedCondition;
   }
 }

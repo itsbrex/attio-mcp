@@ -246,11 +246,36 @@ export function validateBatchOperation(params: {
   checkPayload?: boolean;
 }): BatchValidationResult {
   const { items, operationType, resourceType, checkPayload = true } = params;
+  const normalizedOperationType = operationType.toLowerCase();
 
   // Validate batch size
   const sizeValidation = validateBatchSize(items, operationType, resourceType);
   if (!sizeValidation.isValid) {
     return sizeValidation;
+  }
+
+  // Validate batch search query content (type/emptiness/length)
+  if (normalizedOperationType === 'search' && items) {
+    for (let index = 0; index < items.length; index++) {
+      const item = items[index];
+      if (typeof item !== 'string' || item.trim().length === 0) {
+        return {
+          isValid: false,
+          error: `Query at index ${index} must be a non-empty string`,
+          errorType: ErrorType.VALIDATION_ERROR,
+        };
+      }
+
+      const queryValidation = validateSearchQuery(item);
+      if (!queryValidation.isValid) {
+        return {
+          isValid: false,
+          error: `Query at index ${index}: ${queryValidation.error}`,
+          errorType: queryValidation.errorType,
+          details: queryValidation.details,
+        };
+      }
+    }
   }
 
   // Validate payload size if requested

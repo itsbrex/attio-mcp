@@ -192,6 +192,31 @@ describe('Batch Validation', () => {
       });
       expect(result.isValid).toBe(true);
     });
+
+    it('should reject batch search queries that are not non-empty strings', () => {
+      const result = validateBatchOperation({
+        items: ['valid query', '', 123 as unknown as string],
+        operationType: 'search',
+        resourceType: 'companies',
+        checkPayload: false,
+      });
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain(
+        'Query at index 1 must be a non-empty string'
+      );
+    });
+
+    it('should reject batch search queries that exceed length limits', () => {
+      const result = validateBatchOperation({
+        items: ['x'.repeat(1025)],
+        operationType: 'search',
+        resourceType: 'companies',
+        checkPayload: false,
+      });
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain('Query at index 0');
+      expect(result.error).toContain('Search query length');
+    });
   });
 
   describe('splitBatchIntoChunks', () => {

@@ -35,6 +35,30 @@ describe('Filter Translators', () => {
         expect(result.filter?.name).toHaveProperty('$contains', 'test');
       });
 
+      it('should normalize legacy date operators to $gt/$lte', async () => {
+        const filters: ListEntryFilters = {
+          filters: [
+            {
+              attribute: { slug: 'exp_date' },
+              condition: 'greater_than' as FilterConditionType,
+              value: '2026-02-24',
+            },
+            {
+              attribute: { slug: 'exp_date' },
+              condition: 'less_than_or_equal_to' as FilterConditionType,
+              value: '2028-02-24',
+            },
+          ],
+        };
+
+        const result = await transformFiltersToApiFormat(filters);
+
+        expect(result).toHaveProperty('filter');
+        expect(result.filter).toHaveProperty('exp_date');
+        expect(result.filter?.exp_date).toHaveProperty('$gt', '2026-02-24');
+        expect(result.filter?.exp_date).toHaveProperty('$lte', '2028-02-24');
+      });
+
       it('should transform multiple filters with AND logic', async () => {
         const filters: ListEntryFilters = {
           filters: [

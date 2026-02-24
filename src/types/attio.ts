@@ -101,6 +101,44 @@ export enum FilterConditionType {
 }
 
 /**
+ * Backward-compatible aliases accepted from tool inputs.
+ * These are normalized to canonical FilterConditionType values.
+ */
+const FILTER_CONDITION_ALIASES: Record<string, FilterConditionType> = {
+  greater_than: FilterConditionType.GREATER_THAN,
+  less_than: FilterConditionType.LESS_THAN,
+  greater_than_or_equals: FilterConditionType.GREATER_THAN_OR_EQUALS,
+  less_than_or_equals: FilterConditionType.LESS_THAN_OR_EQUALS,
+  greater_than_or_equal_to: FilterConditionType.GREATER_THAN_OR_EQUALS,
+  less_than_or_equal_to: FilterConditionType.LESS_THAN_OR_EQUALS,
+  greater_than_or_equal: FilterConditionType.GREATER_THAN_OR_EQUALS,
+  less_than_or_equal: FilterConditionType.LESS_THAN_OR_EQUALS,
+};
+
+/**
+ * Normalize an input condition to a canonical FilterConditionType value.
+ *
+ * Accepts both canonical tokens (e.g., "gt") and legacy aliases
+ * (e.g., "greater_than", "greater_than_or_equal_to").
+ */
+export function normalizeFilterCondition(
+  condition: string
+): FilterConditionType | null {
+  const normalized = condition?.trim().toLowerCase();
+  if (!normalized) return null;
+
+  if (
+    Object.values(FilterConditionType).includes(
+      normalized as FilterConditionType
+    )
+  ) {
+    return normalized as FilterConditionType;
+  }
+
+  return FILTER_CONDITION_ALIASES[normalized] || null;
+}
+
+/**
  * Type guard to check if a string is a valid filter condition
  *
  * This function validates that a given string represents a valid filter condition
@@ -126,9 +164,7 @@ export enum FilterConditionType {
 export function isValidFilterCondition(
   condition: string
 ): condition is FilterConditionType {
-  return Object.values(FilterConditionType).includes(
-    condition as FilterConditionType
-  );
+  return normalizeFilterCondition(condition) !== null;
 }
 
 /**

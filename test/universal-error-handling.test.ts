@@ -115,6 +115,44 @@ describe('Enhanced Universal Error Handling', () => {
         expect(validationError.example).toContain('records:');
       }
     });
+
+    it('should apply the same validation for batch_records canonical tool name', () => {
+      const params = {
+        resource_type: UniversalResourceType.COMPANIES,
+        operation_type: 'create',
+      };
+
+      try {
+        validateUniversalToolParams('batch_records', params);
+        expect.fail('Should have thrown validation error');
+      } catch (error: unknown) {
+        expect(error).toBeInstanceOf(UniversalValidationError);
+        const validationError = error as UniversalValidationError;
+        expect(validationError.field).toBe('records');
+        expect(validationError.suggestion).toContain('array of record data');
+      }
+    });
+
+    it('should validate batch search queries for canonical and alias tool names', () => {
+      const params = {
+        resource_type: UniversalResourceType.COMPANIES,
+        queries: ['Acme', '   '],
+      };
+
+      for (const toolName of ['batch_search_records', 'records_search_batch']) {
+        try {
+          validateUniversalToolParams(toolName, params);
+          expect.fail(`Should have thrown validation error for ${toolName}`);
+        } catch (error: unknown) {
+          expect(error).toBeInstanceOf(UniversalValidationError);
+          const validationError = error as UniversalValidationError;
+          expect(validationError.field).toBe('queries[1]');
+          expect(validationError.suggestion).toContain(
+            'Each query must be a non-empty string'
+          );
+        }
+      }
+    });
   });
 
   describe('Parameter Sanitization', () => {

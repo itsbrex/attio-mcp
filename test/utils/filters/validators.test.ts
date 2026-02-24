@@ -98,6 +98,21 @@ describe('Filter Validators', () => {
         validateFilterCondition('not_a_real_condition');
       }).toThrow(/invalid filter condition/i);
     });
+
+    it('should normalize legacy date aliases to canonical operators', () => {
+      expect(validateFilterCondition('greater_than')).toBe(
+        FilterConditionType.GREATER_THAN
+      );
+      expect(validateFilterCondition('less_than')).toBe(
+        FilterConditionType.LESS_THAN
+      );
+      expect(validateFilterCondition('greater_than_or_equal_to')).toBe(
+        FilterConditionType.GREATER_THAN_OR_EQUALS
+      );
+      expect(validateFilterCondition('less_than_or_equal_to')).toBe(
+        FilterConditionType.LESS_THAN_OR_EQUALS
+      );
+    });
   });
 
   describe('validateFilterWithConditions', () => {
@@ -155,6 +170,17 @@ describe('Filter Validators', () => {
       expect(() => {
         validateFilterWithConditions(filter, false);
       }).not.toThrow();
+    });
+
+    it('should normalize legacy condition aliases in-place', () => {
+      const filter: ListEntryFilter = {
+        attribute: { slug: 'exp_date' },
+        condition: 'greater_than' as FilterConditionType,
+        value: '2026-02-24',
+      };
+
+      validateFilterWithConditions(filter, true);
+      expect(filter.condition).toBe(FilterConditionType.GREATER_THAN);
     });
   });
 });

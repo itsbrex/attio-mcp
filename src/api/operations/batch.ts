@@ -502,11 +502,11 @@ async function handleUniversalResourceTypeBatchSearch(
     filters?: Record<string, unknown>;
   }
 ): Promise<UniversalBatchSearchResult[]> {
-  const results: UniversalBatchSearchResult[] = [];
+  const results: UniversalBatchSearchResult[] = new Array(queries.length);
 
   // Process each query independently with error isolation
   await Promise.allSettled(
-    queries.map(async (query) => {
+    queries.map(async (query, index) => {
       try {
         // Dynamic import to avoid circular dependency
         const { UniversalSearchService } = await import(
@@ -520,27 +520,26 @@ async function handleUniversalResourceTypeBatchSearch(
           offset: searchParams.offset,
         } as UniversalSearchParams);
 
-        results.push({
+        results[index] = {
           success: true,
           query,
           result: searchResult,
-        });
+        };
       } catch (error: unknown) {
-        results.push({
+        results[index] = {
           success: false,
           query,
           error: error instanceof Error ? error.message : String(error),
-        });
+        };
       }
     })
   );
 
-  // Ensure results are in the same order as queries
-  return queries.map(
-    (query) =>
-      results.find((r) => r.query === query) || {
+  return results.map(
+    (result, index) =>
+      result || {
         success: false,
-        query,
+        query: queries[index],
         error: 'Query processing failed',
       }
   );
