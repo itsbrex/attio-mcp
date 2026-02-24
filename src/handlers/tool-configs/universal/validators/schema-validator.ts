@@ -532,6 +532,34 @@ toolValidators.batch_search_records = (p) => {
 
 toolValidators.records_search_batch = toolValidators.batch_search_records;
 
+toolValidators.execute_workflow = (p) => {
+  if (!Array.isArray(p.steps) || p.steps.length === 0) {
+    throw new UniversalValidationError(
+      'Missing required parameter: steps',
+      ErrorType.USER_ERROR,
+      {
+        field: 'steps',
+        suggestion:
+          'Provide an ordered array of workflow steps, each with a tool name',
+        example: `steps: [{ tool: 'aaa-health-check' }]`,
+      }
+    );
+  }
+
+  if (p.steps.length > 25) {
+    throw new UniversalValidationError(
+      'Too many workflow steps: maximum is 25',
+      ErrorType.USER_ERROR,
+      {
+        field: 'steps',
+        suggestion: 'Split large workflows into smaller chunks',
+      }
+    );
+  }
+
+  return p;
+};
+
 export function validateUniversalToolParams(
   toolName: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

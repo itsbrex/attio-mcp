@@ -46,6 +46,7 @@ export const TOOL_NAMES = {
   // Batch tools
   BATCH_RECORDS: 'batch_records',
   BATCH_SEARCH_RECORDS: 'batch_search_records',
+  EXECUTE_WORKFLOW: 'execute_workflow',
 
   // CRUD tools
   CREATE_RECORD: 'create_record',

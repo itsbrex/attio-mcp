@@ -89,6 +89,7 @@ describe('Tool Name Consistency Validation', () => {
       // MCP standard verbs used in this codebase
       const verbFirstVerbs = [
         'search',
+        'execute',
         'get',
         'create',
         'update',

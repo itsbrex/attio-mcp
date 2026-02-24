@@ -22,6 +22,10 @@ import {
   batchSearchConfig,
   batchSearchToolDefinition,
 } from './batch-search.js';
+import {
+  workflowExecuteConfig,
+  workflowExecuteToolDefinition,
+} from './workflow-execute.js';
 import { openAiToolConfigs, openAiToolDefinitions } from '../openai/index.js';
 import { formatToolDescription } from '@/handlers/tools/standards/index.js';
 import {
@@ -127,6 +131,7 @@ export const universalToolConfigs = {
   ...coreOperationsToolConfigs,
   ...advancedOperationsToolConfigs,
   batch_search_records: batchSearchConfig,
+  execute_workflow: workflowExecuteConfig,
   ...openAiToolConfigs,
 };
 
@@ -140,6 +145,7 @@ export const universalToolDefinitions = {
   ...coreOperationsToolDefinitions,
   ...advancedOperationsToolDefinitions,
   batch_search_records: batchSearchToolDefinition,
+  execute_workflow: workflowExecuteToolDefinition,
   ...openAiToolDefinitions,
 };
 
@@ -169,6 +175,7 @@ export const advancedUniversalTools = [
   'search_records_by_timeframe',
   'batch_records',
   'batch_search_records',
+  'execute_workflow',
 ];
 
 /**
