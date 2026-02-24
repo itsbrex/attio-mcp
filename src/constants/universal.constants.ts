@@ -69,6 +69,8 @@ export const RESOURCE_TYPE_MAPPINGS: Record<string, UniversalResourceType> = {
   notes: UniversalResourceType.NOTES,
   list: UniversalResourceType.LISTS,
   lists: UniversalResourceType.LISTS,
+  location: UniversalResourceType.LOCATIONS,
+  locations: UniversalResourceType.LOCATIONS,
 
   // Common typos and variations
   comapny: UniversalResourceType.COMPANIES,
@@ -81,6 +83,8 @@ export const RESOURCE_TYPE_MAPPINGS: Record<string, UniversalResourceType> = {
   tsak: UniversalResourceType.TASKS,
   not: UniversalResourceType.NOTES,
   liste: UniversalResourceType.LISTS,
+  locaiton: UniversalResourceType.LOCATIONS,
+  locaton: UniversalResourceType.LOCATIONS,
 };
 
 /**
@@ -95,6 +99,7 @@ export const OBJECT_SLUG_MAP: Record<string, string> = {
   records: 'records',
   lists: 'lists',
   notes: 'notes',
+  locations: 'locations',
 };
 
 // ========================================

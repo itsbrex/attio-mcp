@@ -1,7 +1,7 @@
 /**
  * Universal Resource Types Validation Test
  *
- * Validates that all 7 universal resource types work correctly with our refactored
+ * Validates that all 8 universal resource types work correctly with our refactored
  * formatResult functions and that Phase 2 LISTS and NOTES support is working properly.
  */
 
@@ -22,10 +22,10 @@ import {
 } from './utils/mock-factories/index.js';
 
 describe('Universal Resource Types Validation', () => {
-  describe('All 7 Resource Types Enum Validation', () => {
-    it('should have exactly 7 resource types defined', () => {
+  describe('All 8 Resource Types Enum Validation', () => {
+    it('should have exactly 8 resource types defined', () => {
       const resourceTypes = Object.values(UniversalResourceType);
-      expect(resourceTypes).toHaveLength(7);
+      expect(resourceTypes).toHaveLength(8);
 
       // Verify all expected types are present
       expect(resourceTypes).toContain('companies');
@@ -34,6 +34,8 @@ describe('Universal Resource Types Validation', () => {
       expect(resourceTypes).toContain('records');
       expect(resourceTypes).toContain('tasks');
       expect(resourceTypes).toContain('deals');
+      expect(resourceTypes).toContain('notes');
+      expect(resourceTypes).toContain('locations');
     });
 
     it('should map correctly to ResourceType', () => {
@@ -44,6 +46,8 @@ describe('Universal Resource Types Validation', () => {
       expect(UniversalResourceType.RECORDS).toBe('records');
       expect(UniversalResourceType.TASKS).toBe('tasks');
       expect(UniversalResourceType.DEALS).toBe('deals');
+      expect(UniversalResourceType.NOTES).toBe('notes');
+      expect(UniversalResourceType.LOCATIONS).toBe('locations');
     });
   });
 
@@ -59,6 +63,13 @@ describe('Universal Resource Types Validation', () => {
         id: { record_id: 'note_123' },
         values: { title: [{ value: 'Test Note' }] },
       }, // Simple mock for notes
+      locations: {
+        id: { record_id: 'location_123' },
+        values: {
+          tenant_name: [{ value: 'Acme HQ' }],
+          city: [{ value: 'San Francisco' }],
+        },
+      },
     };
 
     const formatResultFunctions = [
@@ -157,6 +168,7 @@ describe('Universal Resource Types Validation', () => {
         'tasks',
         'deals',
         'notes',
+        'locations',
       ];
       expect(resourceTypes.sort()).toEqual(expectedTypes.sort());
     });
@@ -236,6 +248,16 @@ function getMockDataForType(resourceType: string) {
     case 'records':
     case 'deals':
       return CompanyMockFactory.create(); // Use company structure
+    case 'notes':
+      return {
+        id: { record_id: 'note_123' },
+        values: { title: [{ value: 'Test Note' }] },
+      };
+    case 'locations':
+      return {
+        id: { record_id: 'location_123' },
+        values: { tenant_name: [{ value: 'Acme HQ' }] },
+      };
     default:
       return CompanyMockFactory.create();
   }

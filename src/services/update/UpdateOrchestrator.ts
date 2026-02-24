@@ -104,6 +104,17 @@ export class UpdateOrchestrator {
         );
       }
 
+      case UniversalResourceType.LOCATIONS: {
+        const { LocationUpdateStrategy } = await import(
+          '@/services/update/strategies/LocationUpdateStrategy.js'
+        );
+        return new LocationUpdateStrategy().update(
+          recordId,
+          sanitizedValues,
+          resourceType
+        );
+      }
+
       default: {
         throw new Error(
           `Unsupported resource type for update: ${resourceType}`

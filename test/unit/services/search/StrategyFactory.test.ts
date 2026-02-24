@@ -14,6 +14,9 @@ vi.mock('@/services/search-strategies/index.js', () => ({
     .mockImplementation(() => ({ search: vi.fn() })),
   PeopleSearchStrategy: vi.fn().mockImplementation(() => ({ search: vi.fn() })),
   DealSearchStrategy: vi.fn().mockImplementation(() => ({ search: vi.fn() })),
+  LocationSearchStrategy: vi
+    .fn()
+    .mockImplementation(() => ({ search: vi.fn() })),
   TaskSearchStrategy: vi.fn().mockImplementation(() => ({ search: vi.fn() })),
   ListSearchStrategy: vi.fn().mockImplementation(() => ({ search: vi.fn() })),
   NoteSearchStrategy: vi.fn().mockImplementation(() => ({ search: vi.fn() })),
@@ -45,6 +48,10 @@ vi.mock('@/objects/people/index.js', () => ({
 
 vi.mock('@/objects/deals/index.js', () => ({
   advancedSearchDeals: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock('@/objects/locations/index.js', () => ({
+  advancedSearchLocations: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('@/objects/lists.js', () => ({
@@ -126,6 +133,15 @@ describe('StrategyFactory', () => {
       expect(strategy).toHaveProperty('search');
     });
 
+    it('should return a strategy for LOCATIONS resource type', async () => {
+      const strategy = await StrategyFactory.getStrategy(
+        UniversalResourceType.LOCATIONS
+      );
+
+      expect(strategy).toBeDefined();
+      expect(strategy).toHaveProperty('search');
+    });
+
     it('should return undefined for RECORDS resource type (no strategy)', async () => {
       const strategy = await StrategyFactory.getStrategy(
         UniversalResourceType.RECORDS
@@ -175,6 +191,9 @@ describe('StrategyFactory', () => {
         true
       );
       expect(StrategyFactory.hasStrategy(UniversalResourceType.DEALS)).toBe(
+        true
+      );
+      expect(StrategyFactory.hasStrategy(UniversalResourceType.LOCATIONS)).toBe(
         true
       );
     });

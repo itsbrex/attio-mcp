@@ -62,6 +62,7 @@ describe('Dispatcher Utils', () => {
         ['tasks', 'tasks'],
         ['deals', 'deals'],
         ['notes', 'notes'],
+        ['locations', 'locations'],
         ['COMPANIES', 'companies'], // Case insensitive
         ['Companies', 'companies'],
       ])(

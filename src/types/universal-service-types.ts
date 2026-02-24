@@ -246,6 +246,8 @@ function getResourceDisplayName(
       return 'Task';
     case UniversalResourceType.NOTES:
       return 'Note';
+    case UniversalResourceType.LOCATIONS:
+      return 'Location';
     default:
       return String(resourceType);
   }

@@ -45,6 +45,8 @@ export const ResponseNormalizer = {
         return this.normalizeDealRecord(normalized);
       case UniversalResourceType.RECORDS:
         return this.normalizeGenericRecord(normalized);
+      case UniversalResourceType.LOCATIONS:
+        return this.normalizeLocationRecord(normalized);
       default:
         return normalized;
     }
@@ -133,6 +135,17 @@ export const ResponseNormalizer = {
           vals.value && typeof vals.value === 'string'
             ? parseFloat(vals.value as string) || (vals.value as unknown)
             : vals.value,
+      },
+    } as AttioRecord;
+  },
+
+  normalizeLocationRecord(record: AttioRecord): AttioRecord {
+    const idObj = (record.id as unknown as Record<string, unknown>) || {};
+    return {
+      ...record,
+      id: {
+        ...record.id,
+        object_id: (idObj.object_id as string) || 'locations',
       },
     } as AttioRecord;
   },

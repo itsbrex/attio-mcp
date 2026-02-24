@@ -74,6 +74,8 @@ export const CreateValidation = {
           return await getObjectRecord('deals', recordId);
         case UniversalResourceType.RECORDS:
           return await getObjectRecord('records', recordId);
+        case UniversalResourceType.LOCATIONS:
+          return await getObjectRecord('locations', recordId);
         default:
           return null;
       }

@@ -25,21 +25,24 @@ const RESOURCE_API_PATH: Partial<Record<UniversalResourceType, string>> = {
   [UniversalResourceType.PEOPLE]: 'objects/people/records',
   [UniversalResourceType.LISTS]: 'lists',
   [UniversalResourceType.TASKS]: 'tasks',
+  [UniversalResourceType.LOCATIONS]: 'objects/locations/records',
 };
 
 const SEARCH_RESOURCE_MAP: Record<
-  'companies' | 'people' | 'lists' | 'tasks' | 'all',
+  'companies' | 'people' | 'lists' | 'tasks' | 'locations' | 'all',
   UniversalResourceType[]
 > = {
   companies: [UniversalResourceType.COMPANIES],
   people: [UniversalResourceType.PEOPLE],
   lists: [UniversalResourceType.LISTS],
   tasks: [UniversalResourceType.TASKS],
+  locations: [UniversalResourceType.LOCATIONS],
   all: [
     UniversalResourceType.COMPANIES,
     UniversalResourceType.PEOPLE,
     UniversalResourceType.LISTS,
     UniversalResourceType.TASKS,
+    UniversalResourceType.LOCATIONS,
   ],
 };
 
@@ -149,6 +152,8 @@ function normalizeResourceType(value: string): UniversalResourceType {
       return UniversalResourceType.LISTS;
     case 'tasks':
       return UniversalResourceType.TASKS;
+    case 'locations':
+      return UniversalResourceType.LOCATIONS;
     default:
       throw new Error(`Unsupported resource type: ${value}`);
   }
@@ -218,6 +223,13 @@ function buildTitle(
         SearchUtilities.getFieldValue(record, 'title') ||
         `Task ${record.id?.record_id ?? ''}`.trim()
       );
+    case UniversalResourceType.LOCATIONS:
+      return (
+        SearchUtilities.getFieldValue(record, 'tenant_name') ||
+        SearchUtilities.getFieldValue(record, 'building_name') ||
+        SearchUtilities.getFieldValue(record, 'address') ||
+        `Location ${record.id?.record_id ?? ''}`.trim()
+      );
     default:
       return `Record ${record.id?.record_id ?? ''}`.trim();
   }
@@ -247,6 +259,14 @@ function buildSnippet(
     return firstNonEmpty([
       SearchUtilities.getFieldValue(record, 'status'),
       SearchUtilities.getFieldValue(record, 'due_date'),
+    ]);
+  }
+
+  if (resourceType === UniversalResourceType.LOCATIONS) {
+    return firstNonEmpty([
+      SearchUtilities.getFieldValue(record, 'city'),
+      SearchUtilities.getFieldValue(record, 'state'),
+      SearchUtilities.getFieldValue(record, 'property_type'),
     ]);
   }
 

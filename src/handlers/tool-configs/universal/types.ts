@@ -374,7 +374,16 @@ export interface ResourceTypeHandler {
   [UniversalResourceType.RECORDS]: (
     params: Record<string, unknown>
   ) => Promise<unknown>;
+  [UniversalResourceType.DEALS]: (
+    params: Record<string, unknown>
+  ) => Promise<unknown>;
   [UniversalResourceType.TASKS]: (
+    params: Record<string, unknown>
+  ) => Promise<unknown>;
+  [UniversalResourceType.NOTES]: (
+    params: Record<string, unknown>
+  ) => Promise<unknown>;
+  [UniversalResourceType.LOCATIONS]: (
     params: Record<string, unknown>
   ) => Promise<unknown>;
 }

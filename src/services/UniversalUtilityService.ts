@@ -51,6 +51,10 @@ export class UniversalUtilityService {
         return 'deal';
       case UniversalResourceType.TASKS:
         return 'task';
+      case UniversalResourceType.NOTES:
+        return 'note';
+      case UniversalResourceType.LOCATIONS:
+        return 'location';
       default:
         return resourceType;
     }
@@ -258,6 +262,7 @@ export class UniversalUtilityService {
       case UniversalResourceType.COMPANIES:
       case UniversalResourceType.PEOPLE:
       case UniversalResourceType.LISTS:
+      case UniversalResourceType.LOCATIONS:
         return true; // These use their own specific APIs, but also support objects pattern
       default:
         return false;
@@ -281,6 +286,8 @@ export class UniversalUtilityService {
         return '/objects/deals';
       case UniversalResourceType.TASKS:
         return '/tasks';
+      case UniversalResourceType.LOCATIONS:
+        return '/objects/locations';
       default:
         throw new Error(`Unknown resource type: ${resourceType}`);
     }
@@ -326,6 +333,12 @@ export class UniversalUtilityService {
       case 'task':
       case 'tasks':
         return UniversalResourceType.TASKS;
+      case 'note':
+      case 'notes':
+        return UniversalResourceType.NOTES;
+      case 'location':
+      case 'locations':
+        return UniversalResourceType.LOCATIONS;
       default:
         // Check if it's already a valid UniversalResourceType
         if (this.isValidResourceType(input)) {
@@ -354,6 +367,10 @@ export class UniversalUtilityService {
         return 'Deal records for sales pipeline management';
       case UniversalResourceType.TASKS:
         return 'Task records for activity tracking';
+      case UniversalResourceType.NOTES:
+        return 'Note records attached to related resources';
+      case UniversalResourceType.LOCATIONS:
+        return 'Location records containing site and address information';
       default:
         return `${resourceType} records`;
     }

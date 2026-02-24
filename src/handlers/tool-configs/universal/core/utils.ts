@@ -33,6 +33,8 @@ export function getPluralResourceType(
       return 'tasks';
     case UniversalResourceType.NOTES:
       return 'notes';
+    case UniversalResourceType.LOCATIONS:
+      return 'locations';
     default:
       return 'records';
   }

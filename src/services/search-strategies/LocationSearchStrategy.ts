@@ -3,16 +3,23 @@
  * Following the pattern established by DealSearchStrategy
  */
 
-import { AttioRecord } from '../../types/attio.js';
+import type {
+  ListEntryFilter,
+  ListEntryFilters,
+} from '@/api/operations/types.js';
 import {
   SearchType,
   MatchType,
   SortType,
   UniversalResourceType,
-} from '../../handlers/tool-configs/universal/types.js';
-import { BaseSearchStrategy } from './BaseSearchStrategy.js';
-import { SearchStrategyParams, StrategyDependencies } from './interfaces.js';
-import { FilterValidationError } from '../../errors/api-errors.js';
+} from '@/handlers/tool-configs/universal/types.js';
+import { BaseSearchStrategy } from '@/services/search-strategies/BaseSearchStrategy.js';
+import type {
+  SearchStrategyParams,
+  StrategyDependencies,
+} from '@/services/search-strategies/interfaces.js';
+import { FilterValidationError } from '@/errors/api-errors.js';
+import type { UniversalRecordResult } from '@/types/attio.js';
 
 /**
  * Search strategy for locations with fast path optimization
@@ -34,7 +41,7 @@ export class LocationSearchStrategy extends BaseSearchStrategy {
     return true;
   }
 
-  async search(params: SearchStrategyParams): Promise<AttioRecord[]> {
+  async search(params: SearchStrategyParams): Promise<UniversalRecordResult[]> {
     const {
       query,
       filters,
@@ -82,7 +89,7 @@ export class LocationSearchStrategy extends BaseSearchStrategy {
     filters: Record<string, unknown>,
     limit?: number,
     offset?: number
-  ): Promise<AttioRecord[]> {
+  ): Promise<UniversalRecordResult[]> {
     if (!this.dependencies.advancedSearchFunction) {
       throw new Error('Locations advanced search function not available');
     }
@@ -115,7 +122,7 @@ export class LocationSearchStrategy extends BaseSearchStrategy {
     sort?: SortType,
     limit?: number,
     offset?: number
-  ): Promise<AttioRecord[]> {
+  ): Promise<UniversalRecordResult[]> {
     if (!this.dependencies.advancedSearchFunction) {
       throw new Error('Locations advanced search function not available');
     }
@@ -155,13 +162,16 @@ export class LocationSearchStrategy extends BaseSearchStrategy {
   private async searchWithoutQuery(
     limit?: number,
     offset?: number
-  ): Promise<AttioRecord[]> {
+  ): Promise<UniversalRecordResult[]> {
     if (!this.dependencies.advancedSearchFunction) {
       throw new Error('Locations advanced search function not available');
     }
 
-    // Use empty filters to get all locations
-    return await this.dependencies.advancedSearchFunction({}, limit, offset);
+    return this.handleEmptyFilters(
+      this.dependencies.advancedSearchFunction,
+      limit,
+      offset
+    );
   }
 
   /**
@@ -193,37 +203,20 @@ export class LocationSearchStrategy extends BaseSearchStrategy {
 
     const searchFields = fields && fields.length > 0 ? fields : defaultFields;
 
-    if (
+    const fieldsToSearch =
       searchType === SearchType.CONTENT ||
       searchType === SearchType.RELATIONSHIP
-    ) {
-      // Search across multiple fields with OR logic
-      const conditions = searchFields.map((field) => ({
-        field,
-        value: query,
-        operator,
-      }));
+        ? searchFields
+        : ['tenant_name', 'building_name', 'address', 'city'];
 
-      return {
-        filter: {
-          $or: conditions,
-        },
-      };
-    } else {
-      // Basic search - focus on primary fields
-      const basicFields = ['tenant_name', 'building_name', 'address', 'city'];
-      const conditions = basicFields.map((field) => ({
-        field,
+    return {
+      filters: fieldsToSearch.map((field) => ({
+        attribute: { slug: field },
+        condition: operator,
         value: query,
-        operator,
-      }));
-
-      return {
-        filter: {
-          $or: conditions,
-        },
-      };
-    }
+      })),
+      matchAny: true,
+    };
   }
 
   /**
@@ -244,6 +237,7 @@ export class LocationSearchStrategy extends BaseSearchStrategy {
 
     const { timeframe_attribute, start_date, end_date, date_operator } =
       timeframeParams;
+    const operator = date_operator || 'between';
 
     // Map common date field aliases to actual field names
     const dateFieldMapping: Record<string, string> = {
@@ -260,65 +254,54 @@ export class LocationSearchStrategy extends BaseSearchStrategy {
     const actualField =
       dateFieldMapping[timeframe_attribute] || timeframe_attribute;
 
-    // Build date filter conditions
-    const dateConditions: unknown[] = [];
+    const dateFilters: ListEntryFilters['filters'] = [];
 
-    if (date_operator === 'between' && start_date && end_date) {
-      dateConditions.push(
+    if (operator === 'between' && start_date && end_date) {
+      dateFilters.push(
         {
-          field: actualField,
+          attribute: { slug: actualField },
           value: start_date,
-          operator: 'greater_than_or_equal_to',
+          condition: 'greater_than_or_equal_to',
         },
         {
-          field: actualField,
+          attribute: { slug: actualField },
           value: end_date,
-          operator: 'less_than_or_equal_to',
+          condition: 'less_than_or_equal_to',
         }
       );
-    } else if (date_operator === 'greater_than' && start_date) {
-      dateConditions.push({
-        field: actualField,
+    } else if (operator === 'greater_than' && start_date) {
+      dateFilters.push({
+        attribute: { slug: actualField },
         value: start_date,
-        operator: 'greater_than',
+        condition: 'greater_than_or_equal_to',
       });
-    } else if (date_operator === 'less_than' && end_date) {
-      dateConditions.push({
-        field: actualField,
+    } else if (operator === 'less_than' && end_date) {
+      dateFilters.push({
+        attribute: { slug: actualField },
         value: end_date,
-        operator: 'less_than',
+        condition: 'less_than_or_equal_to',
       });
-    } else if (date_operator === 'equals' && start_date) {
-      dateConditions.push({
-        field: actualField,
-        value: start_date,
-        operator: 'equals',
+    } else if (operator === 'equals' && (start_date || end_date)) {
+      dateFilters.push({
+        attribute: { slug: actualField },
+        value: start_date || end_date || '',
+        condition: 'equals',
       });
     }
 
-    if (dateConditions.length === 0) {
+    if (dateFilters.length === 0) {
       return filters;
     }
 
-    // Merge with existing filters
-    if (filters?.filter) {
-      return {
-        filter: {
-          $and: [
-            filters.filter,
-            ...(dateConditions.length === 1
-              ? dateConditions
-              : [{ $and: dateConditions }]),
-          ],
-        },
-      };
-    } else {
-      return {
-        filter:
-          dateConditions.length === 1
-            ? dateConditions[0]
-            : { $and: dateConditions },
-      };
-    }
+    const existingFiltersRaw = (filters as ListEntryFilters | undefined)
+      ?.filters;
+    const existingFilters: ListEntryFilter[] = Array.isArray(existingFiltersRaw)
+      ? existingFiltersRaw
+      : [];
+
+    return {
+      filters: [...existingFilters, ...dateFilters],
+      matchAny: false,
+    };
   }
 }

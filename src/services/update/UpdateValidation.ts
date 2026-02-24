@@ -159,6 +159,8 @@ export const UpdateValidation = {
           return await getObjectRecord('deals', recordId);
         case 'records' as unknown as UniversalResourceType:
           return await getObjectRecord('records', recordId);
+        case 'locations' as unknown as UniversalResourceType:
+          return await getObjectRecord('locations', recordId);
         default:
           createScopedLogger(
             'update/UpdateValidation',

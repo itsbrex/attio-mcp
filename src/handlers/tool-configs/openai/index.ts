@@ -8,7 +8,9 @@ import { formatToolDescription } from '@/handlers/tools/standards/index.js';
 
 const searchParamsValidator = z.object({
   query: z.string().min(1, 'Query is required'),
-  type: z.enum(['companies', 'people', 'lists', 'tasks', 'all']).optional(),
+  type: z
+    .enum(['companies', 'people', 'lists', 'tasks', 'locations', 'all'])
+    .optional(),
   limit: z.number().int().positive().max(25).optional(),
 });
 
@@ -25,7 +27,14 @@ const searchInputSchema = {
     },
     type: {
       type: 'string' as const,
-      enum: ['companies', 'people', 'lists', 'tasks', 'all'] as const,
+      enum: [
+        'companies',
+        'people',
+        'lists',
+        'tasks',
+        'locations',
+        'all',
+      ] as const,
       description: 'Optional resource filter (defaults to all).',
     },
     limit: {
@@ -140,7 +149,7 @@ export const openAiToolDefinitions = {
     name: 'search',
     description: formatToolDescription({
       capability:
-        'Run lightweight compatibility search across companies, people, lists, and tasks for ChatGPT MCP.',
+        'Run lightweight compatibility search across companies, people, lists, tasks, and locations for ChatGPT MCP.',
       boundaries:
         'support complex filters, batch queries, or return rich record payloads (use records_search* tools).',
       constraints:

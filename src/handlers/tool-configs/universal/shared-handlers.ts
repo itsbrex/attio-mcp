@@ -251,6 +251,7 @@ export async function handleUniversalSearchNotes(
       [UniversalResourceType.COMPANIES]: 'companies',
       [UniversalResourceType.PEOPLE]: 'people',
       [UniversalResourceType.DEALS]: 'deals',
+      [UniversalResourceType.LOCATIONS]: 'locations',
     };
     const parentObject = resourceTypeMap[resource_type];
     if (parentObject) {
@@ -335,6 +336,7 @@ const OBJECT_SLUG_MAP: Record<string, string> = {
   records: 'records',
   lists: 'lists',
   notes: 'notes',
+  locations: 'locations',
 };
 
 export const normalizeAttributeValue = (value: string): string =>
@@ -685,6 +687,8 @@ export async function handleUniversalGetDetailedInfo(
       return getTask(record_id);
     case UniversalResourceType.RECORDS:
       return getObjectRecord('records', record_id);
+    case UniversalResourceType.LOCATIONS:
+      return getObjectRecord('locations', record_id);
     default:
       throw new Error(
         `Unsupported resource type for detailed info: ${resource_type}`

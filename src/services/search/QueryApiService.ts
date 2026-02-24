@@ -178,6 +178,9 @@ export class QueryApiService {
         case UniversalResourceType.PEOPLE:
           fields = ['name', 'email_addresses', 'job_title'];
           break;
+        case UniversalResourceType.LOCATIONS:
+          fields = ['tenant_name', 'building_name', 'address', 'city', 'state'];
+          break;
         default:
           fields = ['name'];
           break;

@@ -155,6 +155,20 @@ export const searchRecordsConfig: UniversalToolConfig<
           const email = getFirstValue(values.email);
           const contactInfo = website || domain || email;
           identifier = contactInfo ? `${name} (${contactInfo})` : name;
+        } else if (resourceType === UniversalResourceType.LOCATIONS) {
+          const tenant =
+            typeof values.tenant_name === 'string'
+              ? values.tenant_name
+              : getFirstValue(values.tenant_name);
+          const building =
+            typeof values.building_name === 'string'
+              ? values.building_name
+              : getFirstValue(values.building_name);
+          const address =
+            typeof values.address === 'string'
+              ? values.address
+              : getFirstValue(values.address);
+          identifier = tenant || building || address || 'Unnamed';
         } else {
           const nameValue = getFirstValue(values.name);
           const titleValue = getFirstValue(values.title);
@@ -181,7 +195,8 @@ export const searchRecordsConfig: UniversalToolConfig<
 export const searchRecordsDefinition = {
   name: 'search_records',
   description: formatToolDescription({
-    capability: 'Search across companies, people, deals, tasks, and records',
+    capability:
+      'Search across companies, people, locations, deals, tasks, and records',
     boundaries: 'create or modify records',
     constraints: 'Returns max 100 results (default: 10)',
     recoveryHint: 'use discover_record_attributes to find searchable fields',

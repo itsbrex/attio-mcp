@@ -3,10 +3,14 @@
  * Provides advanced search functionality for location records
  */
 
-import type { AttioRecord } from '../../types/attio.js';
-import type { ListEntryFilters } from '../../api/operations/types.js';
-import { listObjectRecords } from '../../objects/records/index.js';
-import { debug } from '../../utils/logger.js';
+import type { AttioRecord } from '@/types/attio.js';
+import { ResourceType } from '@/types/attio.js';
+import type {
+  ListEntryFilter,
+  ListEntryFilters,
+} from '@/api/operations/types.js';
+import { advancedSearchObject } from '@/api/operations/index.js';
+import { debug } from '@/utils/logger.js';
 
 /**
  * Advanced search for locations with filter validation
@@ -24,6 +28,10 @@ export async function advancedSearchLocations(
   if (!filters || typeof filters !== 'object') {
     throw new Error('Invalid filter structure: Filters must be an object');
   }
+  const normalizedFilters =
+    Object.keys(filters).length === 0
+      ? ({ filters: [] } as ListEntryFilters)
+      : filters;
 
   // Log the search operation
   debug('LocationSearch', 'Advanced search for locations', {
@@ -34,25 +42,19 @@ export async function advancedSearchLocations(
   });
 
   try {
-    // Use listObjectRecords to search
-    const results = await listObjectRecords('locations', {});
+    const results = await advancedSearchObject<AttioRecord>(
+      ResourceType.LOCATIONS,
+      normalizedFilters,
+      limit,
+      offset
+    );
 
     debug('LocationSearch', 'Advanced search completed', {
       resultCount: results.length,
       limit,
       offset,
     });
-
-    // Apply limit and offset manually if specified
-    let filteredResults = results;
-    if (offset) {
-      filteredResults = filteredResults.slice(offset);
-    }
-    if (limit) {
-      filteredResults = filteredResults.slice(0, limit);
-    }
-
-    return filteredResults;
+    return results;
   } catch (error: unknown) {
     // Log and re-throw errors
     debug('LocationSearch', 'Advanced search failed', {
@@ -75,15 +77,13 @@ export async function searchLocationsByCompany(
   offset?: number
 ): Promise<AttioRecord[]> {
   const filters: ListEntryFilters = {
-    filter: {
-      $or: [
-        {
-          field: 'company',
-          value: companyId,
-          operator: 'equals',
-        },
-      ],
-    },
+    filters: [
+      {
+        attribute: { slug: 'company' },
+        value: companyId,
+        condition: 'equals',
+      },
+    ],
   };
 
   return advancedSearchLocations(filters, limit, offset);
@@ -102,37 +102,37 @@ export async function searchLocationsByAddress(params: {
   limit?: number;
   offset?: number;
 }): Promise<AttioRecord[]> {
-  const conditions: unknown[] = [];
+  const conditions: ListEntryFilter[] = [];
 
   if (params.city) {
     conditions.push({
-      field: 'city',
+      attribute: { slug: 'city' },
       value: params.city,
-      operator: 'contains',
+      condition: 'contains',
     });
   }
 
   if (params.state) {
     conditions.push({
-      field: 'state',
+      attribute: { slug: 'state' },
       value: params.state,
-      operator: 'equals',
+      condition: 'equals',
     });
   }
 
   if (params.zipCode) {
     conditions.push({
-      field: 'zip_code',
+      attribute: { slug: 'zip_code' },
       value: params.zipCode,
-      operator: 'equals',
+      condition: 'equals',
     });
   }
 
   if (params.street) {
     conditions.push({
-      field: 'street_address_1',
+      attribute: { slug: 'street_address_1' },
       value: params.street,
-      operator: 'contains',
+      condition: 'contains',
     });
   }
 
@@ -141,9 +141,8 @@ export async function searchLocationsByAddress(params: {
   }
 
   const filters: ListEntryFilters = {
-    filter: {
-      $and: conditions,
-    },
+    filters: conditions,
+    matchAny: false,
   };
 
   return advancedSearchLocations(filters, params.limit, params.offset);
@@ -164,20 +163,19 @@ export async function searchLocationsByLeaseExpiration(
   offset?: number
 ): Promise<AttioRecord[]> {
   const filters: ListEntryFilters = {
-    filter: {
-      $and: [
-        {
-          field: 'exp_date',
-          value: startDate,
-          operator: 'greater_than_or_equal_to',
-        },
-        {
-          field: 'exp_date',
-          value: endDate,
-          operator: 'less_than_or_equal_to',
-        },
-      ],
-    },
+    filters: [
+      {
+        attribute: { slug: 'exp_date' },
+        value: startDate,
+        condition: 'greater_than_or_equal_to',
+      },
+      {
+        attribute: { slug: 'exp_date' },
+        value: endDate,
+        condition: 'less_than_or_equal_to',
+      },
+    ],
+    matchAny: false,
   };
 
   return advancedSearchLocations(filters, limit, offset);
@@ -197,21 +195,21 @@ export async function searchLocationsBySize(
   limit?: number,
   offset?: number
 ): Promise<AttioRecord[]> {
-  const conditions: unknown[] = [];
+  const conditions: ListEntryFilter[] = [];
 
   if (minSqFt !== undefined) {
     conditions.push({
-      field: 'sf_occupied',
+      attribute: { slug: 'sf_occupied' },
       value: minSqFt,
-      operator: 'greater_than_or_equal_to',
+      condition: 'greater_than_or_equal_to',
     });
   }
 
   if (maxSqFt !== undefined) {
     conditions.push({
-      field: 'sf_occupied',
+      attribute: { slug: 'sf_occupied' },
       value: maxSqFt,
-      operator: 'less_than_or_equal_to',
+      condition: 'less_than_or_equal_to',
     });
   }
 
@@ -220,9 +218,8 @@ export async function searchLocationsBySize(
   }
 
   const filters: ListEntryFilters = {
-    filter: {
-      $and: conditions,
-    },
+    filters: conditions,
+    matchAny: false,
   };
 
   return advancedSearchLocations(filters, limit, offset);

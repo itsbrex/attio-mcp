@@ -49,6 +49,13 @@ describe('UniversalUtilityService', () => {
       expect(result).toBe('task');
     });
 
+    it('should format locations resource type', () => {
+      const result = UniversalUtilityService.formatResourceType(
+        UniversalResourceType.LOCATIONS
+      );
+      expect(result).toBe('location');
+    });
+
     it('should return unknown resource type as-is', () => {
       const result = UniversalUtilityService.formatResourceType(
         'unknown' as UniversalResourceType
@@ -89,6 +96,11 @@ describe('UniversalUtilityService', () => {
           UniversalResourceType.TASKS
         )
       ).toBe('task');
+      expect(
+        UniversalUtilityService.getSingularResourceType(
+          UniversalResourceType.LOCATIONS
+        )
+      ).toBe('location');
     });
   });
 
@@ -102,6 +114,9 @@ describe('UniversalUtilityService', () => {
       expect(UniversalUtilityService.isValidResourceType('records')).toBe(true);
       expect(UniversalUtilityService.isValidResourceType('deals')).toBe(true);
       expect(UniversalUtilityService.isValidResourceType('tasks')).toBe(true);
+      expect(UniversalUtilityService.isValidResourceType('locations')).toBe(
+        true
+      );
     });
 
     it('should reject unknown resource types', () => {
@@ -147,6 +162,11 @@ describe('UniversalUtilityService', () => {
           UniversalResourceType.TASKS
         )
       ).toBe('tasks');
+      expect(
+        UniversalUtilityService.getPluralResourceType(
+          UniversalResourceType.LOCATIONS
+        )
+      ).toBe('locations');
     });
   });
 
@@ -175,6 +195,11 @@ describe('UniversalUtilityService', () => {
       expect(
         UniversalUtilityService.supportsObjectRecordsApi(
           UniversalResourceType.LISTS
+        )
+      ).toBe(true);
+      expect(
+        UniversalUtilityService.supportsObjectRecordsApi(
+          UniversalResourceType.LOCATIONS
         )
       ).toBe(true);
     });
@@ -208,6 +233,9 @@ describe('UniversalUtilityService', () => {
       expect(
         UniversalUtilityService.getApiEndpoint(UniversalResourceType.TASKS)
       ).toBe('/tasks');
+      expect(
+        UniversalUtilityService.getApiEndpoint(UniversalResourceType.LOCATIONS)
+      ).toBe('/objects/locations');
     });
 
     it('should throw error for unknown resource type', () => {
@@ -277,6 +305,9 @@ describe('UniversalUtilityService', () => {
       expect(UniversalUtilityService.normalizeResourceType('task')).toBe(
         UniversalResourceType.TASKS
       );
+      expect(UniversalUtilityService.normalizeResourceType('location')).toBe(
+        UniversalResourceType.LOCATIONS
+      );
     });
 
     it('should normalize plural forms to UniversalResourceType', () => {
@@ -297,6 +328,9 @@ describe('UniversalUtilityService', () => {
       );
       expect(UniversalUtilityService.normalizeResourceType('tasks')).toBe(
         UniversalResourceType.TASKS
+      );
+      expect(UniversalUtilityService.normalizeResourceType('locations')).toBe(
+        UniversalResourceType.LOCATIONS
       );
     });
 
@@ -368,6 +402,11 @@ describe('UniversalUtilityService', () => {
           UniversalResourceType.TASKS
         )
       ).toBe('Task records for activity tracking');
+      expect(
+        UniversalUtilityService.getResourceTypeDescription(
+          UniversalResourceType.LOCATIONS
+        )
+      ).toBe('Location records containing site and address information');
     });
   });
 });

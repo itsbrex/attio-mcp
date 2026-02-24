@@ -11,6 +11,7 @@ import {
   CompanySearchStrategy,
   PeopleSearchStrategy,
   DealSearchStrategy,
+  LocationSearchStrategy,
   TaskSearchStrategy,
   ListSearchStrategy,
   NoteSearchStrategy,
@@ -21,6 +22,7 @@ import { ensureFunctionAvailability } from '@/services/search-utilities/Function
 import { advancedSearchCompanies } from '@/objects/companies/index.js';
 import { advancedSearchPeople } from '@/objects/people/index.js';
 import { advancedSearchDeals } from '@/objects/deals/index.js';
+import { advancedSearchLocations } from '@/objects/locations/index.js';
 import { searchLists } from '@/objects/lists.js';
 import { listTasks } from '@/objects/tasks.js';
 import { listNotes } from '@/objects/notes.js';
@@ -37,6 +39,12 @@ const ensureAdvancedSearchPeople = () =>
 
 const ensureAdvancedSearchDeals = () =>
   ensureFunctionAvailability(advancedSearchDeals, 'advancedSearchDeals');
+
+const ensureAdvancedSearchLocations = () =>
+  ensureFunctionAvailability(
+    advancedSearchLocations,
+    'advancedSearchLocations'
+  );
 
 /**
  * Factory for creating and managing search strategies
@@ -113,6 +121,14 @@ export class StrategyFactory {
       getFieldValue: SearchUtilities.getFieldValue.bind(SearchUtilities),
     };
 
+    const locationDependencies: StrategyDependencies = {
+      advancedSearchFunction: await ensureAdvancedSearchLocations(),
+      createDateFilter: SearchUtilities.createDateFilter,
+      mergeFilters: SearchUtilities.mergeFilters,
+      rankByRelevance: SearchUtilities.rankByRelevance.bind(SearchUtilities),
+      getFieldValue: SearchUtilities.getFieldValue.bind(SearchUtilities),
+    };
+
     // Initialize strategies
     this.strategies.set(
       UniversalResourceType.COMPANIES,
@@ -137,6 +153,10 @@ export class StrategyFactory {
     this.strategies.set(
       UniversalResourceType.NOTES,
       new NoteSearchStrategy(noteDependencies)
+    );
+    this.strategies.set(
+      UniversalResourceType.LOCATIONS,
+      new LocationSearchStrategy(locationDependencies)
     );
   }
 
