@@ -82,7 +82,7 @@ describe('TC-AO03: Owner (actor-reference) filtering by name', () => {
       const dealData = TestDataFactory.createDealData('TCAO03');
       dealData.name = `TCAO03 Owner UUID Filter ${uniqueToken}`;
 
-      const createResult = await testCase.executeToolCall('create-record', {
+      const createResult = await testCase.executeToolCall('create_record', {
         resource_type: 'deals',
         record_data: dealData,
       });
@@ -127,7 +127,7 @@ describe('TC-AO03: Owner (actor-reference) filtering by name', () => {
       error = e instanceof Error ? e.message : String(e);
       throw e;
     } finally {
-      results.push({ test: testName, passed, error });
+      results.push({ testName, passed, error });
     }
   });
 
@@ -149,7 +149,7 @@ describe('TC-AO03: Owner (actor-reference) filtering by name', () => {
       const dealData = TestDataFactory.createDealData('TCAO03');
       dealData.name = `TCAO03 Owner Email Filter ${uniqueToken}`;
 
-      const createResult = await testCase.executeToolCall('create-record', {
+      const createResult = await testCase.executeToolCall('create_record', {
         resource_type: 'deals',
         record_data: dealData,
       });
@@ -195,7 +195,7 @@ describe('TC-AO03: Owner (actor-reference) filtering by name', () => {
       error = e instanceof Error ? e.message : String(e);
       throw e;
     } finally {
-      results.push({ test: testName, passed, error });
+      results.push({ testName, passed, error });
     }
   });
 
@@ -217,7 +217,7 @@ describe('TC-AO03: Owner (actor-reference) filtering by name', () => {
       const dealData = TestDataFactory.createDealData('TCAO03');
       dealData.name = `TCAO03 Owner Name Filter ${uniqueToken}`;
 
-      const createResult = await testCase.executeToolCall('create-record', {
+      const createResult = await testCase.executeToolCall('create_record', {
         resource_type: 'deals',
         record_data: dealData,
       });
@@ -263,7 +263,7 @@ describe('TC-AO03: Owner (actor-reference) filtering by name', () => {
       error = e instanceof Error ? e.message : String(e);
       throw e;
     } finally {
-      results.push({ test: testName, passed, error });
+      results.push({ testName, passed, error });
     }
   });
 });

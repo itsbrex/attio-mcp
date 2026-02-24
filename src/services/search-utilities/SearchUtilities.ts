@@ -3,8 +3,9 @@
  * Issue #574: Extract shared utilities for reuse
  */
 
-import { AttioRecord } from '../../types/attio.js';
-import { TimeframeParams } from '../search-strategies/interfaces.js';
+import type { UniversalRecordResult } from '@/types/attio.js';
+import { isAttioRecord } from '@/types/attio.js';
+import type { TimeframeParams } from '@/services/search-strategies/interfaces.js';
 
 /**
  * Interfaces for type safety improvements (Issue #598)
@@ -30,11 +31,11 @@ export class SearchUtilities {
    * Rank search results by relevance based on query match frequency
    * This provides client-side relevance scoring since Attio API doesn't have native relevance ranking
    */
-  static rankByRelevance(
-    results: AttioRecord[],
+  static rankByRelevance<T extends UniversalRecordResult>(
+    results: T[],
     query: string,
     searchFields: string[]
-  ): AttioRecord[] {
+  ): T[] {
     // Calculate relevance score for each result
     const scoredResults = results.map((record) => {
       let score = 0;
@@ -91,11 +92,55 @@ export class SearchUtilities {
   }
 
   /**
+   * Extract top-level field value with explicit null/undefined handling
+   *
+   * @param record - The record object to extract from
+   * @param field - The field name to extract
+   * @returns The string value if field exists at top level, null if not found
+   */
+  private static getTopLevelFieldValue(
+    record: Record<string, unknown>,
+    field: string
+  ): string | null {
+    const topLevelValue = record[field];
+
+    // Explicitly handle non-string top-level values
+    if (topLevelValue !== undefined && topLevelValue !== null) {
+      if (typeof topLevelValue === 'string') {
+        return topLevelValue;
+      }
+      // Top-level exists but isn't a string - convert to string, skip values wrapper
+      // This prevents unintended fallback to values wrapper when top-level field exists
+      return String(topLevelValue);
+    }
+
+    return null; // Field not found at top level
+  }
+
+  /**
    * Helper method to extract field value from a record
    * Issue #598: Simplified with better type safety and helper methods
+   * Issue #1068: Check top-level fields first (for lists), with explicit non-string handling
+   *
+   * Priority order:
+   * 1. Top-level string field (for lists and new format)
+   * 2. Top-level non-string field (convert to string, skip values wrapper)
+   * 3. Values wrapper field (for records in old format)
    */
-  static getFieldValue(record: AttioRecord, field: string): string {
-    const values = record.values as Record<string, AttioFieldValue>;
+  static getFieldValue(record: UniversalRecordResult, field: string): string {
+    // Try top-level fields first (for lists and new format)
+    const topLevelValue = this.getTopLevelFieldValue(
+      record as Record<string, unknown>,
+      field
+    );
+    if (topLevelValue !== null) {
+      return topLevelValue;
+    }
+
+    // No top-level field - check in values wrapper (for other record types)
+    const values = isAttioRecord(record)
+      ? (record.values as Record<string, AttioFieldValue>)
+      : undefined;
     if (!values) return '';
 
     const fieldValue = values[field];
@@ -159,9 +204,22 @@ export class SearchUtilities {
 
   /**
    * Helper method to extract field value from a list record for content search
+   * Issue #1068: Lists now have fields at top level (not wrapped in values)
    */
-  static getListFieldValue(list: AttioRecord, field: string): string {
-    const values = list.values as Record<string, unknown>;
+  static getListFieldValue(list: UniversalRecordResult, field: string): string {
+    // Try top-level field first (new format) - uses shared helper for consistency
+    const topLevelValue = this.getTopLevelFieldValue(
+      list as Record<string, unknown>,
+      field
+    );
+    if (topLevelValue !== null) {
+      return topLevelValue;
+    }
+
+    // Fall back to values wrapper for backwards compatibility (old format)
+    const values = isAttioRecord(list)
+      ? (list.values as Record<string, unknown>)
+      : undefined;
     if (!values) return '';
 
     const fieldValue = values[field];
@@ -183,8 +241,10 @@ export class SearchUtilities {
   /**
    * Helper method to extract field value from a task record for content search
    */
-  static getTaskFieldValue(task: AttioRecord, field: string): string {
-    const values = task.values as Record<string, unknown>;
+  static getTaskFieldValue(task: UniversalRecordResult, field: string): string {
+    const values = isAttioRecord(task)
+      ? (task.values as Record<string, unknown>)
+      : undefined;
     if (!values) return '';
 
     const fieldValue = values[field];
@@ -207,8 +267,10 @@ export class SearchUtilities {
    * Helper method to extract field value from a note record for content search
    * Issue #888: Support notes search by title and content
    */
-  static getNoteFieldValue(note: AttioRecord, field: string): string {
-    const values = note.values as Record<string, unknown>;
+  static getNoteFieldValue(note: UniversalRecordResult, field: string): string {
+    const values = isAttioRecord(note)
+      ? (note.values as Record<string, unknown>)
+      : undefined;
     if (!values) return '';
 
     const fieldValue = values[field];

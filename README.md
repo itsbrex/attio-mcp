@@ -54,22 +54,28 @@ Transform your CRM workflows with AI-powered automation. Instead of clicking thr
 
 ### 📊 **Company Management**
 
-- **Universal Search**: Find companies with `search-records` and `advanced-search`
+- **Universal Search**: Find companies with `search_records` and `search_records_advanced`
 - **Full CRUD**: Create, read, update, and delete with universal record operations
-- **Relationship Discovery**: Find companies through `search-by-relationship`
-- **Batch Operations**: Process hundreds of companies with `batch-operations`
-- **Detailed Information**: Get contact, business, and social info with `get-detailed-info`
+- **Relationship Discovery**: Find companies through `search_records_by_relationship`
+- **Batch Operations**: Process hundreds of companies with `batch_records`
+- **Detailed Information**: Get contact, business, and social info with `get_record_info`
 
 ### 👥 **People Management**
 
 - **Universal Contact Search**: Find people by any criteria using universal search tools
-- **Relationship Tracking**: Link people to companies with `search-by-relationship`
-- **Activity Timeline**: Track interactions with `search-by-content` and `search-by-timeframe`
+- **Relationship Tracking**: Link people to companies with `search_records_by_relationship`
+- **Activity Timeline**: Track interactions with `search_records_by_content` and `search_records_by_timeframe`
 - **Advanced Filtering**: Multi-attribute search with universal filtering
 - **Bulk Operations**: Efficiently manage contacts with universal batch operations
 
-### 📋 **Lists & Pipeline Management** (11 Tools)
+### 📋 **Lists & Pipeline Management** (4 Tools + 8 Deprecated)
 
+- **Active Tools**: 4 consolidated tools with auto-mode detection ([Migration Guide](./docs/migration/v2-list-tools.md))
+  - `filter-list-entries` - Unified filtering with 4 modes
+  - `manage-list-entry` - Unified entry management with 3 modes
+  - `get-list-entries` - Retrieve list entries
+  - `get-record-list-memberships` - Find record's list memberships
+- **Deprecated (v2.0.0 removal)**: 8 legacy tools replaced by consolidated versions
 - **Pipeline Operations**: Move deals through sales stages
 - **Smart Segmentation**: Create and manage targeted contact lists
 - **Advanced Filtering**: Complex multi-condition filtering with AND/OR logic
@@ -90,6 +96,25 @@ Transform your CRM workflows with AI-powered automation. Instead of clicking thr
 - **Enhanced Filtering**: Text, numeric, date, boolean, and relationship filters with timeframe search (Issue #475)
 - **Data Export**: JSON serialization for integrations
 - **Real-time Updates**: Live data synchronization with Attio
+
+### 🧠 **Claude Skills**
+
+Supercharge Claude's Attio knowledge with pre-built skills that prevent common errors and teach best practices.
+
+| Skill                      | Purpose                                        | Setup                                           |
+| -------------------------- | ---------------------------------------------- | ----------------------------------------------- |
+| **attio-mcp-usage**        | Error prevention + universal workflow patterns | Bundled - just use it                           |
+| **attio-workspace-schema** | YOUR workspace's exact field names and options | `npx attio-discover generate-skill --all --zip` |
+| **attio-skill-generator**  | Create custom workflow skills (advanced)       | Python + prompting                              |
+
+**Quick Start** (solves "wrong field name" errors):
+
+```bash
+npx attio-discover generate-skill --all --zip
+# Import ZIP into Claude Desktop: Settings > Skills > Install Skill
+```
+
+See [Skills Documentation](./docs/usage/skills/README.md) for complete setup and usage guides.
 
 ### 💬 **Pre-Built Prompts** (10 Prompts)
 
@@ -177,7 +202,7 @@ For complete prompt documentation, see [docs/prompts/v1-catalog.md](./docs/promp
 ### 🤝 **OpenAI MCP Compatibility**
 
 - **Developer Mode Ready**: Every tool now publishes MCP safety annotations (`readOnlyHint`, `destructiveHint`) so OpenAI Developer Mode can auto-approve reads and request confirmation for writes.
-- **Full Tool Access (Default)**: All 33 universal tools are exposed by default. Do NOT set `ATTIO_MCP_TOOL_MODE` in Smithery configuration for full access.
+- **Full Tool Access (Default)**: All 35 tools are exposed by default (21 universal + 11 list + 3 workspace member). Do NOT set `ATTIO_MCP_TOOL_MODE` in Smithery configuration for full access.
 - **Search-Only Mode**: To restrict to read-only tools (`search`, `fetch`, `aaa-health-check`), explicitly configure `ATTIO_MCP_TOOL_MODE: 'search'` in Smithery dashboard when Developer Mode is unavailable.
 - **Detailed Guide**: See [docs/chatgpt-developer-mode.md](./docs/chatgpt-developer-mode.md) for environment variables, approval flows, and validation tips.
 - **User Documentation**: See the [ChatGPT Developer Mode docs](./docs/chatgpt-developer-mode.md) for a complete walkthrough of approval flows and setup instructions.
@@ -190,189 +215,9 @@ For complete prompt documentation, see [docs/prompts/v1-catalog.md](./docs/promp
 
 For detailed troubleshooting and solutions, see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) and [GitHub Issues](https://github.com/kesslerio/attio-mcp-server/issues).
 
-## 🎯 **Mastering Advanced Search Filters**
+## 🎯 **Advanced Search Filters**
 
-**The Power Behind Precise CRM Queries** - Stop wrestling with complex data searches. Our advanced filtering system lets you find exactly what you need with surgical precision.
-
-> _"Find all AI companies with 50+ employees that we haven't contacted in 30 days and add them to our Q1 outreach list"_ - This kind of complex query is exactly what advanced search filters excel at.
-
-### 🏗️ **Filter Architecture**
-
-Every advanced search follows this proven pattern that's been battle-tested across thousands of CRM queries:
-
-```json
-{
-  "resource_type": "companies",
-  "filters": {
-    "filters": [
-      {
-        "attribute": { "slug": "field_name" },
-        "condition": "operator",
-        "value": "search_value"
-      }
-    ]
-  }
-}
-```
-
-### ⚡ **Real-World Examples**
-
-**🔍 Single Criteria Search**
-
-```json
-{
-  "resource_type": "companies",
-  "filters": {
-    "filters": [
-      {
-        "attribute": { "slug": "name" },
-        "condition": "contains",
-        "value": "Tech"
-      }
-    ]
-  }
-}
-```
-
-**🎯 Multi-Criteria Power Search (AND Logic)**
-
-```json
-{
-  "resource_type": "companies",
-  "filters": {
-    "filters": [
-      {
-        "attribute": { "slug": "name" },
-        "condition": "contains",
-        "value": "Tech"
-      },
-      {
-        "attribute": { "slug": "employee_count" },
-        "condition": "greater_than",
-        "value": 50
-      },
-      {
-        "attribute": { "slug": "industry" },
-        "condition": "equals",
-        "value": "AI/Machine Learning"
-      }
-    ]
-  }
-}
-```
-
-**🚀 Flexible OR Logic**
-
-```json
-{
-  "resource_type": "companies",
-  "filters": {
-    "filters": [
-      {
-        "attribute": { "slug": "name" },
-        "condition": "contains",
-        "value": "Tech"
-      },
-      {
-        "attribute": { "slug": "name" },
-        "condition": "contains",
-        "value": "AI"
-      }
-    ],
-    "matchAny": true
-  }
-}
-```
-
-### 🧠 **Smart Filter Operators**
-
-| Operator       | Perfect For         | Example Use Case                      |
-| -------------- | ------------------- | ------------------------------------- |
-| `contains`     | Text searches       | Finding companies with "Tech" in name |
-| `equals`       | Exact matches       | Specific industry classification      |
-| `starts_with`  | Prefix searches     | Companies beginning with "Acme"       |
-| `ends_with`    | Suffix searches     | Companies ending with "Inc"           |
-| `greater_than` | Numerical analysis  | Companies with 100+ employees         |
-| `less_than`    | Size filtering      | Startups under 50 people              |
-| `is_empty`     | Data cleanup        | Find records missing key information  |
-| `is_not_empty` | Completeness checks | Records with populated fields         |
-
-### 💡 **Pro Tips for Different Teams**
-
-**🎯 Sales Teams** - Use these field combinations:
-
-- **Companies**: `name`, `industry`, `employee_count`, `website`, `location`
-- **People**: `full_name`, `job_title`, `email`, `company`
-
-**📈 Marketing Teams** - Focus on engagement fields:
-
-- **Activity tracking**: `last_interaction`, `email_status`, `campaign_response`
-- **Segmentation**: `industry`, `company_size`, `location`, `engagement_score`
-
-**✅ Customer Success** - Monitor health metrics:
-
-- **Account health**: `renewal_date`, `support_tickets`, `usage_metrics`
-- **Risk indicators**: `last_contact`, `satisfaction_score`, `contract_value`
-
-### 🚨 **Avoid These Common Mistakes**
-
-❌ **Wrong** (Flat object structure):
-
-```json
-{
-  "filters": {
-    "name": { "operator": "contains", "value": "Test" }
-  }
-}
-```
-
-✅ **Correct** (Nested array structure):
-
-```json
-{
-  "filters": {
-    "filters": [
-      {
-        "attribute": { "slug": "name" },
-        "condition": "contains",
-        "value": "Test"
-      }
-    ]
-  }
-}
-```
-
-### 🔧 **Quick Troubleshooting**
-
-**Getting "Filters must include a 'filters' array property"?**
-
-1. ✅ Ensure your filters object contains a `filters` array
-2. ✅ Each array item needs `attribute`, `condition`, and `value`
-3. ✅ The `attribute` must be an object with a `slug` property
-4. ✅ Double-check your JSON structure matches the examples above
-
-**💬 Pro Tip**: Start with simple single-filter searches, then build complexity once you're comfortable with the structure.
-
-## 🏆 Latest Updates - Critical Issues Resolved
-
-✅ **100% Integration Test Pass Rate Achieved** - All critical API contract violations and build issues have been resolved:
-
-### Recently Fixed Issues (August 2025)
-
-- **P0 Critical API Failures**: Fixed response data structure handling for robust fallback patterns
-- **Build Compilation Errors**: Created missing enhanced-validation module and resolved TypeScript compilation
-- **E2E Test Implementation**: Fixed JSON truncation, resource mappings, and email validation consistency
-- **Field Parameter Filtering**: Resolved tasks attribute handling with special case for missing `/objects/tasks/attributes` endpoint
-- **Email Validation Consistency**: Fixed batch validation and create/update operation alignment
-- **Pagination System**: Documented tasks pagination limitation with in-memory handling workaround
-
-### Test Status
-
-- **Integration Tests**: 15/15 passing (100% pass rate)
-- **Build Status**: All TypeScript compilation successful
-- **API Contract**: All violations resolved with robust error handling
-
-See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) for detailed solutions to these resolved issues.
+Build powerful CRM queries with multi-criteria AND/OR filtering. See the [Advanced Search Guide](./docs/usage/advanced-search.md) for complete examples and operator reference.
 
 ## 🚀 Installation
 
@@ -382,15 +227,214 @@ See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) for detailed solutions to these r
 > The GitHub repository is named `attio-mcp-server`, but the npm package was renamed to `attio-mcp` in June 2025.
 > Installing `attio-mcp-server` will give you an outdated v0.0.2 release with only 4 legacy tools.
 
-### Installing via Smithery (Recommended)
+### Client Compatibility
 
-To install Attio CRM Integration Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@kesslerio/attio-mcp-server):
+| Client             | Smithery (Tier 1) | Local Install (Tier 2-3) | Cloudflare Worker (Tier 4) |
+| ------------------ | ----------------- | ------------------------ | -------------------------- |
+| Claude Desktop     | ✅ Recommended    | ✅ Full support          | ✅ Full support            |
+| Claude Web         | ✅ Recommended    | N/A                      | ✅ Full support            |
+| ChatGPT (Pro/Plus) | ✅ Required       | N/A                      | ✅ Full support            |
+| Cursor IDE         | ✅ Supported      | ✅ Full support          | ✅ Full support            |
+| Claude Code (CLI)  | Partial           | ✅ Recommended           | Partial                    |
+
+**Choose your installation method:**
+
+- **Most users**: Use [Tier 1 (Smithery)](#tier-1-smithery-one-click---recommended) - zero local config required
+- **Local control**: Use [Tier 2 (Shell Installers)](#tier-2-shell-installers) - one command, automatic setup
+- **Power users**: Use [Tier 3 (Manual)](#tier-3-manual-configuration) - full control over configuration
+- **Teams/Enterprise**: Use [Tier 4 (Cloudflare Worker)](#tier-4-cloudflare-worker-remote-deployment) - self-hosted, multi-user OAuth
+
+---
+
+### Tier 1: Smithery (One-Click) - Recommended
+
+> **Best for**: Claude Desktop, Claude Web, ChatGPT, Cursor - zero local installation required.
+
+[Smithery](https://smithery.ai/server/@kesslerio/attio-mcp-server) handles OAuth, hosting, and configuration automatically.
+
+#### Claude Desktop via Smithery
 
 ```bash
 npx -y @smithery/cli install @kesslerio/attio-mcp-server --client claude
 ```
 
-### Option 1: NPM
+#### Cursor IDE via Smithery
+
+```bash
+npx -y @smithery/cli install @kesslerio/attio-mcp-server --client cursor
+```
+
+#### ChatGPT Developer Mode
+
+ChatGPT requires Smithery for OAuth authentication. Direct server URLs are not supported.
+
+1. Enable Developer Mode: **Settings → Connectors → Advanced → Developer Mode**
+2. Add MCP Server URL: `https://server.smithery.ai/@kesslerio/attio-mcp-server/mcp`
+3. Complete OAuth authorization when prompted
+
+See [ChatGPT Developer Mode Guide](./docs/chatgpt-developer-mode.md) for detailed setup instructions.
+
+#### Claude Web
+
+1. Go to [Claude.ai](https://claude.ai) Settings → Connectors
+2. Add new MCP connector
+3. Select "Attio CRM" from Smithery marketplace
+4. Authorize with your Attio account
+
+---
+
+### Tier 2: Shell Installers
+
+> **Best for**: Developers who prefer local installations with automatic configuration.
+
+One-command scripts that install `attio-mcp` and configure your client automatically.
+
+#### Claude Desktop
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kesslerio/attio-mcp-server/main/scripts/install-claude-desktop.sh | bash
+```
+
+#### Cursor IDE
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kesslerio/attio-mcp-server/main/scripts/install-cursor.sh | bash
+```
+
+#### Claude Code (CLI)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kesslerio/attio-mcp-server/main/scripts/install-claude-code.sh | bash
+```
+
+These scripts will:
+
+- Install `attio-mcp` npm package globally (if needed)
+- Backup existing configuration files
+- Prompt for your Attio API key
+- Configure the MCP server for your client
+- Print next steps and restart instructions
+
+---
+
+### Tier 3: Manual Configuration
+
+> **Best for**: Power users who prefer full control or use unsupported clients.
+
+<details>
+<summary><strong>Claude Desktop Manual Setup</strong></summary>
+
+#### Step 1: Install attio-mcp
+
+```bash
+npm install -g attio-mcp
+```
+
+#### Step 2: Find your config file
+
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+#### Step 3: Add configuration
+
+```json
+{
+  "mcpServers": {
+    "attio-mcp": {
+      "command": "attio-mcp",
+      "env": {
+        "ATTIO_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+#### Step 4: Restart Claude Desktop completely (quit and reopen)
+
+</details>
+
+<details>
+<summary><strong>Cursor IDE Manual Setup</strong></summary>
+
+#### Step 1: Install attio-mcp
+
+```bash
+npm install -g attio-mcp
+```
+
+#### Step 2: Edit config file
+
+Location: `~/.cursor/mcp.json`
+
+```json
+{
+  "mcpServers": {
+    "attio-mcp": {
+      "command": "attio-mcp",
+      "env": {
+        "ATTIO_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+#### Step 3: Restart Cursor
+
+</details>
+
+<details>
+<summary><strong>Claude Code (CLI) Manual Setup</strong></summary>
+
+#### Option A: Using Claude CLI command (recommended)
+
+```bash
+echo '{"command":"attio-mcp","env":{"ATTIO_API_KEY":"your_key_here"}}' | claude mcp add-json attio-mcp --stdin -s user
+```
+
+#### Option B: Manual config edit
+
+Edit `~/.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "attio-mcp": {
+      "command": "attio-mcp",
+      "env": {
+        "ATTIO_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><strong>Building from Source</strong></summary>
+
+For development or custom deployments:
+
+```bash
+git clone https://github.com/kesslerio/attio-mcp-server.git
+cd attio-mcp-server
+npm install
+npm run build
+```
+
+Run directly:
+
+```bash
+ATTIO_API_KEY=your_key node dist/index.js
+```
+
+</details>
+
+<details>
+<summary><strong>NPM Global Install</strong></summary>
 
 ```bash
 # Global installation for CLI usage
@@ -400,33 +444,166 @@ npm install -g attio-mcp
 npm install attio-mcp
 ```
 
-### Option 2: One-Command Script Installation
+</details>
+
+---
+
+### Tier 4: Cloudflare Worker (Remote Deployment)
+
+> **Best for**: Teams needing centralized OAuth, multi-user access, mobile access, or running MCP without local installation.
+
+Deploy your own Attio MCP server on Cloudflare Workers with full OAuth 2.1 support.
+
+**Mobile Access**: With a remote MCP server, you can use Attio tools from:
+
+- ChatGPT mobile app (iOS/Android)
+- Claude mobile app (iOS/Android)
+- Any browser on any device
+
+#### Smithery vs. Cloudflare Worker
+
+| Feature           | Smithery  | Cloudflare Worker |
+| ----------------- | --------- | ----------------- |
+| Setup complexity  | Very Low  | Medium            |
+| OAuth built-in    | ✅        | ✅                |
+| Mobile app access | ✅        | ✅                |
+| Multi-user access | ❌        | ✅                |
+| Custom domain     | ❌        | ✅                |
+| Self-hosted       | ❌        | ✅                |
+| Team deployments  | Limited   | ✅ Full           |
+| Cost              | Free tier | Free tier         |
+
+#### Quick Deploy
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kesslerio/attio-mcp-server/main/install.sh | bash
-```
-
-### Option 3: Manual Installation
-
-```bash
-git clone https://github.com/kesslerio/attio-mcp-server.git
-cd attio-mcp-server
+cd examples/cloudflare-mcp-server
 npm install
-npm run build
+wrangler kv:namespace create "TOKEN_STORE"
+# Update wrangler.toml with the KV namespace ID
+wrangler secret put ATTIO_CLIENT_ID
+wrangler secret put ATTIO_CLIENT_SECRET
+wrangler secret put TOKEN_ENCRYPTION_KEY
+wrangler deploy
 ```
+
+#### Client Configuration
+
+After deployment, configure your client with your Worker URL:
+
+- **Claude.ai**: Settings → Connectors → Add your Worker URL
+- **ChatGPT**: Settings → Connectors → Developer Mode → Add Worker URL
+
+See [Cloudflare Worker Deployment Guide](./examples/cloudflare-mcp-server/README.md) for:
+
+- Complete OAuth 2.1 setup with Attio
+- Token encryption configuration
+- Production deployment checklist
+- Troubleshooting guide
+
+---
+
+## 🆕 What's New in v1.4.0
+
+### Major Features
+
+- **🎯 Workspace Schema Skill Generator** (#983) - Auto-generate Claude Skills from your Attio workspace schema for error-free field names and options
+- **🔍 Select-field Transformer** (#1019) - Case-insensitive matching, partial matching, and UUID pass-through for select/status fields
+- **🛠️ Attio Skill Generator Meta-skill** (#1020) - Meta-skill for automatic workspace documentation
+- **📚 Universal Usage Guide Skill** (#1018) - Hand-crafted workflow patterns and error prevention
+- **⚙️ `get_record_attribute_options` tool** (#975) - Get valid options for select/status fields with enhanced error messages
+- **📞 Phone validation** (#951) - Built-in phone number validation support
+- **⏱️ Configurable option fetch delay** - Rate limiting control via `--option-fetch-delay` flag
+
+### Major Enhancements
+
+- **🏷️ MCP-compliant tool naming** (#1039) - All tools now use `snake_case`, verb-first naming (old names work via aliases until v2.0.0)
+- **🎨 Custom object display names** (#1017) - Fetch display names directly from Attio API
+- **📖 Split integration patterns** (#1023) - Progressive discovery patterns by use case
+- **💡 Enhanced attribute error messages** (#975) - Levenshtein distance suggestions for typos
+
+### Critical Fixes
+
+- 📝 Note content line breaks preserved (#1052)
+- 👤 People search "Unnamed" display fixed (#1051)
+- ✅ Select field persistence (#1045)
+- 🔗 Record-reference auto-transformation (#997)
+- 📊 Multi-select array auto-transformation (#992)
+- 🛡️ Complex attribute validation (#991)
+- ⚠️ Field persistence false warnings (#995)
+- 📦 SDK dependency pinning (#1025)
+- 💼 Deal stage/UTM validation (#1043)
+- 📍 Location field auto-normalization (#987)
+
+### Internal Improvements
+
+- Tool alias system refactoring (#1041) - Type-safe constants with pattern-based generation
+- Strategy Pattern for CRUD error handlers (#1001)
+- Consolidated metadata fetching (#984)
+- UniversalUpdateService modularization (#984)
+- Select transformation type rename (#1055) - `select_title_to_array` for clarity
+
+## 🔄 Migration Guide
+
+**Upgrading from v1.3.x or earlier?** Tool names have changed to follow MCP naming conventions.
+
+**Old names still work** via backward-compatible aliases, but will be removed in **v2.0.0 (Q1 2026)**.
+
+### Tool Name Changes
+
+| Old Name (Deprecated)            | New Name (MCP-compliant)         | Notes              |
+| -------------------------------- | -------------------------------- | ------------------ |
+| `records_search`                 | `search_records`                 | Verb-first pattern |
+| `records_get_details`            | `get_record_details`             | Verb-first pattern |
+| `records_get_attributes`         | `get_record_attributes`          | Verb-first pattern |
+| `records_discover_attributes`    | `discover_record_attributes`     | Verb-first pattern |
+| `records_search_advanced`        | `search_records_advanced`        | Verb-first pattern |
+| `records_search_by_relationship` | `search_records_by_relationship` | Verb-first pattern |
+| `records_search_by_content`      | `search_records_by_content`      | Verb-first pattern |
+| `records_search_by_timeframe`    | `search_records_by_timeframe`    | Verb-first pattern |
+| `records_batch`                  | `batch_records`                  | Verb-first pattern |
+| `search-records`                 | `search_records`                 | snake_case format  |
+| `get-record-details`             | `get_record_details`             | snake_case format  |
+| `create-record`                  | `create_record`                  | snake_case format  |
+| `update-record`                  | `update_record`                  | snake_case format  |
+| `delete-record`                  | `delete_record`                  | snake_case format  |
+| `create-note`                    | `create_note`                    | snake_case format  |
+| `list-notes`                     | `list_notes`                     | snake_case format  |
+| `smithery-debug-config`          | `smithery_debug_config`          | snake_case format  |
+
+**Action Required:** Update your integrations to use new tool names before Q1 2026. See [MIGRATION-GUIDE.md](docs/MIGRATION-GUIDE.md) for the complete migration table.
+
+---
 
 ## ⚡ Quick Start
 
 ### Prerequisites
 
 - Node.js (v18 or higher)
-- Attio API Key ([Get one here](https://app.attio.com/settings/api))
+- Attio API Key ([Get one here](https://app.attio.com/settings/api)) **or** OAuth access token
 - Attio Workspace ID
+
+### 🔐 Authentication Options
+
+The server supports two authentication methods—both use the same Bearer token scheme:
+
+| Method                    | Environment Variable | Best For                             |
+| ------------------------- | -------------------- | ------------------------------------ |
+| **API Key** (recommended) | `ATTIO_API_KEY`      | Long-term integrations, personal use |
+| **OAuth Access Token**    | `ATTIO_ACCESS_TOKEN` | OAuth integrations, third-party apps |
+
+> **Note:** If both are set, `ATTIO_API_KEY` takes precedence.
+>
+> **OAuth Users:** For detailed setup including PKCE flow and token refresh, see [OAuth Authentication Guide](./docs/guides/oauth-authentication.md).
 
 ### 1. Set Environment Variables
 
 ```bash
+# Option 1: API Key (recommended for most users)
 export ATTIO_API_KEY="your_api_key_here"
+
+# Option 2: OAuth Access Token (for OAuth integrations)
+# export ATTIO_ACCESS_TOKEN="your_oauth_access_token_here"
+
 export ATTIO_WORKSPACE_ID="your_workspace_id_here"
 
 # Optional: Deal defaults configuration
@@ -663,96 +840,14 @@ See [docs/deployment/smithery-cli-setup.md](./docs/deployment/smithery-cli-setup
 
 ### **Testing**
 
-The project includes comprehensive testing at multiple levels with **100% E2E test pass rate**:
-
-#### **🚀 E2E Test Framework (100% Pass Rate)**
-
-Our comprehensive E2E test framework validates all universal tools with real Attio API integration:
-
 ```bash
-# E2E Tests (requires ATTIO_API_KEY in .env file)
-npm run e2e                 # Run complete E2E test suite (51 tests, 100% pass rate)
-npm test -- test/e2e/suites/universal-tools.e2e.test.ts  # Universal tools E2E tests
-
-# Set up E2E environment
-echo "ATTIO_API_KEY=your_api_key_here" > .env
-npm run e2e                 # Should show 51/51 tests passing
-```
-
-**✅ Comprehensive Coverage:**
-
-- **Pagination Testing**: Validates `offset` parameter across all universal tools
-- **Field Filtering**: Tests `fields` parameter for selective data retrieval
-- **Tasks Integration**: Complete lifecycle testing for tasks resource type
-- **Cross-Resource Validation**: Ensures consistent behavior across companies, people, lists, tasks
-- **Error Handling**: Validates graceful error responses and edge cases
-- **Performance Monitoring**: Tracks execution times and API response sizes
-
-**🛠️ Enhanced Assertions (7 New Methods):**
-
-```typescript
-// Available in test/e2e/utils/assertions.ts
-expectValidPagination(result, params); // Validates pagination behavior
-expectFieldFiltering(result, fields); // Validates field selection
-expectValidTasksIntegration(result); // Tasks-specific validation
-expectSpecificError(result, errorType); // Typed error validation
-expectOptimalPerformance(result, budget); // Performance validation
-expectValidUniversalToolParams(params); // Parameter validation
-expectValidBatchOperation(result, records); // Batch operation validation
-```
-
-**📊 Performance Benchmarks:**
-
-- **Search Operations**: < 1000ms per API call
-- **CRUD Operations**: < 1500ms per operation
-- **Batch Operations**: < 3000ms for 10 records
-- **Field Filtering**: < 500ms additional overhead
-- **Pagination**: < 200ms additional per offset
-
-#### **Unit & Integration Tests**
-
-```bash
-# Unit Tests (no API required)
 npm test                    # Run all tests
-npm run test:offline        # Run only offline tests (206 tests)
-npm run test:watch          # Watch mode for development
-
-# Integration Tests (requires API key and test data)
-npm run test:integration    # Run all integration tests (15 tests, 100% pass rate)
-npm run setup:test-data     # Create test data in your workspace
+npm run test:offline        # Run only offline tests (no API required)
+npm run test:integration    # Integration tests (requires ATTIO_API_KEY)
+npm run e2e                 # E2E tests (requires ATTIO_API_KEY)
 ```
 
-#### **Test Environment Setup**
-
-For E2E and integration tests, you need:
-
-1. **Create `.env` file** in project root:
-
-```bash
-# Required for E2E/Integration tests
-ATTIO_API_KEY=your_64_character_api_key_here
-ATTIO_WORKSPACE_ID=your_workspace_id_here
-
-# Optional: Use test workspace to prevent production changes
-ATTIO_USE_TEST_WORKSPACE=false  # Set to "true" to use test workspace
-ATTIO_TEST_API_KEY=your_test_api_key_here
-ATTIO_TEST_WORKSPACE_ID=your_test_workspace_id_here
-
-PORT=3000
-LOG_LEVEL=debug
-NODE_ENV=development
-```
-
-**🔒 Test Workspace Safety**: Set `ATTIO_USE_TEST_WORKSPACE=true` to automatically use test credentials (`ATTIO_TEST_API_KEY` and `ATTIO_TEST_WORKSPACE_ID`) instead of production. Simply toggle back to `false` to return to production. This prevents accidental changes to your production data during testing.
-
-2. **Verify API key** format (must be exactly 64 characters)
-3. **Run tests** to validate setup:
-
-```bash
-npm run build && npm run test:integration
-```
-
-See the [Testing Guide](./docs/testing.md) and [E2E Troubleshooting Guide](./docs/testing/e2e-troubleshooting.md) for detailed setup instructions.
+For E2E/integration tests, create `.env` with your `ATTIO_API_KEY`. See the [Testing Guide](./docs/testing.md) for detailed setup.
 
 ### **Available Scripts**
 

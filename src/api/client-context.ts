@@ -3,6 +3,10 @@
  * Uses WeakMap for memory-safe storage and implements security best practices
  */
 
+import { createScopedLogger } from '@/utils/logger.js';
+
+const logger = createScopedLogger('client-context');
+
 // Use WeakMap to prevent memory leaks and provide secure storage
 const contextStorage = new WeakMap<object, Record<string, unknown>>();
 let contextKey: object | null = null;
@@ -21,19 +25,17 @@ const FAILED_CONTEXT_CACHE_TTL = 10000; // 10 seconds - increased for retry scen
  */
 export function setClientContext(context: Record<string, unknown>): void {
   // Debug logging for Issue #891: Track context storage
-  if (process.env.MCP_LOG_LEVEL === 'DEBUG') {
-    const typedContext = context as {
-      getApiKey?: () => string | undefined;
-      ATTIO_API_KEY?: string;
-    };
-    console.error('[client-context:set] Storing context:', {
-      hasContext: Boolean(context),
-      contextKeys: Object.keys(context),
-      hasGetApiKeyFunction: typeof typedContext.getApiKey === 'function',
-      hasDirectApiKey: Boolean(typedContext.ATTIO_API_KEY),
-      timestamp: new Date().toISOString(),
-    });
-  }
+  const typedContext = context as {
+    getApiKey?: () => string | undefined;
+    ATTIO_API_KEY?: string;
+  };
+  logger.debug('Storing context', {
+    hasContext: Boolean(context),
+    contextKeys: Object.keys(context),
+    hasGetApiKeyFunction: typeof typedContext.getApiKey === 'function',
+    hasDirectApiKey: Boolean(typedContext.ATTIO_API_KEY),
+    timestamp: new Date().toISOString(),
+  });
 
   // Reuse existing key if available to prevent memory accumulation
   if (!contextKey) {
@@ -92,60 +94,53 @@ export function getContextKey(): object | null {
 }
 
 /**
- * Attempts to resolve an Attio API key from the stored context.
+ * Attempts to resolve an Attio API key or OAuth access token from the stored context.
  * Uses caching to avoid repeated failed context getter calls.
  *
- * Preference order:
+ * Preference order (Issue #928 - OAuth token support):
  * 1. invoke context.getApiKey() if provided
  * 2. read ATTIO_API_KEY field directly
+ * 3. read ATTIO_ACCESS_TOKEN field directly (OAuth alternative)
  */
 export function getContextApiKey(): string | undefined {
   const context = getClientContext();
   if (!context) {
-    if (process.env.MCP_LOG_LEVEL === 'DEBUG') {
-      console.error('[client-context:getApiKey] No context available');
-    }
+    logger.debug('No context available');
     return undefined;
   }
 
   const typedContext = context as {
     getApiKey?: () => string | undefined;
     ATTIO_API_KEY?: string;
+    ATTIO_ACCESS_TOKEN?: string;
   };
 
   // Check if we should avoid calling getApiKey due to recent failures
   const getApiKeyIdentifier = 'getApiKey';
   const shouldSkipGetter = failedContextCache.has(getApiKeyIdentifier);
 
-  if (process.env.MCP_LOG_LEVEL === 'DEBUG') {
-    console.error('[client-context:getApiKey] Attempting API key resolution:', {
-      hasContext: Boolean(context),
-      hasGetApiKeyFunction: typeof typedContext.getApiKey === 'function',
-      shouldSkipGetter,
-      hasDirectApiKey: Boolean(typedContext.ATTIO_API_KEY),
-      directKeyLength: typedContext.ATTIO_API_KEY?.length || 0,
-    });
-  }
+  logger.debug('Attempting API key/token resolution', {
+    hasContext: Boolean(context),
+    hasGetApiKeyFunction: typeof typedContext.getApiKey === 'function',
+    shouldSkipGetter,
+    hasDirectApiKey: Boolean(typedContext.ATTIO_API_KEY),
+    hasDirectAccessToken: Boolean(typedContext.ATTIO_ACCESS_TOKEN),
+    directKeyLength: typedContext.ATTIO_API_KEY?.length || 0,
+    directTokenLength: typedContext.ATTIO_ACCESS_TOKEN?.length || 0,
+  });
 
   if (typeof typedContext.getApiKey === 'function' && !shouldSkipGetter) {
     try {
       const key = typedContext.getApiKey();
-      if (process.env.MCP_LOG_LEVEL === 'DEBUG') {
-        console.error('[client-context:getApiKey] Function call result:', {
-          resolved: Boolean(key),
-          keyLength: key?.length || 0,
-        });
-      }
+      logger.debug('Function call result', {
+        resolved: Boolean(key),
+        keyLength: key?.length || 0,
+      });
       if (key && typeof key === 'string' && key.trim()) {
         return key;
       }
     } catch (error) {
-      if (process.env.MCP_LOG_LEVEL === 'DEBUG') {
-        console.error(
-          '[client-context:getApiKey] Function call failed:',
-          error
-        );
-      }
+      logger.debug('Function call failed', { error });
       // Cache this failure to avoid repeated exceptions
       // Clear existing timer if present to prevent duplicates
       const existingTimer = failedContextCache.get(getApiKeyIdentifier);
@@ -163,20 +158,25 @@ export function getContextApiKey(): string | undefined {
     }
   }
 
-  // Try direct property access
+  // Try direct property access - ATTIO_API_KEY first
   if (
     typeof typedContext.ATTIO_API_KEY === 'string' &&
     typedContext.ATTIO_API_KEY.trim()
   ) {
-    if (process.env.MCP_LOG_LEVEL === 'DEBUG') {
-      console.error('[client-context:getApiKey] Using direct property access');
-    }
+    logger.debug('Using direct ATTIO_API_KEY property');
     return typedContext.ATTIO_API_KEY;
   }
 
-  if (process.env.MCP_LOG_LEVEL === 'DEBUG') {
-    console.error('[client-context:getApiKey] No API key found in context');
+  // Fallback to ATTIO_ACCESS_TOKEN (Issue #928 - OAuth token support)
+  if (
+    typeof typedContext.ATTIO_ACCESS_TOKEN === 'string' &&
+    typedContext.ATTIO_ACCESS_TOKEN.trim()
+  ) {
+    logger.debug('Using direct ATTIO_ACCESS_TOKEN property');
+    return typedContext.ATTIO_ACCESS_TOKEN;
   }
+
+  logger.debug('No API key or access token found in context');
 
   return undefined;
 }
@@ -203,12 +203,14 @@ export function getContextStats(): {
   hasFallbackStorage: boolean;
   hasApiKeyGetter: boolean;
   hasDirectApiKey: boolean;
+  hasDirectAccessToken: boolean;
   failedContextCacheSize: number;
 } {
   const context = getClientContext();
   const typedContext = context as {
     getApiKey?: () => string | undefined;
     ATTIO_API_KEY?: string;
+    ATTIO_ACCESS_TOKEN?: string;
   };
 
   return {
@@ -217,6 +219,7 @@ export function getContextStats(): {
     hasFallbackStorage: Boolean(clientContext),
     hasApiKeyGetter: typeof typedContext?.getApiKey === 'function',
     hasDirectApiKey: typeof typedContext?.ATTIO_API_KEY === 'string',
+    hasDirectAccessToken: typeof typedContext?.ATTIO_ACCESS_TOKEN === 'string',
     failedContextCacheSize: failedContextCache.size,
   };
 }

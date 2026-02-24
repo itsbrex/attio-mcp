@@ -27,7 +27,7 @@ class ListOperationsTest extends MCPTestBase {
     try {
       // Create a test company first
       const companyData = TestDataFactory.createCompanyData('TC006');
-      const createResult = await this.executeToolCall('create-record', {
+      const createResult = await this.executeToolCall('create_record', {
         resource_type: 'companies',
         record_data: companyData,
       });
@@ -109,7 +109,7 @@ describe('TC-006: List Operations - Basic List Management', () => {
       error = e instanceof Error ? e.message : String(e);
       throw e;
     } finally {
-      results.push({ test: testName, passed, error });
+      results.push({ testName, passed, error });
     }
   });
 
@@ -149,7 +149,7 @@ describe('TC-006: List Operations - Basic List Management', () => {
       error = e instanceof Error ? e.message : String(e);
       throw e;
     } finally {
-      results.push({ test: testName, passed, error });
+      results.push({ testName, passed, error });
     }
   });
 
@@ -196,7 +196,7 @@ describe('TC-006: List Operations - Basic List Management', () => {
       error = e instanceof Error ? e.message : String(e);
       throw e;
     } finally {
-      results.push({ test: testName, passed, error });
+      results.push({ testName, passed, error });
     }
   });
 
@@ -242,7 +242,7 @@ describe('TC-006: List Operations - Basic List Management', () => {
       error = e instanceof Error ? e.message : String(e);
       throw e;
     } finally {
-      results.push({ test: testName, passed, error });
+      results.push({ testName, passed, error });
     }
   });
 });

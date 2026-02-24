@@ -171,6 +171,8 @@ jobs:
 
       - name: Extract PR Context for Review
         id: pr_context
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           PR_NUM="${{ steps.resolve.outputs.pr }}"
 
@@ -189,14 +191,17 @@ jobs:
               # Check if error is transient (network/API) vs permanent (not found)
               if echo "$PR_DATA" | grep -qi "could not resolve to a PullRequest\|not found"; then
                 echo "⚠️ PR #$PR_NUM not found (permanent error), skipping retries" >> $GITHUB_STEP_SUMMARY
+                echo "gh pr view failed (permanent): $PR_DATA" >&2
                 PR_DATA=""
                 break
               elif [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
                 BACKOFF=$((2 ** RETRY_COUNT))  # Exponential backoff: 2, 4, 8 seconds
                 echo "⚠️ Transient error fetching PR metadata (attempt $RETRY_COUNT/$MAX_RETRIES), retrying in ${BACKOFF}s..." >> $GITHUB_STEP_SUMMARY
+                echo "gh pr view failed (attempt $RETRY_COUNT): exit $EXIT_CODE, output: $PR_DATA" >&2
                 sleep $BACKOFF
               else
                 echo "❌ Failed to fetch PR metadata after $MAX_RETRIES attempts" >> $GITHUB_STEP_SUMMARY
+                echo "gh pr view failed after retries: exit $EXIT_CODE, output: $PR_DATA" >&2
                 PR_DATA=""
               fi
             fi
@@ -322,6 +327,16 @@ jobs:
             printf 'HAS_DELETIONS=false\n' >> "$GITHUB_ENV"
           fi
 
+          # Load alias resolutions if available (pre-computed from full repo)
+          # Filter to only confirmed existing paths so prompt claim is accurate
+          ALIAS_PATH="$SCOPE_DIR/alias-resolutions.json"
+          if [ -f "$ALIAS_PATH" ]; then
+            alias_json=$(jq -c '[.[] | select(.exists == true)]' "$ALIAS_PATH")
+            printf 'ALIAS_RESOLUTIONS=%s\n' "$alias_json" >> "$GITHUB_ENV"
+          else
+            printf 'ALIAS_RESOLUTIONS=[]\n' >> "$GITHUB_ENV"
+          fi
+
           ring0_count=$(jq -r '.ring0Count' "$SUMMARY_PATH")
           ring1_count=$(jq -r '.ring1Count' "$SUMMARY_PATH")
           deletions_count=$(jq -r '.deletionsCount // 0' "$SUMMARY_PATH")
@@ -345,7 +360,7 @@ jobs:
 
           # Prepare sparse checkout patterns (optimized with jq deduplication)
           tmpfile=$(mktemp)
-          jq -rs --argjson static '["/.github/**", "/scripts/claude/**"]' \
+          jq -rs --argjson static '["/.github/**", "/scripts/claude/**", "/configs/**"]' \
             '$static + add | unique | .[]' \
             "$RING0_JSON_PATH" "$RING1_JSON_PATH" > "$tmpfile"
 
@@ -375,6 +390,28 @@ jobs:
           git sparse-checkout list || true
           rm -f "$tmpfile"
 
+      - name: Load unified diff for review scope
+        if: steps.decide.outputs.internal == 'true' && (steps.haslabel.outputs.has == 'true' || github.event_name == 'workflow_dispatch')
+        id: load_diff
+        run: |
+          SCOPE_DIR=".github/claude-cache/${{ github.run_id }}"
+          DIFF_PATH="$SCOPE_DIR/diff.txt"
+
+          if [ -f "$DIFF_PATH" ]; then
+            DELIMITER="DIFF_EOF_${{ github.run_id }}"
+            {
+              echo "PR_DIFF<<${DELIMITER}"
+              cat "$DIFF_PATH"
+              printf '\n'
+              echo "${DELIMITER}"
+            } >> "$GITHUB_ENV"
+            echo "has_diff=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Loaded unified diff for line-level review scope" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "has_diff=false" >> "$GITHUB_OUTPUT"
+            echo "⚠️ No unified diff available (fallback mode or generation failed)" >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: Claude Review (Sonnet)
         if: steps.decide.outputs.internal == 'true' && (steps.haslabel.outputs.has_review == 'true' || (github.event_name == 'workflow_dispatch' && steps.resolve.outputs.label == 'claude:review'))
         id: claude_sonnet
@@ -397,6 +434,19 @@ jobs:
             - End the report with the exact marker: END-OF-REPORT
             - Start the report with the heading `# PR Review Report`.
             - Respect the scope rules below. If you cannot remain in scope, say so explicitly.
+
+            LANGUAGE SEMANTICS VERIFICATION (critical rule)
+            NOTE: Keep this section in sync with both Sonnet and Opus prompts to prevent drift
+            - When making claims about JavaScript/TypeScript operator behavior (??/||/&&/etc):
+              * If you're confident, state it directly with evidence
+              * If uncertain, phrase as a question: "Does X operator work this way?" and recommend writing a test
+              * Say "I'm not certain about the semantics of [operator]" instead of making incorrect claims
+              * Prefer empirical testing over theoretical reasoning when possible
+              * If tools don't allow verification, clearly state: "Cannot verify [claim] without running code"
+            - Common pitfalls to avoid:
+              * Confusing ?? (nullish coalescing) with || (logical OR)
+              * Assuming null/undefined are equivalent in all contexts
+              * Making absolute statements about runtime behavior without evidence
 
             TOOLS POLICY (hard rule)
             - Use only: Read, Glob, Grep. Do NOT use Bash, Web*, NotebookEdit, or TodoWrite.
@@ -468,10 +518,45 @@ jobs:
               * false = Full Ring 0 + Ring 1 context available.
             - If Ring 1 is unavailable, work with Ring 0 alone rather than expanding scope.
 
+            SPARSE CHECKOUT LIMITATIONS (CRITICAL):
+            - This review runs in a sparse checkout environment
+            - Only Ring 0 files, Ring 1 files, /.github/**, /scripts/claude/**, and /configs/** are available
+            - If Glob/Read returns "no files found" for paths outside these scopes:
+              * DO NOT report as "missing files" - they likely exist but aren't checked out
+              * State: "could not verify - outside sparse checkout scope"
+              * Or skip verification and focus on Ring 0 changes only
+            - Never claim files are missing based solely on Glob "no files found" results
+            - If a file or function name is **referenced in Ring 0 code** but Glob/Grep cannot find it:
+              * Assume it exists **outside sparse checkout scope**, not that it's missing
+              * Say "could not verify (outside sparse checkout scope)" rather than "missing"
+              * This applies especially to dynamic imports like `await import('@/...')`
+              * Check the "Pre-computed alias resolutions" section above - those paths are CONFIRMED to exist
+
             PATH RESOLUTION RULES
             - Source files use ESM imports like "../foo.js" but live on disk as "../foo.ts".
             - When a Read(...) of a "*.js" path fails, immediately retry the same path with ".ts".
             - Never treat missing "*.js" as missing code if a ".ts" twin exists.
+
+            JAVASCRIPT/TYPESCRIPT OPERATOR REFERENCE (for accuracy)
+            Quick reference for common operators (verify claims against these definitions):
+
+            - **Nullish Coalescing (??)**: Returns right side when left is null OR undefined
+              * null ?? "fallback" → "fallback"
+              * undefined ?? "fallback" → "fallback"
+              * "" ?? "fallback" → "" (empty string is NOT nullish)
+              * 0 ?? "fallback" → 0 (zero is NOT nullish)
+
+            - **Logical OR (||)**: Returns right side when left is falsy
+              * null || "fallback" → "fallback"
+              * undefined || "fallback" → "fallback"
+              * "" || "fallback" → "fallback" (empty string IS falsy)
+              * 0 || "fallback" → "fallback" (zero IS falsy)
+
+            - **Optional Chaining (?.)**: Short-circuits to undefined if left is null/undefined
+              * obj?.prop → undefined (if obj is null/undefined)
+              * obj?.prop → obj.prop (if obj exists)
+
+            If uncertain about operator semantics, say "Cannot verify without running code" rather than making incorrect claims.
 
             Changed files (Ring 0 JSON):
             ${{ env.RING0_JSON }}
@@ -479,9 +564,28 @@ jobs:
             Context files (Ring 1 JSON):
             ${{ env.RING1_JSON }}
 
+            Pre-computed alias resolutions (verified from full repo before sparse checkout):
+            ${{ env.ALIAS_RESOLUTIONS }}
+            NOTE: These paths are CONFIRMED to exist in the full repository. If Glob/Grep cannot find them in sparse checkout, they exist outside the checkout scope - do NOT report them as missing.
+
             ${{ env.HAS_DELETIONS == 'true' && format('
             {0}
             ', env.DELETIONS_CONTENT) || '' }}
+
+            ${{ env.PR_DIFF && format('
+            ACTUAL CHANGES (unified diff):
+            ```diff
+            {0}
+            ```
+
+            CRITICAL SCOPE RULE FOR REVIEW:
+            - Lines starting with + are ADDITIONS - these are the NEW code you MUST review
+            - Lines starting with - are DELETIONS - verify removal is safe
+            - Lines WITHOUT +/- prefix are CONTEXT ONLY - do NOT flag issues in unchanged lines
+            - When flagging an issue, you MUST cite the specific + or - line from the diff
+            - Pre-existing code is NOT part of this review unless directly affected by changes
+            - If an issue exists in surrounding context but was NOT changed in this PR, do NOT report it
+            ', env.PR_DIFF) || '' }}
 
             Perform a PR review with full working tree access.
 
@@ -508,6 +612,10 @@ jobs:
 
             ## Summary
             Brief overview of changes and overall assessment.
+
+            **Required**: For any IMPORTANT or CRITICAL suggestions involving language semantics:
+            - State your confidence level: "High Confidence" / "Medium Confidence" / "Low Confidence - Cannot Verify"
+            - If Low Confidence, recommend manual verification instead of implementation
 
             ## ⚠️ CRITICAL Issues (Fix before merge)
             Issues that MUST be addressed before merging:
@@ -550,7 +658,7 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
           claude_args: >-
-            --model claude-opus-4-1-20250805
+            --model claude-opus-4-5-20251101
             --max-turns ${{ steps.turns.outputs.opus_turns }}
             --allowed-tools Read,Glob,Grep
             --output-format stream-json
@@ -563,6 +671,19 @@ jobs:
             - End the report with the exact marker: END-OF-REPORT
             - Start the report with the heading `# PR Review Report`.
             - Respect the scope rules below. If you cannot remain in scope, say so explicitly.
+
+            LANGUAGE SEMANTICS VERIFICATION (critical rule)
+            NOTE: Keep this section in sync with both Sonnet and Opus prompts to prevent drift
+            - When making claims about JavaScript/TypeScript operator behavior (??/||/&&/etc):
+              * If you're confident, state it directly with evidence
+              * If uncertain, phrase as a question: "Does X operator work this way?" and recommend writing a test
+              * Say "I'm not certain about the semantics of [operator]" instead of making incorrect claims
+              * Prefer empirical testing over theoretical reasoning when possible
+              * If tools don't allow verification, clearly state: "Cannot verify [claim] without running code"
+            - Common pitfalls to avoid:
+              * Confusing ?? (nullish coalescing) with || (logical OR)
+              * Assuming null/undefined are equivalent in all contexts
+              * Making absolute statements about runtime behavior without evidence
 
             TOOLS POLICY (hard rule)
             - Use only: Read, Glob, Grep. Do NOT use Bash, Web*, NotebookEdit, or TodoWrite.
@@ -634,10 +755,45 @@ jobs:
               * false = Full Ring 0 + Ring 1 context available.
             - If Ring 1 is unavailable, work with Ring 0 alone rather than expanding scope.
 
+            SPARSE CHECKOUT LIMITATIONS (CRITICAL):
+            - This review runs in a sparse checkout environment
+            - Only Ring 0 files, Ring 1 files, /.github/**, /scripts/claude/**, and /configs/** are available
+            - If Glob/Read returns "no files found" for paths outside these scopes:
+              * DO NOT report as "missing files" - they likely exist but aren't checked out
+              * State: "could not verify - outside sparse checkout scope"
+              * Or skip verification and focus on Ring 0 changes only
+            - Never claim files are missing based solely on Glob "no files found" results
+            - If a file or function name is **referenced in Ring 0 code** but Glob/Grep cannot find it:
+              * Assume it exists **outside sparse checkout scope**, not that it's missing
+              * Say "could not verify (outside sparse checkout scope)" rather than "missing"
+              * This applies especially to dynamic imports like `await import('@/...')`
+              * Check the "Pre-computed alias resolutions" section above - those paths are CONFIRMED to exist
+
             PATH RESOLUTION RULES
             - Source files use ESM imports like "../foo.js" but live on disk as "../foo.ts".
             - When a Read(...) of a "*.js" path fails, immediately retry the same path with ".ts".
             - Never treat missing "*.js" as missing code if a ".ts" twin exists.
+
+            JAVASCRIPT/TYPESCRIPT OPERATOR REFERENCE (for accuracy)
+            Quick reference for common operators (verify claims against these definitions):
+
+            - **Nullish Coalescing (??)**: Returns right side when left is null OR undefined
+              * null ?? "fallback" → "fallback"
+              * undefined ?? "fallback" → "fallback"
+              * "" ?? "fallback" → "" (empty string is NOT nullish)
+              * 0 ?? "fallback" → 0 (zero is NOT nullish)
+
+            - **Logical OR (||)**: Returns right side when left is falsy
+              * null || "fallback" → "fallback"
+              * undefined || "fallback" → "fallback"
+              * "" || "fallback" → "fallback" (empty string IS falsy)
+              * 0 || "fallback" → "fallback" (zero IS falsy)
+
+            - **Optional Chaining (?.)**: Short-circuits to undefined if left is null/undefined
+              * obj?.prop → undefined (if obj is null/undefined)
+              * obj?.prop → obj.prop (if obj exists)
+
+            If uncertain about operator semantics, say "Cannot verify without running code" rather than making incorrect claims.
 
             Changed files (Ring 0 JSON):
             ${{ env.RING0_JSON }}
@@ -645,9 +801,28 @@ jobs:
             Context files (Ring 1 JSON):
             ${{ env.RING1_JSON }}
 
+            Pre-computed alias resolutions (verified from full repo before sparse checkout):
+            ${{ env.ALIAS_RESOLUTIONS }}
+            NOTE: These paths are CONFIRMED to exist in the full repository. If Glob/Grep cannot find them in sparse checkout, they exist outside the checkout scope - do NOT report them as missing.
+
             ${{ env.HAS_DELETIONS == 'true' && format('
             {0}
             ', env.DELETIONS_CONTENT) || '' }}
+
+            ${{ env.PR_DIFF && format('
+            ACTUAL CHANGES (unified diff):
+            ```diff
+            {0}
+            ```
+
+            CRITICAL SCOPE RULE FOR REVIEW:
+            - Lines starting with + are ADDITIONS - these are the NEW code you MUST review
+            - Lines starting with - are DELETIONS - verify removal is safe
+            - Lines WITHOUT +/- prefix are CONTEXT ONLY - do NOT flag issues in unchanged lines
+            - When flagging an issue, you MUST cite the specific + or - line from the diff
+            - Pre-existing code is NOT part of this review unless directly affected by changes
+            - If an issue exists in surrounding context but was NOT changed in this PR, do NOT report it
+            ', env.PR_DIFF) || '' }}
 
             Perform a PR review with full working tree access.
 
@@ -674,6 +849,10 @@ jobs:
 
             ## Summary
             Brief overview of changes and overall assessment.
+
+            **Required**: For any IMPORTANT or CRITICAL suggestions involving language semantics:
+            - State your confidence level: "High Confidence" / "Medium Confidence" / "Low Confidence - Cannot Verify"
+            - If Low Confidence, recommend manual verification instead of implementation
 
             ## ⚠️ CRITICAL Issues (Fix before merge)
             Issues that MUST be addressed before merging:
@@ -946,6 +1125,40 @@ jobs:
             }
             core.exportVariable('RESULT_OPUS', review);
             core.info(`Captured Opus review content (${review.length} chars).`);
+
+      - name: Validate Review for Common False Positives
+        if: always() && (steps.claude_sonnet.outcome == 'success' || steps.claude_opus.outcome == 'success')
+        run: |
+          # Check for common false positive patterns in review output
+          # Uses -F (fixed-string) to avoid regex interpretation of special chars like '?'
+          VALIDATION_WARNINGS=""
+          DOC_LINK="See: .github/docs/claude-review-known-issues.md"
+
+          if [ -n "$RESULT_SONNET" ]; then
+            if printf '%s' "$RESULT_SONNET" | grep -Fq '?? operator'; then
+              VALIDATION_WARNINGS="${VALIDATION_WARNINGS}⚠️ Sonnet review mentions ?? operator - verify semantics manually. ${DOC_LINK}\n"
+            fi
+            if printf '%s' "$RESULT_SONNET" | grep -Fq 'nullish coalescing'; then
+              VALIDATION_WARNINGS="${VALIDATION_WARNINGS}⚠️ Sonnet review mentions nullish coalescing - verify semantics manually. ${DOC_LINK}\n"
+            fi
+          fi
+
+          if [ -n "$RESULT_OPUS" ]; then
+            if printf '%s' "$RESULT_OPUS" | grep -Fq '?? operator'; then
+              VALIDATION_WARNINGS="${VALIDATION_WARNINGS}⚠️ Opus review mentions ?? operator - verify semantics manually. ${DOC_LINK}\n"
+            fi
+            if printf '%s' "$RESULT_OPUS" | grep -Fq 'nullish coalescing'; then
+              VALIDATION_WARNINGS="${VALIDATION_WARNINGS}⚠️ Opus review mentions nullish coalescing - verify semantics manually. ${DOC_LINK}\n"
+            fi
+          fi
+
+          if [ -n "$VALIDATION_WARNINGS" ]; then
+            echo -e "$VALIDATION_WARNINGS"
+            echo -e "$VALIDATION_WARNINGS" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ No common false positive patterns detected"
+            echo "✅ No common false positive patterns detected" >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Debug review env
         run: |

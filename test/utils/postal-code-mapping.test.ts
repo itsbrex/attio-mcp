@@ -70,15 +70,10 @@ describe('Postal Code Field Mapping - Issue #219', () => {
       );
       const zipResult = getAttributeSlug('ZIP', 'companies');
 
-      // Default behavior: field names return as-is without custom mappings
+      // Default behavior: snake_case slugs pass through, display names get normalized
       expect(postalCodeResult).toBe('postal_code');
-      expect(postalCodeDisplayResult).toBe('Postal Code');
-      expect(zipResult).toBe('ZIP');
-
-      console.log('Default mapping results:');
-      console.log('postal_code ->', postalCodeResult);
-      console.log('Postal Code ->', postalCodeDisplayResult);
-      console.log('ZIP ->', zipResult);
+      expect(postalCodeDisplayResult).toBe('postal_code'); // Display name normalized to slug
+      expect(zipResult).toBe('postal_code');
     });
 
     it('should not map to non-existent "zip" slug if that causes the API error', () => {

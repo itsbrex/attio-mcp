@@ -7,9 +7,385 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Breaking Changes
+### Changed
+
+- **Consolidated list filter tools (5 → 1)** (#1069) - Part of Issue #1059 list tools consolidation (11 → 4 tools) - PR #2 of 4
+  - Enhanced `filter-list-entries` with 4 auto-detected parameter modes:
+    - Mode 1 (Simple): Single attribute filtering
+    - Mode 2 (Advanced): Multi-condition AND/OR filtering
+    - Mode 3 (Parent Attribute): Filter by parent record attributes
+    - Mode 4 (Parent UUID): Filter by exact parent record UUID
+  - Deprecated tools (removal in v2.0.0): `advanced-filter-list-entries`, `filter-list-entries-by-parent`, `filter-list-entries-by-parent-id`
+  - Full backward compatibility maintained - all existing Mode 1 calls work unchanged
+  - Simpler API surface - one tool to learn instead of five
+- **Consolidated list entry management tools (3 → 1)** (#1075) - Part of Issue #1059 list tools consolidation (11 → 4 tools) - PR #3 of 4
+  - Enhanced `manage-list-entry` with 3 auto-detected parameter modes:
+    - Mode 1 (Add): Add company/person to list with optional initial values
+    - Mode 2 (Remove): Remove entry from list
+    - Mode 3 (Update): Update entry attributes (stage, status, custom fields)
+  - Deprecated tools (removal in v2.0.0): `add-record-to-list`, `remove-record-from-list`, `update-list-entry`
+  - Full backward compatibility maintained - all existing calls work unchanged with identical parameter structure
+  - Simpler API surface - one tool to learn instead of three
+- **List tools consolidation complete** (#1071) - Part of Issue #1059 list tools consolidation (11 → 4 tools) - PR #4 of 4
+  - Added runtime deprecation warnings for 8 legacy list tools (removal in v2.0.0):
+    - Filter operations: `advanced-filter-list-entries`, `filter-list-entries-by-parent`, `filter-list-entries-by-parent-id`
+    - Entry management: `add-record-to-list`, `remove-record-from-list`, `update-list-entry`
+    - List discovery: `get-lists`, `get-list-details` (migrate to universal tools)
+  - Comprehensive migration guide at `/docs/migration/v2-list-tools.md` with all 8 tools documented
+  - Updated tool count: 11 → 4 (64% reduction achieved)
+  - See [Migration Guide](./docs/migration/v2-list-tools.md) for migration examples
+
+### Fixed
+
+- Universal tools (`search_records`, `get_record_details`) now return proper list format matching list-specific tools instead of generic record format with values wrapper (#1068)
+- Universal update/search flows now preserve list-native shapes across the UniversalRecord union without values wrapper coercion (#1073)
+- MCP Registry publishing workflow schema version and re-publish errors (#1066)
+- Operations playbook validation tests now work across all workspaces via dynamic attribute discovery (#973, #1081)
+  - Added `is_empty` operator support to advanced-search
+  - Tests discover available attributes at runtime instead of hardcoding field names
+  - Proper error handling for API failures (auth, rate limits, server errors)
+
+## [1.4.0] - 2025-12-29
+
+**TL;DR for Users**: New workspace skill generator, better select field handling, MCP-compliant tool naming. **No action needed** - old tool names still work via backward-compatible aliases until v2.0.0 (Q1 2026). See [Migration Guide](./docs/MIGRATION-GUIDE.md) for future planning.
 
 ### Added
+
+- **Workspace Schema Skill Generator** (#983) - Auto-generate Claude Skills from Attio workspace schemas
+  - New CLI command `attio-discover generate-skill` for generating workspace schema documentation
+  - Supports companies, people, and deals (Phase 1 objects) with experimental support for custom objects
+  - Three output formats: Claude Skill (SKILL.md + resources/), Markdown (single file), and JSON
+  - Prominent Display Name ↔ API Slug mapping tables to address #1 LLM error source
+  - Select/status option values with 20-item truncation and "(+N more)" indicators
+  - Complex type structure documentation (location, personal-name, phone-number, email-address)
+  - Multi-select, unique, and required field indicators for accurate attribute usage
+  - ZIP packaging support (--zip flag) for easy Claude desktop upload
+  - Graceful error handling with partial data generation when individual objects fail
+  - Handlebars-based templating for clean separation of logic and presentation
+  - Security validation prevents directory traversal attacks
+  - Comprehensive unit tests for all services (45 tests total)
+
+- **Universal Usage Guide Skill** (#1018) - Hand-crafted skill for workflow patterns and error prevention
+  - Universal workflow patterns (Find or Create, Batch Update, Pipeline Movement, Data Enrichment)
+  - Golden Rules error prevention system (read-only fields, multi-select arrays, data types, UUID validation)
+  - Complete MCP tool reference with signatures and examples for all tools
+  - Integration patterns for deals pipeline, list-based organization, lead qualification, bulk import
+  - Object-agnostic design supporting companies, deals, people, lists, and custom objects
+  - Cross-references to attio-workspace-schema skill for workspace-specific details
+  - Two-skill architecture: Schema skill (WHAT) + Usage skill (HOW)
+
+- **Select-field Transformer** (#1019, #1029) - Quality-of-life enhancement for select field values
+  - Case-insensitive title matching: `"potential customer"` → `"Potential Customer"`
+  - Partial matching support: `"Potential"` → `"Potential Customer"`
+  - Better error messages listing valid options with suggestions
+  - UUID pass-through support (no API lookup needed)
+  - 5-minute TTL caching to minimize API calls
+  - Consistent UX with existing status-transformer
+
+- **`records_get_attribute_options` tool** (#975) - Get valid options for select, status, and multi-select attributes
+  - Prevents "Cannot find select option" errors by showing available options upfront
+  - Works with companies, people, deals, and custom objects
+  - Returns option titles, IDs, and active/archived status
+
+- **Comprehensive FieldPersistenceHandler tests** (#984) - 50 new unit tests
+  - Optional actualRecord parameter behavior (10 tests)
+  - Verification modes: disabled, warn-only, strict (15 tests)
+  - Semantic vs cosmetic mismatch filtering (15 tests)
+  - Integration with UpdateValidation (10 tests)
+  - Increases total test count from 2973 to 3026 (+53 tests)
+
+- **Configurable skill generator option fetch delay** (#1015, #1024) - New `--option-fetch-delay` flag to tune rate limiting between option fetches
+
+- **Attio skill generator meta-skill** (#1020, #1024) - Meta-skill for generating workspace schema documentation
+
+- **Phone validation to @attio-mcp/core** (#951, #964) - Extracted phone number validation into dedicated package
+  - New `@attio-mcp/core` package with phone validation utilities
+  - E.164 format support with international dialing code parsing
+  - Reusable validation logic for phone number attributes across the codebase
+
+### Changed
+
+- **Extract search services from UniversalSearchService** (#935, #974) - Improved search architecture and maintainability
+  - Created dedicated strategy classes: CompanySearchStrategy, PeopleSearchStrategy, NoteSearchStrategy, TaskSearchStrategy
+  - Extracted common search patterns into BaseSearchStrategy abstract class
+  - Reduced code duplication and improved testability
+  - Better separation of concerns for resource-specific search logic
+
+- **Transformation type rename** (#1055) - Renamed transformation type for clarity
+  - Renamed `select_title_to_id` to `select_title_to_array` to better reflect array-based format
+  - Maintains consistency with Attio API's array-based select field expectations
+
+- **Tool alias system refactoring** (#1041) - Simplified and improved maintainability of the tool alias system
+  - Created `src/constants/tool-names.ts` with type-safe tool name constants and `ToolName` type
+  - Refactored `src/config/tool-aliases.ts` to use data-driven pattern-based alias generation
+  - Created `test/utils/tool-assertions.ts` with reusable assertion helpers for tool validation
+  - Refactored consistency tests to use assertion helpers, improving readability and reducing duplication
+  - All 29 aliases remain fully functional with 100% backward compatibility
+
+- **MCP-compliant tool naming** (#1039) - All universal tools now use `snake_case`, verb-first naming
+  - Universal search/metadata tools: `records_search` → `search_records`, `records_get_details` → `get_record_details`, etc. (12 tools)
+  - CRUD tools: `create-record` → `create_record`, `update-record` → `update_record`, `delete-record` → `delete_record`
+  - Note tools: `create-note` → `create_note`, `list-notes` → `list_notes`
+  - Debug tool: `smithery-debug-config` → `smithery_debug_config`
+  - Tool descriptions now use natural language sentences instead of pipe-separated labels
+  - Aligns with MCP ecosystem standards (Desktop Commander, SEP-986, official MCP docs)
+  - Old names continue to work via dual alias support (both old `noun_verb` and `kebab-case` formats)
+  - See `docs/MIGRATION-GUIDE.md` for complete migration table
+
+- **Refactored UniversalUpdateService** (#984) - Reduced from 831 to 691 lines (-17%) by extracting focused modules
+  - Created MetadataResolver for centralized metadata fetching (eliminates 40-60% duplicate API calls)
+  - Created UpdateOrchestrator for clean strategy dispatch separation
+  - Created FieldValidationHandler for validation with display name resolution
+  - Created FieldPersistenceHandler for post-update verification
+
+- **Unified verification API** (#984) - Single entry point for field persistence verification
+  - UniversalUpdateService now routes through FieldPersistenceHandler.verifyPersistence
+  - Eliminates duplicate semantic filtering logic (47 lines removed)
+  - FieldPersistenceHandler.verifyPersistence now accepts optional actualRecord parameter
+  - Verification results surfaced in UpdateMetadata.fieldVerification (verified status + discrepancies)
+  - Renamed ValidationResult → UpdateMetadata for clarity (3 competing interfaces reduced to distinct purposes)
+
+- **Standardized environment variables** (#984) - Consistent verification configuration
+  - UpdateValidation now uses ENABLE_FIELD_VERIFICATION (deprecated SKIP_FIELD_VERIFICATION)
+  - Both variables supported for backward compatibility with deprecation notice
+
+- **Improved MetadataResolver error handling** (#984, #1006) - Better error handling for critical failures
+  - Re-throws critical authentication errors (401, 403, Unauthorized, Forbidden)
+  - Re-throws schema validation errors for immediate failure visibility
+  - Graceful degradation with empty metadata for non-critical transient errors
+  - Prevents silent masking of authentication and validation failures
+
+- **Consolidated metadata fetching** (#984, #1006) - Single API call per resource type per request
+  - MetadataResolver provides single source of truth for attribute metadata
+  - Value transformer receives metadata via context to avoid duplicate fetch
+  - Reduces API calls and improves performance
+
+- **Extended display name resolution** (#984) - User-friendly field names now work in create/update operations
+  - Can use "Deal stage" instead of "stage" in all operations (not just attribute_options)
+  - FieldValidationHandler automatically resolves display names before validation
+  - Integrated into both UniversalCreateService and UniversalUpdateService
+
+- **Added TTL to metadata caches** (#984) - All metadata caches now expire after 5 minutes
+  - Value transformer migrated to CachingService with DEFAULT_ATTRIBUTES_CACHE_TTL
+  - Status transformer uses timestamp-based expiration with lazy eviction
+  - Prevents stale data while maintaining performance benefits
+
+- **Enhanced attribute error messages** (#975) - Better guidance when API requests fail
+  - Levenshtein distance suggestions for misspelled attribute names (threshold ≤3 edits)
+  - Field alias mapping converts common mistakes automatically (`linkedin_url` → `linkedin`)
+  - Select/status errors now show valid workspace-specific options
+  - Error messages include `records_discover_attributes` hint for discovery
+
+- **Expanded valid field lists** (#975) - Validators now accept more standard Attio attributes
+  - Companies: `team_size`, `founded_at`, `headquarters`, `crunchbase`, `instagram`, `angellist`, etc.
+  - People: `primary_email_address`, `primary_phone_number`, `avatar_url`, `timezone`, `instagram`, etc.
+
+- **Location field auto-normalization** (#987) - Incomplete location objects now auto-fill missing fields
+  - Attio requires all 10 location fields (`line_1`-`line_4`, `locality`, `region`, `postcode`, `country_code`, `latitude`, `longitude`) even if null
+  - Transformer auto-fills missing fields with `null` to prevent validation errors
+  - Common aliases supported: `street`→`line_1`, `city`→`locality`, `state`→`region`, `zip`→`postcode`, `lat`→`latitude`
+
+- **Refactored select array handling** (#1030) - Normalized select array data structures for consistency
+
+- **Removed unused normalizeLocation function** (#1030) - Cleaned up unused code to reduce technical debt
+
+- **Error handling refactoring** (#1001) - Extracted validation enhancers for improved code organization and maintainability
+  - Extracted required-fields enhancer (Step 1/6)
+  - Extracted uniqueness enhancer (Step 2/6)
+  - Extracted attribute-not-found enhancer (Step 3/6)
+  - Extracted final 3 enhancers (Steps 4-6/6)
+
+### Fixed
+
+- **Note content line breaks preserved** (#1052) - Fixed line breaks being stripped from note content during sanitization
+  - Preserved leading indentation for nested Markdown (bullet lists, code blocks)
+  - Added `sanitizeMultilineString()` for content-heavy fields while maintaining XSS security
+  - Supports all multiline fields: content, content_markdown, content_plaintext, description, body, notes
+  - Enhanced `create_note` tool description with markdown formatting guidance
+  - **Action**: Re-generate workspace schema skills to get updated note formatting documentation
+
+- **People search results display** (#1051) - Fixed people search showing "Unnamed" instead of actual names
+  - Updated `getAttributeValue()` to handle `personal-name` attributes with `full_name`, `first_name`, `last_name` fields
+  - Added fallback support for `formatted` attribute values
+  - Maintains backward compatibility with standard `value` attributes
+
+- **Select field persistence** (#1045) - Fixed silent API failures where select field updates returned 200 OK but didn't persist
+  - Fixed `detectFieldType()` to return `'array'` for all select fields (single and multi-select)
+  - Fixed select-transformer to use `["title"]` format instead of `["uuid"]` format (Attio silently rejects UUID arrays)
+  - Added E2E test validating real API persistence with select fields
+  - Resolves type mismatch validation errors and false-positive update confirmations
+
+- **Deal creation** (#1043) - Accept stage titles + UTM fields and improve validation/error surfacing
+
+- **Field persistence false warnings for status fields** (#995, #1011) - Resolved spurious warnings when updating status field values
+  - Fixed unwrapArrayValue to properly handle both status and title field properties
+  - Improved isStatusField detection to recognize stage and status field variations
+  - Enhanced test coverage for status field update scenarios
+  - Resolves confusing warnings after successful updates (e.g., "Sales Qualified" stage updates)
+
+- **Enhance uniqueness constraint violation errors** (#990, #1000) - Better error messages for duplicate records
+  - Searches for conflicting records and shows field name, conflicting value, and existing record ID
+  - Provides actionable options: update existing, view details, or use different value
+  - Integrated into handleCreateError() for companies and people records
+
+- **Complex attribute validation** (#991) - Clearer validation and error messages for location, personal-name, and phone-number fields
+  - Pre-validates complex types with actionable errors and examples before Attio API calls
+  - Auto-fills missing location fields with nulls; enforces phone_number/original_phone_number and non-empty names
+  - Enhanced CRUD error handling surfaces Attio validation_errors and select/status option hints
+
+- **Record-reference fields now auto-format** (#997) - Automatic transformation to Attio's required format
+  - String IDs like `company: "uuid"` are auto-converted to `[{target_object: "companies", target_record_id: "uuid"}]`
+  - Fixes 400 errors when linking people to companies or associating people with deals
+  - Supports legacy formats: `{record_id: "uuid"}`, `{id: "uuid"}`, incomplete objects
+  - Target object inferred from field name (`company`→`companies`, `associated_people`→`people`)
+
+- **Multi-select fields now accept single values** (#992) - Automatic array wrapping for multi-select attributes
+  - Single values like `lead_type: "Inbound"` are now auto-converted to `["Inbound"]`
+  - Works for all custom multi-select fields (e.g., `categories`, `inbound_outbound`, `regions`)
+  - Fixes "Multi-select attribute expects an array" errors when using natural input format
+  - Detects multi-select via Attio's `is_multiselect` flag (not just type name)
+
+- **`records_get_attribute_options` now returns status options** (#987) - Fixed empty results for status attributes
+  - Select endpoint returning empty `[]` now falls back to status endpoint
+  - `deals.stage` and similar status attributes now return correct options
+  - `attributeType` correctly identifies `'status'` vs `'select'` based on successful endpoint
+  - Error messages include both select and status error details when both fail
+
+- **Company location updates now work correctly** (#987) - Fixed "Expected an object, but got string" error
+  - `processFieldValue` now preserves object-type fields (like `primary_location`) instead of converting to `[object Object]`
+  - `formatAttributeValue` normalizes location objects with all 10 required Attio fields (nulls where missing)
+  - Both company-specific (`updateCompany`) and universal (`update-record`) flows now work
+
+- **Claude PR review dynamic import detection** (#1002, #1003) - Ring 1 scope now includes dynamically imported modules
+  - Adds regex patterns for dynamic imports (`await import(...)`) in scope generator
+  - Captures both relative (`../../path`) and `@/` alias dynamic imports
+  - Pre-computes alias paths from full repo and outputs alias-resolutions.json
+  - Adds prompt hardening to prevent "missing file" claims from sparse checkout limitations
+  - Fixes false positive "missing dependency" errors when PR files use `await import('@/...')` or `await import('./...')`
+
+- **PR review workflow path alias detection** (#977) - Fixed false positive "missing file" errors
+  - Ring scope generator now detects `@/...` path alias imports (not just relative imports)
+  - Resolves `@/services/utils/foo.js` to `src/services/utils/foo.ts` for Ring 1 inclusion
+
+- **Daily changelog workflow authentication** (#1005) - Added claude_args with required tool permissions
+  - Explicitly permits Read, Edit, Write for file operations
+  - Allows Bash(git:\*) for branch/commit/push operations
+  - Allows Bash(gh pr list:_), Bash(gh pr create:_) for PR operations
+  - Allows Bash(date:\*) for branch naming
+  - Ensures gh CLI has authentication inside Claude's Bash environment
+
+- **SDK dependency pinning** (#1025, #1026) - Pinned @modelcontextprotocol/sdk to ~1.24.0 to ensure stability
+
+### Deprecated
+
+- **Old universal tool names** (#1039) - Removal: v2.0.0 (Q1 2026)
+  - Old noun-verb snake_case format (e.g., `records_search`, `records_get_details`)
+  - Old kebab-case format (e.g., `create-record`, `update-record`, `create-note`)
+  - Use new verb-first snake_case names (e.g., `search_records`, `create_record`, `create_note`)
+  - Dual aliases provide backward compatibility with deprecation warnings
+  - Migration guide available in `docs/MIGRATION-GUIDE.md`
+
+- **Legacy resource-specific tools** (#1022) - Removal: v2.0.0 (Q1 2026)
+  - All resource-specific tools (`search-companies`, `create-person`, etc.) are deprecated
+  - Use universal tools instead (`search_records`, `create_record`, etc.)
+  - Legacy tools accessible via `DISABLE_UNIVERSAL_TOOLS=true` but emit deprecation warnings
+  - See `docs/MIGRATION-GUIDE.md` for migration guide
+
+## [1.3.6] - 2025-12-03
+
+Documentation and testing infrastructure improvements for remote deployment support.
+
+### Added
+
+- **Install Script Test Suite** (#958) - Automated testing for bash install scripts
+  - Tests for `install-claude-desktop.sh`, `install-cursor.sh`, `install-claude-code.sh`
+  - Validates API key sanitization, config merging, prerequisite checks
+  - Security tests for command injection prevention
+  - Uses Vitest + Node.js child_process for bash function testing
+
+- **E2E Remote Mode Troubleshooting Guide** (#958) - Remote-specific debugging documentation
+  - Smithery deployment troubleshooting (scanner, OAuth, session issues)
+  - Cloudflare Worker debugging (Error 1042, KV namespace, token encryption)
+  - Network debugging tools and commands (`wrangler tail`, curl examples)
+  - Local vs remote comparison table for common issues
+
+### Changed
+
+- **Remote Deployment Production Checklist** (#958) - Expanded from 12 to 28+ items
+  - Added Cloudflare Worker-specific checklist with validation commands
+  - Added Smithery-specific validation steps
+  - Added rollback procedures for all deployment types
+  - Added health check monitoring setup examples (Datadog, UptimeRobot, Prometheus)
+
+## [1.3.5] - 2025-12-02
+
+**Self-host your own remote MCP server** - Use Attio from Claude.ai, ChatGPT, or any remote MCP client without relying on third-party platforms.
+
+This release addresses [Issue #928](https://github.com/kesslerio/attio-mcp-server/issues/928) by providing a **free, self-hosted alternative to Smithery** for remote OAuth MCP deployment. Deploy once to Cloudflare Workers (free tier) and access your Attio data from anywhere.
+
+### Why This Matters
+
+- **No third-party dependencies** - Your credentials stay on infrastructure you control
+- **Works with any remote MCP client** - Claude.ai, ChatGPT, custom integrations
+- **Completely free** - Cloudflare Workers free tier is more than sufficient
+- **Global edge deployment** - Low latency from anywhere in the world
+
+### Added
+
+- **Self-hosted Remote MCP Server** ([docs](https://github.com/kesslerio/attio-mcp-server/tree/main/examples/cloudflare-mcp-server))
+  - Full MCP protocol over HTTP - all 40+ Attio tools work remotely
+  - OAuth 2.1 with PKCE for secure authentication
+  - Encrypted token storage in Cloudflare Workers KV
+  - Dynamic client registration for Claude.ai and ChatGPT
+  - One-time deploy, works forever
+
+- **`@attio-mcp/core` package** - Edge-compatible core library for custom deployments
+
+### Security
+
+- **OAuth security hardening**
+  - Exact hostname validation prevents redirect attacks
+  - One-time authorization codes (deleted after use)
+  - Session token separation from auth codes
+
+## [1.3.0] - 2025-12-02
+
+OAuth access token support - enables delegated authentication for third-party integrations and Claude Desktop users who prefer OAuth over API keys.
+
+### Added
+
+- **OAuth access token support** (#928) - New `ATTIO_ACCESS_TOKEN` environment variable as alternative to `ATTIO_API_KEY`
+  - Both authentication methods use identical Bearer token auth under the hood
+  - Resolution order: `ATTIO_API_KEY` (config) → `ATTIO_ACCESS_TOKEN` (config) → `ATTIO_API_KEY` (env) → `ATTIO_ACCESS_TOKEN` (env)
+
+- **Local OAuth helper script** (#928) - Interactive PKCE flow for obtaining tokens without hosted infrastructure
+  - Run `npm run oauth:setup` to complete OAuth authorization flow
+  - Run `npm run oauth:refresh` to refresh expired tokens
+  - Tokens saved to `.env.local` for easy configuration
+
+- **Cloudflare Worker OAuth template** (#928) - Self-hostable OAuth broker for teams
+  - Full OAuth 2.1 + PKCE implementation at `examples/cloudflare-mcp-server/`
+  - OAuth discovery endpoint, CORS support for Claude.ai
+  - Deploy with `wrangler deploy`
+
+- **OAuth documentation** (#928) - Comprehensive guide at `docs/guides/oauth-authentication.md`
+  - Step-by-step OAuth app creation at build.attio.com
+  - Token lifecycle and refresh guidance
+  - Claude Desktop and Smithery configuration examples
+
+### Changed
+
+- **Improved 401 error messages** (#928) - Now includes OAuth-specific guidance for token expiration
+
+## [1.2.2] - 2025-12-01
+
+### Fixed
+
+- **Critical: Added axios to production dependencies** (#917, #919) - Package failed on startup with `ERR_MODULE_NOT_FOUND` because axios was incorrectly placed in devDependencies instead of dependencies. This caused 100% failure rate for all users installing via npm.
+
+- **CLI binary symlink resolution** (#916, #920) - `attio-mcp --help` and `--version` now work correctly when installed via npm global. The `isMain` check now resolves symlinks before path comparison, handling npm's symlink-based binary wrappers.
+
+## [1.2.1] - 2025-11-28
 
 ### Changed
 
@@ -21,12 +397,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Solution**: Added prominent warnings in README and documentation about correct package name
   - **Note**: Old package owned by different npm user, cannot be deprecated by maintainers
   - **Result**: Clear installation instructions prevent users from installing wrong package
-
-### Fixed
-
-### Security
-
-### Deprecated
 
 ## [1.2.0] - 2025-11-03
 

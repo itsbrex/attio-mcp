@@ -25,6 +25,9 @@ dist/
 test-dist/
 .smithery/
 
+# Skill generator output
+output/
+
 # Log files
 *.log
 performance-report-22.x/
@@ -57,10 +60,15 @@ test/e2e/outputs/
 vitest-report.json
 performance-results/
 eslint.json
+eslint-report.txt
 
 # Log files
 logs/
 logs.backup/
+
+# Cloudflare Worker config (contains user-specific KV namespace IDs)
+examples/cloudflare-mcp-server/wrangler.toml
+examples/cloudflare-mcp-server/.wrangler/
 
 # Other
 .qodo
@@ -72,6 +80,6 @@ logs/*.log
 tsconfig.tsbuildinfo
 .github/claude-cache/
 
-.env.development
-.specstory
-package-lock.json
+# MCP Publisher tokens (local authentication)
+.mcpregistry_*
+mcp-publisher

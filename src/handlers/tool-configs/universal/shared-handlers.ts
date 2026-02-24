@@ -19,59 +19,64 @@ import {
   UniversalUpdateNoteParams,
   UniversalSearchNotesParams,
   UniversalDeleteNoteParams,
-} from './types.js';
+  UniversalGetAttributeOptionsParams,
+} from '@/handlers/tool-configs/universal/types.js';
 
-import { JsonObject } from '../../../types/attio.js';
+import type {
+  JsonObject,
+  UniversalRecord,
+  UniversalRecordResult,
+} from '@/types/attio.js';
 
 // Import extracted services from Issue #489 Phase 2 & 3
-import { UniversalDeleteService } from '../../../services/UniversalDeleteService.js';
-import { UniversalMetadataService } from '../../../services/UniversalMetadataService.js';
-import { UniversalUtilityService } from '../../../services/UniversalUtilityService.js';
-import { UniversalUpdateService } from '../../../services/UniversalUpdateService.js';
-import { UniversalRetrievalService } from '../../../services/UniversalRetrievalService.js';
-import { UniversalSearchService } from '../../../services/UniversalSearchService.js';
-import { UniversalCreateService } from '../../../services/UniversalCreateService.js';
-import { getLazyAttioClient } from '../../../api/lazy-client.js';
+import { UniversalDeleteService } from '@/services/UniversalDeleteService.js';
+import { UniversalMetadataService } from '@/services/UniversalMetadataService.js';
+import { UniversalUtilityService } from '@/services/UniversalUtilityService.js';
+import { UniversalUpdateService } from '@/services/UniversalUpdateService.js';
+import { UniversalRetrievalService } from '@/services/UniversalRetrievalService.js';
+import { UniversalSearchService } from '@/services/UniversalSearchService.js';
+import { UniversalCreateService } from '@/services/UniversalCreateService.js';
+import {
+  AttributeOptionsService,
+  type AttributeOptionsResult,
+} from '@/services/metadata/index.js';
+import { getLazyAttioClient } from '@/api/lazy-client.js';
 
 // Import existing handlers by resource type
 
-import { getListDetails } from '../../../objects/lists.js';
+import { getListDetails } from '@/objects/lists.js';
 
-import { getPersonDetails } from '../../../objects/people/index.js';
+import { getPersonDetails } from '@/objects/people/index.js';
 
-import { getObjectRecord } from '../../../objects/records/index.js';
+import { getObjectRecord } from '@/objects/records/index.js';
 
-import { getTask } from '../../../objects/tasks.js';
-import { listNotes } from '../../../objects/notes.js';
-import { getCreateService } from '../../../services/create/index.js';
-import {
-  debug,
-  error as logError,
-  OperationType,
-} from '../../../utils/logger.js';
+import { getTask } from '@/objects/tasks.js';
+import { listNotes } from '@/objects/notes.js';
+import { getCreateService } from '@/services/create/index.js';
+import { debug, error as logError, OperationType } from '@/utils/logger.js';
 
 // Note: Using direct Attio API client calls instead of object-specific note functions
 
 // Import Attio API client for direct note operations
-import { unwrapAttio, normalizeNotes } from '../../../utils/attio-response.js';
-
-import { AttioRecord } from '../../../types/attio.js';
+import { unwrapAttio, normalizeNotes } from '@/utils/attio-response.js';
 
 /**
  * Universal search handler - delegates to UniversalSearchService
+ * Issue #1068: Lists returned in list-native format (UniversalRecordResult[])
  */
 export async function handleUniversalSearch(
   params: UniversalSearchParams
-): Promise<AttioRecord[]> {
+): Promise<UniversalRecordResult[]> {
   return UniversalSearchService.searchRecords(params);
 }
 
 /**
  * Universal get record details handler with performance optimization
+ * Issue #1068: Lists returned in list-native format (UniversalRecord)
  */
 export async function handleUniversalGetDetails(
   params: UniversalRecordDetailsParams
-): Promise<AttioRecord> {
+): Promise<UniversalRecordResult> {
   return UniversalRetrievalService.getRecordDetails(params);
 }
 
@@ -99,7 +104,7 @@ export async function handleUniversalCreateNote(
     });
 
     const { unwrapAttio, normalizeNote } = await import(
-      '../../../utils/attio-response.js'
+      '@/utils/attio-response.js'
     );
 
     const result = normalizeNote(unwrapAttio<JsonObject>(rawResult));
@@ -185,7 +190,9 @@ export async function handleUniversalGetNotes(
             ? message
             : `invalid: ${message}`;
     throw new Error(
-      `Attio list-notes failed${status ? ` (${status})` : ''}: ${semanticMessage}`
+      `Attio list-notes failed${
+        status ? ` (${status})` : ''
+      }: ${semanticMessage}`
     );
   }
 }
@@ -274,7 +281,7 @@ export async function handleUniversalDeleteNote(
  */
 export async function handleUniversalCreate(
   params: UniversalCreateParams
-): Promise<AttioRecord> {
+): Promise<UniversalRecord> {
   return UniversalCreateService.createRecord(params);
 }
 
@@ -283,7 +290,7 @@ export async function handleUniversalCreate(
  */
 export async function handleUniversalUpdate(
   params: UniversalUpdateParams
-): Promise<AttioRecord> {
+): Promise<UniversalRecord> {
   return UniversalUpdateService.updateRecord(params);
 }
 
@@ -318,6 +325,344 @@ export async function handleUniversalDiscoverAttributes(
 }
 
 /**
+ * Object slug mapping for resource types
+ */
+const OBJECT_SLUG_MAP: Record<string, string> = {
+  companies: 'companies',
+  people: 'people',
+  deals: 'deals',
+  tasks: 'tasks',
+  records: 'records',
+  lists: 'lists',
+  notes: 'notes',
+};
+
+export const normalizeAttributeValue = (value: string): string =>
+  value.trim().toLowerCase();
+
+const levenshteinDistance = (a: string, b: string): number => {
+  const matrix: number[][] = [];
+
+  for (let i = 0; i <= a.length; i++) {
+    matrix[i] = [i];
+  }
+
+  for (let j = 0; j <= b.length; j++) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      if (a[i - 1] === b[j - 1]) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+
+  return matrix[a.length][b.length];
+};
+
+const getAttributeSchema = async (
+  objectSlug: string
+): Promise<
+  Array<{
+    name?: string;
+    title?: string;
+    api_slug?: string;
+  }>
+> => {
+  const schema = await handleUniversalDiscoverAttributes(
+    objectSlug as UniversalResourceType
+  );
+  return ((schema as Record<string, unknown>).all || []) as Array<{
+    name?: string;
+    title?: string;
+    api_slug?: string;
+  }>;
+};
+
+/**
+ * Resolve display name to API slug for an attribute
+ * Fetches attribute metadata and finds the slug by title match
+ *
+ * @param objectSlug - The object slug (e.g., "deals", "companies")
+ * @param displayName - The display name to resolve (e.g., "Deal stage")
+ * @returns The API slug if found, or null
+ */
+export async function resolveAttributeDisplayName(
+  objectSlug: string,
+  displayName: string
+): Promise<string | null> {
+  try {
+    const allAttrs = await getAttributeSchema(objectSlug);
+    const normalizedInput = normalizeAttributeValue(displayName);
+
+    const exactMatch = allAttrs.find((attr) => {
+      const candidates = [attr.title, attr.name, attr.api_slug].filter(Boolean);
+      return candidates.some(
+        (candidate) =>
+          normalizeAttributeValue(candidate as string) === normalizedInput
+      );
+    });
+    if (exactMatch?.api_slug) {
+      debug(
+        'shared-handlers',
+        `Resolved display name "${displayName}" to API slug "${exactMatch.api_slug}"`,
+        { attribute: displayName, resolvedSlug: exactMatch.api_slug },
+        'resolveDisplayName',
+        OperationType.DATA_PROCESSING
+      );
+      return exactMatch.api_slug;
+    }
+
+    const partialMatch = allAttrs.find((attr) => {
+      const title = attr.title ? normalizeAttributeValue(attr.title) : null;
+      const slug = attr.api_slug
+        ? normalizeAttributeValue(attr.api_slug)
+        : null;
+      return (
+        (title && title.includes(normalizedInput)) ||
+        (slug && slug.includes(normalizedInput)) ||
+        (title && normalizedInput.includes(title)) ||
+        (slug && normalizedInput.includes(slug))
+      );
+    });
+    if (partialMatch?.api_slug) {
+      debug(
+        'shared-handlers',
+        `Resolved display name "${displayName}" to API slug "${partialMatch.api_slug}" via partial match`,
+        { attribute: displayName, resolvedSlug: partialMatch.api_slug },
+        'resolveDisplayName',
+        OperationType.DATA_PROCESSING
+      );
+      return partialMatch.api_slug;
+    }
+
+    const typoCandidates = allAttrs
+      .filter((attr) => attr.api_slug)
+      .map((attr) => {
+        const slug = attr.api_slug as string;
+        const title = attr.title || attr.name || slug;
+        return {
+          slug,
+          distance: Math.min(
+            levenshteinDistance(normalizedInput, normalizeAttributeValue(slug)),
+            levenshteinDistance(
+              normalizedInput,
+              normalizeAttributeValue(title as string)
+            )
+          ),
+        };
+      })
+      .filter((candidate) => candidate.distance <= 2)
+      .sort((a, b) => a.distance - b.distance);
+
+    if (typoCandidates.length > 0) {
+      debug(
+        'shared-handlers',
+        `Resolved display name "${displayName}" to API slug "${typoCandidates[0].slug}" via typo tolerance`,
+        { attribute: displayName, resolvedSlug: typoCandidates[0].slug },
+        'resolveDisplayName',
+        OperationType.DATA_PROCESSING
+      );
+      return typoCandidates[0].slug;
+    }
+
+    return null;
+  } catch {
+    // If discovery fails, return null - the original error will be shown
+    return null;
+  }
+}
+
+export const getSimilarAttributeSlugs = async (
+  objectSlug: string,
+  attribute: string,
+  maxResults = 3
+): Promise<string[]> => {
+  try {
+    const allAttrs = await getAttributeSchema(objectSlug);
+    const normalizedInput = normalizeAttributeValue(attribute);
+    const candidates = allAttrs
+      .filter((attr) => attr.api_slug)
+      .map((attr) => {
+        const slug = attr.api_slug as string;
+        const title = attr.title || attr.name || slug;
+        return {
+          slug,
+          distance: Math.min(
+            levenshteinDistance(normalizedInput, normalizeAttributeValue(slug)),
+            levenshteinDistance(
+              normalizedInput,
+              normalizeAttributeValue(title as string)
+            )
+          ),
+        };
+      })
+      .sort((a, b) => a.distance - b.distance);
+
+    const partials = allAttrs
+      .filter((attr) => attr.api_slug)
+      .filter((attr) => {
+        const title = attr.title ? normalizeAttributeValue(attr.title) : '';
+        const slug = attr.api_slug
+          ? normalizeAttributeValue(attr.api_slug)
+          : '';
+        return (
+          title.includes(normalizedInput) ||
+          slug.includes(normalizedInput) ||
+          normalizedInput.includes(title) ||
+          normalizedInput.includes(slug)
+        );
+      })
+      .map((attr) => attr.api_slug as string);
+
+    const combined = [
+      ...partials,
+      ...candidates.map((candidate) => candidate.slug),
+    ];
+    const unique: string[] = [];
+    for (const slug of combined) {
+      if (!unique.includes(slug)) {
+        unique.push(slug);
+      }
+    }
+    return unique.slice(0, maxResults);
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * Universal get attribute options handler
+ * Retrieves valid options for select, multi-select, and status attributes
+ *
+ * Supports both API slugs (e.g., "stage") and display names (e.g., "Deal stage")
+ */
+export async function handleUniversalGetAttributeOptions(
+  params: UniversalGetAttributeOptionsParams
+): Promise<AttributeOptionsResult> {
+  const { resource_type, attribute, show_archived } = params;
+
+  // Map resource type to object slug
+  const objectSlug =
+    OBJECT_SLUG_MAP[resource_type.toLowerCase()] || resource_type.toLowerCase();
+
+  // Lists require both list_id and attribute_slug - not yet supported via this tool
+  // TODO: Add list_id parameter to support list attributes (see plan Phase 3B)
+  if (resource_type === UniversalResourceType.LISTS) {
+    throw new Error(
+      'records_get_attribute_options does not yet support list attributes. ' +
+        'Use get-list-details to inspect list attribute schemas instead.'
+    );
+  }
+
+  // First attempt: try with the attribute as provided (may be slug or display name)
+  try {
+    return await AttributeOptionsService.getOptions(
+      objectSlug,
+      attribute,
+      show_archived
+    );
+  } catch (firstError) {
+    let latestError: unknown = firstError;
+    // Check if this looks like a display name (contains space or uppercase)
+    const mightBeDisplayName =
+      attribute.includes(' ') || /[A-Z]/.test(attribute);
+
+    if (mightBeDisplayName) {
+      // Try to resolve display name to API slug
+      const resolvedSlug = await resolveAttributeDisplayName(
+        objectSlug,
+        attribute
+      );
+
+      if (resolvedSlug && resolvedSlug !== attribute) {
+        try {
+          // Retry with resolved slug
+          debug(
+            'shared-handlers',
+            `Resolved display name "${attribute}" to API slug "${resolvedSlug}"`,
+            { attribute, resolvedSlug },
+            'resolveDisplayName',
+            OperationType.DATA_PROCESSING
+          );
+          return await AttributeOptionsService.getOptions(
+            objectSlug,
+            resolvedSlug,
+            show_archived
+          );
+        } catch (retryError) {
+          latestError = retryError;
+        }
+      }
+    }
+
+    const errorMsg =
+      latestError instanceof Error ? latestError.message : String(latestError);
+    let slugExists: boolean | null = null;
+    try {
+      const allAttrs = await getAttributeSchema(objectSlug);
+      const normalizedAttr = normalizeAttributeValue(attribute);
+      const displayNameMatch = allAttrs.find((attr) => {
+        const title = attr.title ? normalizeAttributeValue(attr.title) : '';
+        const name = attr.name ? normalizeAttributeValue(attr.name) : '';
+        return title === normalizedAttr || name === normalizedAttr;
+      });
+      if (
+        displayNameMatch?.api_slug &&
+        displayNameMatch.api_slug !== attribute
+      ) {
+        try {
+          return await AttributeOptionsService.getOptions(
+            objectSlug,
+            displayNameMatch.api_slug,
+            show_archived
+          );
+        } catch (retryError) {
+          latestError = retryError;
+        }
+      }
+
+      slugExists = allAttrs.some(
+        (attr) =>
+          attr.api_slug &&
+          normalizeAttributeValue(attr.api_slug) === normalizedAttr
+      );
+      if (slugExists === false) {
+        const suggestions = await getSimilarAttributeSlugs(
+          objectSlug,
+          attribute
+        );
+        const suggestionText =
+          suggestions.length > 0
+            ? ` Did you mean: ${suggestions.map((s) => `"${s}"`).join(', ')}?`
+            : '';
+        throw new Error(
+          `Attribute "${attribute}" not found on ${objectSlug}.${suggestionText}\n\n` +
+            `Use API slugs (e.g., "stage" not "Deal stage"). Run records_discover_attributes(resource_type="${objectSlug}") to see available attribute slugs.`
+        );
+      }
+    } catch (resolutionError) {
+      if (resolutionError instanceof Error) {
+        throw resolutionError;
+      }
+    }
+
+    throw new Error(
+      `${errorMsg}\n\nTip: Use the API slug (e.g., "stage") not the display name (e.g., "Deal stage"). ` +
+        `Run records_discover_attributes to see available attribute slugs.`
+    );
+  }
+}
+
+/**
  * Universal get detailed info handler
  */
 export async function handleUniversalGetDetailedInfo(
@@ -332,31 +677,7 @@ export async function handleUniversalGetDetailedInfo(
     case UniversalResourceType.PEOPLE:
       return getPersonDetails(record_id);
     case UniversalResourceType.LISTS: {
-      const list = await getListDetails(record_id);
-      // Convert AttioList to AttioRecord format with robust shape handling
-      // Handle all documented Attio API list response shapes
-      const raw = list;
-      const listId =
-        raw?.id?.list_id ?? // nested shape from some endpoints
-        raw?.list_id ?? // flat shape from "Get a list" endpoint
-        raw?.id ?? // some responses use a flat id
-        record_id; // final fallback when caller already knows it
-
-      return {
-        id: {
-          record_id: listId,
-          list_id: listId,
-        },
-        values: {
-          name: list.name || list.title,
-          description: list.description,
-          parent_object: list.object_slug || list.parent_object,
-          api_slug: list.api_slug,
-          workspace_id: list.workspace_id,
-          workspace_member_access: list.workspace_member_access,
-          created_at: list.created_at,
-        },
-      } as unknown as AttioRecord;
+      return getListDetails(record_id);
     }
     case UniversalResourceType.DEALS:
       return getObjectRecord('deals', record_id);

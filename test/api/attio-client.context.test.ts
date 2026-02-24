@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearClientCache } from '@/api/lazy-client.js';
 
 const originalApiKey = process.env.ATTIO_API_KEY;
 const originalLogLevel = process.env.MCP_LOG_LEVEL;
@@ -7,6 +8,12 @@ const originalLogLevel = process.env.MCP_LOG_LEVEL;
 vi.mock('@/utils/logger.js', () => ({
   debug: vi.fn(),
   error: vi.fn(),
+  createScopedLogger: vi.fn(() => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  })),
   OperationType: {
     API_CALL: 'API_CALL',
     SYSTEM: 'SYSTEM',
@@ -27,7 +34,7 @@ describe('Attio client context fallback', () => {
     });
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     vi.resetModules();
     vi.restoreAllMocks();
 
@@ -43,7 +50,7 @@ describe('Attio client context fallback', () => {
       delete process.env.MCP_LOG_LEVEL;
     }
 
-    const { clearClientCache } = await import('@/api/lazy-client.js');
+    // Clear client cache (imported at module scope to avoid dynamic import hang)
     clearClientCache();
   });
 

@@ -98,15 +98,22 @@ export function createAttioClient(
   const config = configOrApiKey as ClientConfig;
 
   // Get API key from config, environment, or context
+  // Supports both API keys and OAuth access tokens (Issue #928)
   const apiKey =
-    config.apiKey ?? process.env.ATTIO_API_KEY ?? getContextApiKey() ?? '';
+    config.apiKey ??
+    process.env.ATTIO_API_KEY ??
+    process.env.ATTIO_ACCESS_TOKEN ??
+    getContextApiKey() ??
+    '';
 
   // Determine the source for better error messages
   const apiKeySource = config.apiKey
     ? 'config parameter'
     : process.env.ATTIO_API_KEY
-      ? 'environment variable'
-      : 'context configuration';
+      ? 'ATTIO_API_KEY environment variable'
+      : process.env.ATTIO_ACCESS_TOKEN
+        ? 'ATTIO_ACCESS_TOKEN environment variable'
+        : 'context configuration';
 
   // Validate API key using standardized validation
   validateAndThrowForApiKey(apiKey, apiKeySource);
@@ -269,17 +276,22 @@ export async function getAttributeSchema(
 }
 
 /**
- * Lists the available options for a select attribute.
+ * Lists the available options for a select attribute on an object.
  * @param objectSlug - The slug of the object.
  * @param attributeSlug - The slug of the select attribute.
+ * @param showArchived - Whether to include archived options.
  * @returns A list of available select options.
  */
 export async function getSelectOptions(
   objectSlug: string,
-  attributeSlug: string
+  attributeSlug: string,
+  showArchived?: boolean
 ): Promise<AttioSelectOption[]> {
   const client = getAttioClient();
-  const path = `/objects/${objectSlug}/attributes/${attributeSlug}/options`;
+  let path = `/objects/${objectSlug}/attributes/${attributeSlug}/options`;
+  if (showArchived) {
+    path += '?show_archived=true';
+  }
   try {
     const response = await client.get(path);
     return response.data?.data || [];
@@ -288,7 +300,38 @@ export async function getSelectOptions(
       'attio-client',
       `Failed to get select options for ${objectSlug}.${attributeSlug}`,
       err,
-      { objectSlug, attributeSlug }
+      { objectSlug, attributeSlug, showArchived }
+    );
+    throw err;
+  }
+}
+
+/**
+ * Lists the available options for a select attribute on a list.
+ * @param listId - The ID or slug of the list.
+ * @param attributeSlug - The slug of the select attribute.
+ * @param showArchived - Whether to include archived options.
+ * @returns A list of available select options.
+ */
+export async function getListSelectOptions(
+  listId: string,
+  attributeSlug: string,
+  showArchived?: boolean
+): Promise<AttioSelectOption[]> {
+  const client = getAttioClient();
+  let path = `/lists/${listId}/attributes/${attributeSlug}/options`;
+  if (showArchived) {
+    path += '?show_archived=true';
+  }
+  try {
+    const response = await client.get(path);
+    return response.data?.data || [];
+  } catch (err) {
+    error(
+      'attio-client',
+      `Failed to get select options for list ${listId}.${attributeSlug}`,
+      err,
+      { listId, attributeSlug, showArchived }
     );
     throw err;
   }
@@ -298,14 +341,19 @@ export async function getSelectOptions(
  * Lists the available statuses for a status attribute.
  * @param objectSlug - The slug of the object.
  * @param attributeSlug - The slug of the status attribute.
+ * @param showArchived - Whether to include archived statuses.
  * @returns A list of available statuses.
  */
 export async function getStatusOptions(
   objectSlug: string,
-  attributeSlug: string
+  attributeSlug: string,
+  showArchived?: boolean
 ): Promise<AttioStatusOption[]> {
   const client = getAttioClient();
-  const path = `/objects/${objectSlug}/attributes/${attributeSlug}/statuses`;
+  let path = `/objects/${objectSlug}/attributes/${attributeSlug}/statuses`;
+  if (showArchived) {
+    path += '?show_archived=true';
+  }
   try {
     const response = await client.get(path);
     return response.data?.data || [];
@@ -314,7 +362,7 @@ export async function getStatusOptions(
       'attio-client',
       `Failed to get status options for ${objectSlug}.${attributeSlug}`,
       err,
-      { objectSlug, attributeSlug }
+      { objectSlug, attributeSlug, showArchived }
     );
     throw err;
   }
@@ -404,7 +452,7 @@ export function getAttioClient(opts?: { rawE2E?: boolean }): AxiosInstance {
         ? validationError.message
         : String(validationError);
     throw new Error(
-      `API client not initialized and no valid API key available. ${errorMessage} Call initializeAttioClient first or set ATTIO_API_KEY environment variable.`
+      `API client not initialized and no valid API key or access token available. ${errorMessage} Call initializeAttioClient first or set ATTIO_API_KEY (or ATTIO_ACCESS_TOKEN for OAuth) environment variable.`
     );
   }
 }

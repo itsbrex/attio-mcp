@@ -33,7 +33,7 @@ These tests use universal tools instead of task-specific tools:
 
 ```typescript
 // ✅ Correct - Universal tool pattern
-await this.executeToolCall('create-record', {
+await this.executeToolCall('create_record', {
   resource_type: 'tasks',
   record_data: taskData,
 });
@@ -186,6 +186,7 @@ npm run cleanup:test-data:tasks --live  # Use with caution
    - **Solution**: Wrap data in `record_data` parameter for universal tools
 
 3. **Content Immutability Errors**
+
    ```
    Error: Content field cannot be updated
    ```

@@ -199,7 +199,7 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
           claude_args: >-
-            --model claude-opus-4-1-20250805
+            --model claude-opus-4-5-20251101
             --max-turns 36
             --allowed-tools Read
             --output-format stream-json
@@ -235,7 +235,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const { extractAllTextFromSession, dedupeAdjacent } = require('./scripts/workflows/claude/extract-text.js');
+            const { extractAllTextFromSession, dedupeAdjacent } = require('./scripts/workflows/claude/extract-text.cjs');
             const path = process.env.EXEC_FILE;
             if (!path || !fs.existsSync(path)) {
               core.info('No execution file to parse.');
@@ -307,7 +307,7 @@ jobs:
             let body = (process.env.ISSUE_REVIEW_RESULT || '').trim();
 
             const fs = require('fs');
-            const { extractAllTextFromSession, dedupeAdjacent } = require('./scripts/workflows/claude/extract-text.js');
+            const { extractAllTextFromSession, dedupeAdjacent } = require('./scripts/workflows/claude/extract-text.cjs');
             if (!body) {
               const execFile = process.env.EXEC_FILE_ISSUE;
               if (execFile && fs.existsSync(execFile)) {

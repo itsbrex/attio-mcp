@@ -7,10 +7,19 @@
  * Must achieve 100% pass rate as part of P0 quality gate.
  */
 
-import { describe, it, beforeAll, afterAll, expect } from 'vitest';
+import {
+  describe,
+  it,
+  beforeAll,
+  beforeEach,
+  afterAll,
+  afterEach,
+  expect,
+} from 'vitest';
 import { MCPTestBase } from '../shared/mcp-test-base';
 import { QAAssertions } from '../shared/qa-assertions';
 import { TestDataFactory } from '../shared/test-data-factory';
+import { TestUtilities } from '../shared/test-utilities';
 import type { TestResult } from '../shared/quality-gates';
 
 class UpdateRecordsTest extends MCPTestBase {
@@ -34,32 +43,34 @@ describe('TC-004: Update Records - Data Modification', () => {
 
   beforeEach(async () => {
     const companyData = TestDataFactory.createCompanyData('TC004_SETUP');
-    const companyResult = await testCase.executeToolCall('create-record', {
+    const companyResult = await testCase.executeToolCall('create_record', {
       resource_type: 'companies',
       record_data: companyData,
     });
-    companyId = testCase.extractRecordId(
+    companyId = TestUtilities.extractRecordId(
       testCase.extractTextContent(companyResult)
     );
-    testCase.trackRecord('companies', companyId);
+    if (companyId) testCase.trackRecord('companies', companyId);
 
     const personData = TestDataFactory.createPersonData('TC004_SETUP');
-    const personResult = await testCase.executeToolCall('create-record', {
+    const personResult = await testCase.executeToolCall('create_record', {
       resource_type: 'people',
       record_data: personData,
     });
-    personId = testCase.extractRecordId(
+    personId = TestUtilities.extractRecordId(
       testCase.extractTextContent(personResult)
     );
-    testCase.trackRecord('people', personId);
+    if (personId) testCase.trackRecord('people', personId);
 
     const taskData = TestDataFactory.createTaskData('TC004_SETUP');
-    const taskResult = await testCase.executeToolCall('create-record', {
+    const taskResult = await testCase.executeToolCall('create_record', {
       resource_type: 'tasks',
       record_data: taskData,
     });
-    taskId = testCase.extractRecordId(testCase.extractTextContent(taskResult));
-    testCase.trackRecord('tasks', taskId);
+    taskId = TestUtilities.extractRecordId(
+      testCase.extractTextContent(taskResult)
+    );
+    if (taskId) testCase.trackRecord('tasks', taskId);
   });
 
   afterEach(async () => {
@@ -93,7 +104,7 @@ describe('TC-004: Update Records - Data Modification', () => {
         description: `Updated by TC004 at ${new Date().toISOString()}`,
       };
 
-      const result = await testCase.executeToolCall('update-record', {
+      const result = await testCase.executeToolCall('update_record', {
         resource_type: 'companies',
         record_id: companyId,
         record_data: updateData,
@@ -123,7 +134,7 @@ describe('TC-004: Update Records - Data Modification', () => {
       error = e instanceof Error ? e.message : String(e);
       throw e;
     } finally {
-      results.push({ test: testName, passed, error });
+      results.push({ testName, passed, error });
     }
   });
 
@@ -141,7 +152,7 @@ describe('TC-004: Update Records - Data Modification', () => {
         job_title: 'TC004 Updated Senior Engineer',
       };
 
-      const result = await testCase.executeToolCall('update-record', {
+      const result = await testCase.executeToolCall('update_record', {
         resource_type: 'people',
         record_id: personId,
         record_data: updateData,
@@ -154,7 +165,7 @@ describe('TC-004: Update Records - Data Modification', () => {
       error = e instanceof Error ? e.message : String(e);
       throw e;
     } finally {
-      results.push({ test: testName, passed, error });
+      results.push({ testName, passed, error });
     }
   });
 
@@ -174,7 +185,7 @@ describe('TC-004: Update Records - Data Modification', () => {
         is_completed: true,
       };
 
-      const result = await testCase.executeToolCall('update-record', {
+      const result = await testCase.executeToolCall('update_record', {
         resource_type: 'tasks',
         record_id: taskId,
         record_data: updateData,
@@ -187,7 +198,7 @@ describe('TC-004: Update Records - Data Modification', () => {
       error = e instanceof Error ? e.message : String(e);
       throw e;
     } finally {
-      results.push({ test: testName, passed, error });
+      results.push({ testName, passed, error });
     }
   });
 
@@ -207,7 +218,7 @@ describe('TC-004: Update Records - Data Modification', () => {
         deadline_at: futureDate.toISOString(),
       };
 
-      const result = await testCase.executeToolCall('update-record', {
+      const result = await testCase.executeToolCall('update_record', {
         resource_type: 'tasks',
         record_id: taskId,
         record_data: updateData,
@@ -220,7 +231,7 @@ describe('TC-004: Update Records - Data Modification', () => {
       error = e instanceof Error ? e.message : String(e);
       throw e;
     } finally {
-      results.push({ test: testName, passed, error });
+      results.push({ testName, passed, error });
     }
   });
 
@@ -232,7 +243,7 @@ describe('TC-004: Update Records - Data Modification', () => {
     try {
       const fakeId = 'NONEXISTENT_' + Date.now();
 
-      const result = await testCase.executeToolCall('update-record', {
+      const result = await testCase.executeToolCall('update_record', {
         resource_type: 'companies',
         record_id: fakeId,
         record_data: {
@@ -254,7 +265,7 @@ describe('TC-004: Update Records - Data Modification', () => {
       // If it throws, that's also acceptable error handling
       passed = true;
     } finally {
-      results.push({ test: testName, passed, error });
+      results.push({ testName, passed, error });
     }
   });
 
@@ -283,7 +294,7 @@ describe('TC-004: Update Records - Data Modification', () => {
         size: 'large',
       };
 
-      await testCase.executeToolCall('update-record', {
+      await testCase.executeToolCall('update_record', {
         resource_type: 'companies',
         record_id: companyId,
         record_data: updateData,
@@ -309,7 +320,7 @@ describe('TC-004: Update Records - Data Modification', () => {
       error = e instanceof Error ? e.message : String(e);
       throw e;
     } finally {
-      results.push({ test: testName, passed, error });
+      results.push({ testName, passed, error });
     }
   });
 });

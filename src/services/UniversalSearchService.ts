@@ -2,224 +2,45 @@
  * UniversalSearchService - Centralized record search operations
  *
  * Issue #574: Refactored to use Strategy Pattern for resource-specific search logic
- * Reduced from 1800+ lines to <500 lines by extracting strategies
+ * Issue #935: Search routing delegated to SearchCoordinator and extracted services
  */
+
+import { performance } from 'perf_hooks';
 
 import {
   UniversalResourceType,
   SearchType,
   MatchType,
   SortType,
-} from '../handlers/tool-configs/universal/types.js';
-import type { UniversalSearchParams } from '../handlers/tool-configs/universal/types.js';
-import { AttioRecord } from '../types/attio.js';
-import { performance } from 'perf_hooks';
-import { debug, createScopedLogger, OperationType } from '../utils/logger.js';
+} from '@/handlers/tool-configs/universal/types.js';
+import type { UniversalSearchParams } from '@/handlers/tool-configs/universal/types.js';
+import type { UniversalRecordResult } from '@/types/attio.js';
+import { debug } from '@/utils/logger.js';
 
 // Import services
-import { ValidationService } from './ValidationService.js';
-import { CachingService } from './CachingService.js';
+import { ValidationService } from '@/services/ValidationService.js';
+import { CachingService } from '@/services/CachingService.js';
 
-// Import performance tracking
-import { enhancedPerformanceTracker } from '../middleware/performance-enhanced.js';
-
-// Import error types for validation and proper error handling
-import {
-  AuthenticationError,
-  AuthorizationError,
-  NetworkError,
-  RateLimitError,
-  ServerError,
-  ResourceNotFoundError,
-  createApiErrorFromAxiosError,
-} from '../errors/api-errors.js';
-
-// Import resource-specific search functions
-import { advancedSearchCompanies } from '../objects/companies/index.js';
-import { advancedSearchPeople } from '../objects/people/index.js';
-import { advancedSearchDeals } from '../objects/deals/index.js';
-import { advancedSearchLocations } from '../objects/locations/index.js';
-import { searchLists } from '../objects/lists.js';
-import { listObjectRecords } from '../objects/records/index.js';
-import { listTasks } from '../objects/tasks.js';
-import { listNotes, normalizeNoteResponse } from '../objects/notes.js';
-
-// Import guardrails
-
-// Import Attio client for deal queries
-import { getLazyAttioClient } from '../api/lazy-client.js';
-import * as AttioClientModule from '../api/attio-client.js';
-import type { AxiosInstance } from 'axios';
-
-// Note: Attio client resolution is centralized in getLazyAttioClient(),
-// which prefers mocked getAttioClient() during tests/offline.
-
-// Import factory for guard checks
-
-// Prefer the module's getAttioClient (enables Vitest mocks). Fallback to lazy client.
-function resolveQueryApiClient(): AxiosInstance {
-  const mod = AttioClientModule as { getAttioClient?: () => AxiosInstance };
-  if (typeof mod.getAttioClient === 'function') {
-    return mod.getAttioClient();
-  }
-  return getLazyAttioClient();
-}
-
-// Import new query API utilities
-import {
-  createRelationshipQuery,
-  createTimeframeQuery,
-  createContentSearchQuery,
-} from '../utils/filters/index.js';
+import { enhancedPerformanceTracker } from '@/middleware/performance-enhanced.js';
 
 // Import timeframe utility functions for Issue #475
-import { convertDateParamsToTimeframeQuery } from '../utils/filters/timeframe-utils.js';
-
-// Import query API types
-import { RelationshipQuery, TimeframeQuery } from '../utils/filters/types.js';
-
-// Import search strategies
-import {
-  ISearchStrategy,
-  CompanySearchStrategy,
-  PeopleSearchStrategy,
-  DealSearchStrategy,
-  LocationSearchStrategy,
-  TaskSearchStrategy,
-  ListSearchStrategy,
-  NoteSearchStrategy,
-  StrategyDependencies,
-} from './search-strategies/index.js';
-import { SearchUtilities } from './search-utilities/SearchUtilities.js';
-import { ensureFunctionAvailability } from './search-utilities/FunctionValidator.js';
-
-// Dynamic imports for better error handling using extracted utility pattern
-const ensureAdvancedSearchCompanies = () =>
-  ensureFunctionAvailability(
-    advancedSearchCompanies,
-    'advancedSearchCompanies'
-  );
-
-const ensureAdvancedSearchPeople = () =>
-  ensureFunctionAvailability(advancedSearchPeople, 'advancedSearchPeople');
-
-const ensureAdvancedSearchDeals = () =>
-  ensureFunctionAvailability(advancedSearchDeals, 'advancedSearchDeals');
-
-const ensureAdvancedSearchLocations = () =>
-  ensureFunctionAvailability(
-    advancedSearchLocations,
-    'advancedSearchLocations'
-  );
+import { convertDateParamsToTimeframeQuery } from '@/utils/filters/timeframe-utils.js';
+// Issue #935: Search routing delegated to SearchCoordinator
+import { SearchCoordinator } from '@/services/search/SearchCoordinator.js';
 
 /**
  * UniversalSearchService provides centralized record search functionality
+ * Issue #935: Strategy initialization delegated to StrategyFactory via SearchCoordinator
+ * Issue #1068: Lists returned in list-native format (UniversalRecordResult[])
  */
 export class UniversalSearchService {
-  private static strategies = new Map<UniversalResourceType, ISearchStrategy>();
-
-  /**
-   * Initialize search strategies with their dependencies
-   */
-  private static async initializeStrategies(): Promise<void> {
-    if (this.strategies.size > 0) {
-      return; // Already initialized
-    }
-
-    // Create dependencies for strategies
-    const companyDependencies: StrategyDependencies = {
-      advancedSearchFunction: await ensureAdvancedSearchCompanies(),
-      createDateFilter: SearchUtilities.createDateFilter,
-      mergeFilters: SearchUtilities.mergeFilters,
-      rankByRelevance: SearchUtilities.rankByRelevance.bind(SearchUtilities),
-      getFieldValue: SearchUtilities.getFieldValue.bind(SearchUtilities),
-    };
-
-    const peopleDependencies: StrategyDependencies = {
-      paginatedSearchFunction: await ensureAdvancedSearchPeople(),
-      createDateFilter: SearchUtilities.createDateFilter,
-      mergeFilters: SearchUtilities.mergeFilters,
-      rankByRelevance: SearchUtilities.rankByRelevance.bind(SearchUtilities),
-      getFieldValue: SearchUtilities.getFieldValue.bind(SearchUtilities),
-    };
-
-    const dealDependencies: StrategyDependencies = {
-      advancedSearchFunction: await ensureAdvancedSearchDeals(),
-      createDateFilter: SearchUtilities.createDateFilter,
-      mergeFilters: SearchUtilities.mergeFilters,
-      rankByRelevance: SearchUtilities.rankByRelevance.bind(SearchUtilities),
-      getFieldValue: SearchUtilities.getFieldValue.bind(SearchUtilities),
-    };
-
-    const listDependencies: StrategyDependencies = {
-      listFunction: (query?: string, limit?: number, offset?: number) =>
-        searchLists(query || '', limit, offset),
-      rankByRelevance: SearchUtilities.rankByRelevance.bind(SearchUtilities),
-      getFieldValue: SearchUtilities.getFieldValue.bind(SearchUtilities),
-    };
-
-    const taskDependencies: StrategyDependencies = {
-      taskFunction: (
-        status?: string,
-        assigneeId?: string,
-        page?: number,
-        pageSize?: number
-      ) => listTasks(status, assigneeId, page, pageSize),
-      rankByRelevance: SearchUtilities.rankByRelevance.bind(SearchUtilities),
-      getFieldValue: SearchUtilities.getFieldValue.bind(SearchUtilities),
-    };
-
-    const noteDependencies: StrategyDependencies = {
-      noteFunction: (query?: Record<string, unknown>) => listNotes(query || {}),
-      rankByRelevance: SearchUtilities.rankByRelevance.bind(SearchUtilities),
-      getFieldValue: SearchUtilities.getFieldValue.bind(SearchUtilities),
-    };
-
-    const locationDependencies: StrategyDependencies = {
-      advancedSearchFunction: await ensureAdvancedSearchLocations(),
-      createDateFilter: SearchUtilities.createDateFilter,
-      mergeFilters: SearchUtilities.mergeFilters,
-      rankByRelevance: SearchUtilities.rankByRelevance.bind(SearchUtilities),
-      getFieldValue: SearchUtilities.getFieldValue.bind(SearchUtilities),
-    };
-
-    // Initialize strategies
-    this.strategies.set(
-      UniversalResourceType.COMPANIES,
-      new CompanySearchStrategy(companyDependencies)
-    );
-    this.strategies.set(
-      UniversalResourceType.PEOPLE,
-      new PeopleSearchStrategy(peopleDependencies)
-    );
-    this.strategies.set(
-      UniversalResourceType.DEALS,
-      new DealSearchStrategy(dealDependencies)
-    );
-    this.strategies.set(
-      UniversalResourceType.LOCATIONS,
-      new LocationSearchStrategy(locationDependencies)
-    );
-    this.strategies.set(
-      UniversalResourceType.LISTS,
-      new ListSearchStrategy(listDependencies)
-    );
-    this.strategies.set(
-      UniversalResourceType.TASKS,
-      new TaskSearchStrategy(taskDependencies)
-    );
-    this.strategies.set(
-      UniversalResourceType.NOTES,
-      new NoteSearchStrategy(noteDependencies)
-    );
-  }
-
   /**
    * Universal search handler with performance tracking
+   * Issue #1068: Lists returned in list-native format (UniversalRecordResult[])
    */
   static async searchRecords(
     params: UniversalSearchParams
-  ): Promise<AttioRecord[]> {
+  ): Promise<UniversalRecordResult[]> {
     const {
       resource_type,
       query,
@@ -342,34 +163,29 @@ export class UniversalSearchService {
 
     // Track API call timing
     const apiStart = enhancedPerformanceTracker.markApiStart(perfId);
-    let results: AttioRecord[];
+    let results: UniversalRecordResult[];
 
     try {
-      results = await this.performSearchByResourceType(
-        resource_type,
-        {
-          query,
-          filters,
-          limit,
-          offset,
-          search_type: finalSearchType,
-          fields,
-          match_type,
-          sort,
-          // New TC search parameters
-          relationship_target_type,
-          relationship_target_id,
-          // Use processed timeframe parameters (Issue #475)
-          timeframe_attribute: processedTimeframeParams.timeframe_attribute,
-          start_date: processedTimeframeParams.start_date,
-          end_date: processedTimeframeParams.end_date,
-          date_operator: processedTimeframeParams.date_operator,
-          content_fields,
-          use_or_logic,
-        },
-        perfId,
-        apiStart
-      );
+      results = await this.performSearchByResourceType(resource_type, {
+        query,
+        filters,
+        limit,
+        offset,
+        search_type: finalSearchType,
+        fields,
+        match_type,
+        sort,
+        // New TC search parameters
+        relationship_target_type,
+        relationship_target_id,
+        // Use processed timeframe parameters (Issue #475)
+        timeframe_attribute: processedTimeframeParams.timeframe_attribute,
+        start_date: processedTimeframeParams.start_date,
+        end_date: processedTimeframeParams.end_date,
+        date_operator: processedTimeframeParams.date_operator,
+        content_fields,
+        use_or_logic,
+      });
 
       enhancedPerformanceTracker.markApiEnd(perfId, apiStart);
       enhancedPerformanceTracker.endOperation(perfId, true, undefined, 200, {
@@ -398,7 +214,8 @@ export class UniversalSearchService {
   }
 
   /**
-   * Perform search by resource type with strategy pattern
+   * Perform search by resource type
+   * Issue #935: Delegates to SearchCoordinator for routing logic
    */
   private static async performSearchByResourceType(
     resource_type: UniversalResourceType,
@@ -411,7 +228,6 @@ export class UniversalSearchService {
       fields?: string[];
       match_type?: MatchType;
       sort?: SortType;
-      // New TC search parameters
       relationship_target_type?: UniversalResourceType;
       relationship_target_id?: string;
       timeframe_attribute?: string;
@@ -420,342 +236,16 @@ export class UniversalSearchService {
       date_operator?: 'greater_than' | 'less_than' | 'between' | 'equals';
       content_fields?: string[];
       use_or_logic?: boolean;
-    },
-    perfId: string,
-    apiStart: number
-  ): Promise<AttioRecord[]> {
-    const {
-      query,
-      filters,
-      limit,
-      offset,
-      search_type,
-      fields,
-      match_type,
-      sort,
-      relationship_target_type,
-      relationship_target_id,
-      timeframe_attribute,
-      start_date,
-      end_date,
-      date_operator,
-      content_fields,
-      use_or_logic,
-    } = params;
-
-    // Handle new search types first (unchanged from original)
-    switch (search_type) {
-      case SearchType.RELATIONSHIP:
-        if (relationship_target_type && relationship_target_id) {
-          return this.searchByRelationship(
-            resource_type,
-            relationship_target_type,
-            relationship_target_id,
-            limit,
-            offset
-          );
-        }
-        throw new Error(
-          'Relationship search requires target_type and target_id parameters'
-        );
-
-      case SearchType.TIMEFRAME:
-        if (timeframe_attribute) {
-          const timeframeConfig: TimeframeQuery = {
-            resourceType: resource_type,
-            attribute: timeframe_attribute,
-            startDate: start_date,
-            endDate: end_date,
-            operator: date_operator || 'between',
-          };
-          return this.searchByTimeframe(
-            resource_type,
-            timeframeConfig,
-            limit,
-            offset
-          );
-        }
-        throw new Error(
-          'Timeframe search requires timeframe_attribute parameter'
-        );
-
-      case SearchType.CONTENT:
-        // Use new Query API if content_fields is explicitly provided
-        if (content_fields && content_fields.length > 0) {
-          if (!query) {
-            throw new Error('Content search requires query parameter');
-          }
-          return this.searchByContent(
-            resource_type,
-            query,
-            content_fields,
-            use_or_logic !== false,
-            limit,
-            offset
-          );
-        }
-        // Fall through to strategy-based content search
-        break;
     }
-
-    // Initialize strategies if needed
-    await this.initializeStrategies();
-
-    // Use strategy pattern for resource-specific searches
-    const strategy = this.strategies.get(resource_type);
-    if (strategy) {
-      return await strategy.search({
-        query,
-        filters,
-        limit,
-        offset,
-        search_type,
-        fields,
-        match_type,
-        sort,
-        timeframeParams: {
-          timeframe_attribute,
-          start_date,
-          end_date,
-          date_operator,
-        },
-      });
-    }
-
-    // Fallback for resources without strategies (RECORDS only)
-    switch (resource_type) {
-      case UniversalResourceType.RECORDS:
-        return this.searchRecords_ObjectType(limit, offset, filters);
-
-      default:
-        throw new Error(
-          `Unsupported resource type for search: ${resource_type}`
-        );
-    }
-  }
-
-  // LEGACY METHODS - These remain unchanged for non-strategy resources
-
-  /**
-   * Search records using object records API with filter support
-   */
-  private static async searchRecords_ObjectType(
-    limit?: number,
-    offset?: number,
-    filters?: Record<string, unknown>
-  ): Promise<AttioRecord[]> {
-    // Handle list_membership filters - invalid UUID should return empty array
-    if (filters?.list_membership) {
-      const listId = String(filters.list_membership);
-      if (!ValidationService.validateUUIDForSearch(listId)) {
-        return []; // Return empty success for invalid UUID
-      }
-      createScopedLogger(
-        'UniversalSearchService',
-        'searchRecords_ObjectType',
-        OperationType.DATA_PROCESSING
-      ).warn('list_membership filter not yet supported in listObjectRecords');
-    }
-
-    return await listObjectRecords('records', {
-      pageSize: limit,
-      page: Math.floor((offset || 0) / (limit || 10)) + 1,
+  ): Promise<UniversalRecordResult[]> {
+    // Issue #935: Delegate to SearchCoordinator for all search routing
+    return SearchCoordinator.executeSearch({
+      resource_type,
+      ...params,
     });
   }
 
-  // Query API methods remain unchanged
-  static async searchByRelationship(
-    sourceResourceType: UniversalResourceType,
-    targetResourceType: UniversalResourceType,
-    targetRecordId: string,
-    limit?: number,
-    offset?: number
-  ): Promise<AttioRecord[]> {
-    const relationshipQuery: RelationshipQuery = {
-      sourceObjectType: sourceResourceType,
-      targetObjectType: targetResourceType,
-      targetAttribute: 'id',
-      condition: 'equals',
-      value: targetRecordId,
-    };
-
-    const queryApiFilter = createRelationshipQuery(relationshipQuery);
-
-    try {
-      const client = resolveQueryApiClient();
-      const path = `/objects/${sourceResourceType}/records/query`;
-      const requestBody = {
-        ...queryApiFilter,
-        limit: limit || 10,
-        offset: offset || 0,
-      };
-
-      const response = await client.post(path, requestBody);
-      return response?.data?.data || [];
-    } catch (error: unknown) {
-      const apiError = createApiErrorFromAxiosError(
-        error,
-        `/objects/${sourceResourceType}/records/query`,
-        'POST'
-      );
-
-      if (
-        apiError instanceof AuthenticationError ||
-        apiError instanceof AuthorizationError ||
-        apiError instanceof NetworkError ||
-        apiError instanceof RateLimitError ||
-        apiError instanceof ServerError
-      ) {
-        throw apiError;
-      }
-
-      if (apiError instanceof ResourceNotFoundError) {
-        debug(
-          'UniversalSearchService',
-          `No relationship found between ${sourceResourceType} -> ${targetResourceType}`,
-          { targetRecordId }
-        );
-        return [];
-      }
-
-      createScopedLogger(
-        'UniversalSearchService',
-        'searchByRelationship',
-        OperationType.API_CALL
-      ).error(
-        `Relationship search failed for ${sourceResourceType} -> ${targetResourceType}`,
-        error
-      );
-      return [];
-    }
-  }
-
-  static async searchByTimeframe(
-    resourceType: UniversalResourceType,
-    timeframeConfig: TimeframeQuery,
-    limit?: number,
-    offset?: number
-  ): Promise<AttioRecord[]> {
-    const queryApiFilter = createTimeframeQuery(timeframeConfig);
-
-    try {
-      const client = resolveQueryApiClient();
-      const path = `/objects/${resourceType}/records/query`;
-      const requestBody = {
-        ...queryApiFilter,
-        limit: limit || 10,
-        offset: offset || 0,
-      };
-
-      const response = await client.post(path, requestBody);
-      return response?.data?.data || [];
-    } catch (error: unknown) {
-      const apiError = createApiErrorFromAxiosError(
-        error,
-        `/objects/${resourceType}/records/query`,
-        'POST'
-      );
-
-      if (
-        apiError instanceof AuthenticationError ||
-        apiError instanceof AuthorizationError ||
-        apiError instanceof NetworkError ||
-        apiError instanceof RateLimitError ||
-        apiError instanceof ServerError
-      ) {
-        throw apiError;
-      }
-
-      if (apiError instanceof ResourceNotFoundError) {
-        debug(
-          'UniversalSearchService',
-          `No ${resourceType} records found in specified timeframe`,
-          { timeframeConfig }
-        );
-        return [];
-      }
-
-      createScopedLogger(
-        'UniversalSearchService',
-        'searchByTimeframe',
-        OperationType.API_CALL
-      ).error(`Timeframe search failed for ${resourceType}`, error);
-      return [];
-    }
-  }
-
-  static async searchByContent(
-    resourceType: UniversalResourceType,
-    query: string,
-    searchFields: string[] = [],
-    useOrLogic: boolean = true,
-    limit?: number,
-    offset?: number
-  ): Promise<AttioRecord[]> {
-    let fields = searchFields;
-    if (fields.length === 0) {
-      switch (resourceType) {
-        case UniversalResourceType.COMPANIES:
-          fields = ['name', 'description', 'domains'];
-          break;
-        case UniversalResourceType.PEOPLE:
-          fields = ['name', 'email_addresses', 'job_title'];
-          break;
-        default:
-          fields = ['name'];
-          break;
-      }
-    }
-
-    const queryApiFilter = createContentSearchQuery(fields, query, useOrLogic);
-
-    try {
-      const client = getLazyAttioClient();
-      const path = `/objects/${resourceType}/records/query`;
-      const requestBody = {
-        ...queryApiFilter,
-        limit: limit || 10,
-        offset: offset || 0,
-      };
-
-      const response = await client.post(path, requestBody);
-      return response?.data?.data || [];
-    } catch (error: unknown) {
-      const apiError = createApiErrorFromAxiosError(
-        error,
-        `/objects/${resourceType}/records/query`,
-        'POST'
-      );
-
-      if (
-        apiError instanceof AuthenticationError ||
-        apiError instanceof AuthorizationError ||
-        apiError instanceof NetworkError ||
-        apiError instanceof RateLimitError ||
-        apiError instanceof ServerError
-      ) {
-        throw apiError;
-      }
-
-      if (apiError instanceof ResourceNotFoundError) {
-        debug(
-          'UniversalSearchService',
-          `No ${resourceType} records found matching content search`,
-          { query, fields }
-        );
-        return [];
-      }
-
-      createScopedLogger(
-        'UniversalSearchService',
-        'searchByContent',
-        OperationType.API_CALL
-      ).error(`Content search failed for ${resourceType}`, error);
-      return [];
-    }
-  }
-
-  // Utility methods remain unchanged
+  // Utility methods
   static async getSearchSuggestions(): Promise<string[]> {
     return [];
   }
@@ -779,6 +269,7 @@ export class UniversalSearchService {
     switch (resource_type) {
       case UniversalResourceType.COMPANIES:
       case UniversalResourceType.PEOPLE:
+      case UniversalResourceType.LOCATIONS:
         return true;
       case UniversalResourceType.LISTS:
       case UniversalResourceType.RECORDS:
@@ -795,6 +286,7 @@ export class UniversalSearchService {
       case UniversalResourceType.COMPANIES:
       case UniversalResourceType.PEOPLE:
       case UniversalResourceType.LISTS:
+      case UniversalResourceType.LOCATIONS:
         return true;
       case UniversalResourceType.RECORDS:
       case UniversalResourceType.DEALS:

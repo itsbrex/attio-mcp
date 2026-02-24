@@ -5,16 +5,17 @@
  * Provides universal create functionality across all resource types with enhanced validation and error handling.
  */
 
-import { UniversalResourceType } from '../handlers/tool-configs/universal/types.js';
-import type { UniversalCreateParams } from '../handlers/tool-configs/universal/types.js';
-import { AttioRecord } from '../types/attio.js';
+import { UniversalResourceType } from '@/handlers/tool-configs/universal/types.js';
+import type { UniversalCreateParams } from '@/handlers/tool-configs/universal/types.js';
+import type { UniversalRecord } from '@/types/attio.js';
 import {
   UniversalValidationError,
   ErrorType,
-} from '../handlers/tool-configs/universal/schemas.js';
+} from '@/handlers/tool-configs/universal/schemas.js';
 
 // Import services
-import { ValidationService } from './ValidationService.js';
+import { ValidationService } from '@/services/ValidationService.js';
+import { FieldValidationHandler } from '@/services/update/FieldValidationHandler.js';
 
 // Import field mapping utilities
 import {
@@ -23,10 +24,10 @@ import {
   validateFields,
   getValidResourceTypes,
   FIELD_MAPPINGS,
-} from '../handlers/tool-configs/universal/field-mapper.js';
+} from '@/handlers/tool-configs/universal/field-mapper.js';
 
 // Import validation utilities
-import { validateRecordFields } from '../utils/validation-utils.js';
+import { validateRecordFields } from '@/utils/validation-utils.js';
 
 // Import format helpers
 // Attribute format conversions are handled within create strategies
@@ -40,22 +41,22 @@ import { validateRecordFields } from '../utils/validation-utils.js';
 // Enhanced API error helpers are used within strategies
 
 // Import logging utilities
-import { OperationType, createScopedLogger } from '../utils/logger.js';
+import { OperationType, createScopedLogger } from '@/utils/logger.js';
 
 // Import constants for better maintainability
 import {
   ERROR_MESSAGES,
   MAX_VALIDATION_SUGGESTIONS,
   MAX_SUGGESTION_TEXT_LENGTH,
-} from '../constants/universal.constants.js';
+} from '@/constants/universal.constants.js';
 
 // Import enhanced types for better type safety
 //
 import {
   createEnhancedValidationError,
   createFieldCollisionError,
-} from './create/helpers/ErrorHelpers.js';
-import { ErrorCategory } from './create/helpers/ErrorHelpers.js';
+} from '@/services/create/helpers/ErrorHelpers.js';
+import { ErrorCategory } from '@/services/create/helpers/ErrorHelpers.js';
 
 // Create scoped logger for this service
 const logger = createScopedLogger(
@@ -100,7 +101,7 @@ export class UniversalCreateService {
    * @param params - The record creation parameters
    * @param params.resource_type - Type of record to create (companies, people, etc.)
    * @param params.record_data - The data for the new record
-   * @returns Promise resolving to the created AttioRecord with full metadata
+   * @returns Promise resolving to the created UniversalRecord with full metadata
    *
    * @throws {UniversalValidationError} When field validation fails with enhanced details
    * @throws {Error} For authentication, network, or other system errors
@@ -119,7 +120,7 @@ export class UniversalCreateService {
    */
   static async createRecord(
     params: UniversalCreateParams
-  ): Promise<AttioRecord> {
+  ): Promise<UniversalRecord> {
     // CRITICAL FIX: Ensure record_data is always a plain object (not JSON string)
     // Must mutate the original params.record_data, not just local variable
     if (typeof params.record_data === 'string') {
@@ -139,9 +140,14 @@ export class UniversalCreateService {
       throw new UniversalValidationError('record_data must be a JSON object');
     }
 
+    // Log metadata only to avoid PII exposure (PR #981 review feedback)
     logger.debug('Entry point - createRecord', {
       resource_type,
-      record_data: JSON.stringify(record_data, null, 2),
+      topLevelKeys: Object.keys(record_data),
+      hasValues: 'values' in record_data,
+      fieldCount: record_data.values
+        ? Object.keys(record_data.values as Record<string, unknown>).length
+        : Object.keys(record_data).length,
     });
 
     // Pre-validate fields and provide helpful suggestions
@@ -167,7 +173,112 @@ export class UniversalCreateService {
       >; // Normal validation for other types
     }
 
-    const fieldValidation = validateFields(resource_type, fieldsToValidate);
+    // Issue #984: Display name resolution integration
+    // Attempt to resolve display names (e.g., "Deal stage" → "stage") before validation
+    const objectSlug =
+      resource_type === UniversalResourceType.RECORDS
+        ? typeof record_data.object === 'string'
+          ? record_data.object
+          : typeof record_data.object_api_slug === 'string'
+            ? record_data.object_api_slug
+            : undefined
+        : resource_type.toLowerCase();
+
+    // Issue #984 / PR #1006 Phase 3.1: Single validation call via validateAndResolve()
+    // This eliminates ~40% performance overhead from double validation
+    let fieldValidation: {
+      valid: boolean;
+      errors: string[];
+      warnings: string[];
+      suggestions: string[];
+    };
+
+    if (objectSlug) {
+      try {
+        const validationResult =
+          await FieldValidationHandler.validateAndResolve(
+            resource_type,
+            fieldsToValidate,
+            objectSlug,
+            true // Enable display name resolution
+          );
+
+        // Store validation result for later use
+        fieldValidation = {
+          valid: validationResult.valid,
+          errors: validationResult.errors,
+          warnings: validationResult.warnings,
+          suggestions: validationResult.suggestions,
+        };
+
+        // Apply resolved field names
+        if (
+          validationResult.resolvedFields &&
+          validationResult.resolvedFields.size > 0
+        ) {
+          for (const [
+            displayName,
+            apiSlug,
+          ] of validationResult.resolvedFields) {
+            // Update the appropriate data structure
+            if (resource_type === UniversalResourceType.RECORDS) {
+              // For RECORDS, update values if it exists
+              if (
+                record_data.values &&
+                typeof record_data.values === 'object'
+              ) {
+                const values = record_data.values as Record<string, unknown>;
+                if (displayName in values) {
+                  values[apiSlug] = values[displayName];
+                  delete values[displayName];
+                }
+              }
+            } else {
+              // For other types, update values or record_data
+              const target = record_data.values || record_data;
+              if (
+                target &&
+                typeof target === 'object' &&
+                displayName in target
+              ) {
+                const targetObj = target as Record<string, unknown>;
+                targetObj[apiSlug] = targetObj[displayName];
+                delete targetObj[displayName];
+              }
+            }
+          }
+
+          logger.info('Display names resolved', {
+            count: validationResult.resolvedFields.size,
+            mappings: Array.from(validationResult.resolvedFields.entries()),
+          });
+
+          // Update fieldsToValidate with resolved names
+          if (resource_type === UniversalResourceType.RECORDS) {
+            const { ...topLevelFields } = record_data;
+            fieldsToValidate =
+              Object.keys(topLevelFields).length > 0
+                ? (topLevelFields as Record<string, unknown>)
+                : ({ object: 'placeholder' } as Record<string, unknown>);
+          } else {
+            fieldsToValidate = (record_data.values || record_data) as Record<
+              string,
+              unknown
+            >;
+          }
+        }
+      } catch (err) {
+        // Display name resolution is non-critical - log and continue
+        logger.debug('Display name resolution skipped', {
+          reason: err instanceof Error ? err.message : String(err),
+        });
+        // Fall back to basic validation if validateAndResolve fails
+        fieldValidation = validateFields(resource_type, fieldsToValidate);
+      }
+    } else {
+      // No objectSlug - use basic validation
+      fieldValidation = validateFields(resource_type, fieldsToValidate);
+    }
     logger.debug('Field validation result', {
       valid: fieldValidation.valid,
       warnings: fieldValidation.warnings,
@@ -196,7 +307,7 @@ export class UniversalCreateService {
       // Add each error on its own line for clarity
       if (fieldValidation.errors.length > 0) {
         errorMessage +=
-          '\n' + fieldValidation.errors.map((err) => `  ❌ ${err}`).join('\n');
+          '\n' + fieldValidation.errors.map((err) => `  - ${err}`).join('\n');
       }
 
       // Add suggestions if available (truncated to prevent buffer overflow)
@@ -204,8 +315,8 @@ export class UniversalCreateService {
         const truncated = ValidationService.truncateSuggestions(
           fieldValidation.suggestions
         );
-        errorMessage += '\n\n💡 Suggestions:\n';
-        errorMessage += truncated.map((sug) => `  • ${sug}`).join('\n');
+        errorMessage += '\n\nSuggestions:\n';
+        errorMessage += truncated.map((sug) => `  - ${sug}`).join('\n');
 
         remediation = truncated.slice(0, MAX_VALIDATION_SUGGESTIONS);
       }
@@ -213,7 +324,7 @@ export class UniversalCreateService {
       // List available fields for this resource type
       const mapping = FIELD_MAPPINGS[resource_type];
       if (mapping && mapping.validFields.length > 0) {
-        errorMessage += `\n\n📋 Available fields for ${resource_type}:\n  ${mapping.validFields.join(
+        errorMessage += `\n\nAvailable fields for ${resource_type}:\n  ${mapping.validFields.join(
           ', '
         )}`;
         remediation.push(
@@ -391,90 +502,139 @@ export class UniversalCreateService {
       }
     }
 
+    // FEATURE: Auto-transform values for Issue #980 UX improvements
+    // Transforms: status titles → {status_id: uuid}, single values → arrays for multi-select
+    let transformedData = mappedData;
+    try {
+      const { transformRecordValues, mayNeedTransformation } = await import(
+        './value-transformer/index.js'
+      );
+
+      // Quick check to avoid unnecessary async work
+      if (mayNeedTransformation(mappedData, resource_type)) {
+        const transformResult = await transformRecordValues(mappedData, {
+          resourceType: resource_type,
+          operation: 'create',
+        });
+
+        transformedData = transformResult.data;
+
+        // Log transformations for debugging
+        if (transformResult.transformations.length > 0) {
+          logger.info('Value transformations applied', {
+            transformations: transformResult.transformations.map((t) => ({
+              field: t.field,
+              type: t.type,
+            })),
+          });
+        }
+
+        if (transformResult.warnings.length > 0) {
+          logger.warn('Value transformation warnings', {
+            warnings: transformResult.warnings,
+          });
+        }
+      }
+    } catch (transformError) {
+      // If transformation throws (e.g., invalid status value), propagate the error
+      if (transformError instanceof Error) {
+        throw new UniversalValidationError(
+          transformError.message,
+          ErrorType.USER_ERROR,
+          {
+            suggestion:
+              'Check that field values match the expected format. Use records_get_attribute_options to see valid options.',
+            field: undefined,
+          }
+        );
+      }
+      throw transformError;
+    }
+
     switch (resource_type) {
       case UniversalResourceType.COMPANIES: {
         const { CompanyCreateStrategy } = await import(
-          './create/strategies/CompanyCreateStrategy.js'
+          '@/services/create/strategies/CompanyCreateStrategy.js'
         );
-        return (await new CompanyCreateStrategy().create({
+        return await new CompanyCreateStrategy().create({
           resourceType: resource_type,
-          values: mappedData,
-        })) as AttioRecord;
+          values: transformedData,
+        });
       }
 
       case UniversalResourceType.LISTS: {
         const { ListCreateStrategy } = await import(
-          './create/strategies/ListCreateStrategy.js'
+          '@/services/create/strategies/ListCreateStrategy.js'
         );
-        return (await new ListCreateStrategy().create({
+        return await new ListCreateStrategy().create({
           resourceType: resource_type,
-          values: mappedData,
-        })) as AttioRecord;
+          values: transformedData,
+        });
       }
 
       case UniversalResourceType.PEOPLE: {
         const { PersonCreateStrategy } = await import(
-          './create/strategies/PersonCreateStrategy.js'
+          '@/services/create/strategies/PersonCreateStrategy.js'
         );
-        return (await new PersonCreateStrategy().create({
+        return await new PersonCreateStrategy().create({
           resourceType: resource_type,
-          values: mappedData,
-        })) as AttioRecord;
+          values: transformedData,
+        });
       }
 
       case UniversalResourceType.RECORDS: {
         const { RecordCreateStrategy } = await import(
-          './create/strategies/RecordCreateStrategy.js'
+          '@/services/create/strategies/RecordCreateStrategy.js'
         );
         const context = { objectSlug: recordsObjectSlug } as Record<
           string,
           unknown
         >;
-        return (await new RecordCreateStrategy().create({
+        return await new RecordCreateStrategy().create({
           resourceType: resource_type,
-          values: mappedData,
+          values: transformedData,
           context,
-        })) as AttioRecord;
+        });
       }
 
       case UniversalResourceType.DEALS: {
         const { DealCreateStrategy } = await import(
-          './create/strategies/DealCreateStrategy.js'
+          '@/services/create/strategies/DealCreateStrategy.js'
         );
-        return (await new DealCreateStrategy().create({
+        return await new DealCreateStrategy().create({
           resourceType: resource_type,
-          values: mappedData,
-        })) as AttioRecord;
+          values: transformedData,
+        });
       }
 
       case UniversalResourceType.TASKS: {
         const { TaskCreateStrategy } = await import(
-          './create/strategies/TaskCreateStrategy.js'
+          '@/services/create/strategies/TaskCreateStrategy.js'
         );
-        return (await new TaskCreateStrategy().create({
+        return await new TaskCreateStrategy().create({
           resourceType: resource_type,
-          values: mappedData,
-        })) as AttioRecord;
+          values: transformedData,
+        });
       }
 
       case UniversalResourceType.NOTES: {
         const { NoteCreateStrategy } = await import(
-          './create/strategies/NoteCreateStrategy.js'
+          '@/services/create/strategies/NoteCreateStrategy.js'
         );
-        return (await new NoteCreateStrategy().create({
+        return await new NoteCreateStrategy().create({
           resourceType: resource_type,
-          values: mappedData,
-        })) as AttioRecord;
+          values: transformedData,
+        });
       }
 
       case UniversalResourceType.LOCATIONS: {
         const { LocationCreateStrategy } = await import(
-          './create/strategies/LocationCreateStrategy.js'
+          '@/services/create/strategies/LocationCreateStrategy.js'
         );
-        return (await new LocationCreateStrategy().create({
+        return await new LocationCreateStrategy().create({
           resourceType: resource_type,
-          values: mappedData,
-        })) as AttioRecord;
+          values: transformedData,
+        });
       }
 
       default:
@@ -490,7 +650,7 @@ export class UniversalCreateService {
   private static async handleUnsupportedResourceType(
     resource_type: string,
     params: UniversalCreateParams
-  ): Promise<AttioRecord> {
+  ): Promise<UniversalRecord> {
     // Check if resource type can be corrected
     const resourceValidation = validateResourceType(resource_type);
     if (resourceValidation.corrected) {

@@ -240,6 +240,37 @@ export interface EnhancedAttioRecord extends AttioRecord {
 }
 
 /**
+ * Universal record type for operations that handle both regular records and lists
+ * Issue #1068: Lists don't have a values wrapper (list-native format)
+ *
+ * Use this union type in universal tool configs and services to support both:
+ * - AttioRecord: Regular records with values wrapper (companies, people, deals, tasks)
+ * - AttioList: Lists with top-level fields, no values wrapper
+ *
+ * This makes "lists don't have values" a first-class type contract.
+ *
+ * @see src/handlers/tool-configs/universal/core/*
+ * @see src/services/Universal*Service.ts
+ */
+export type UniversalRecord = AttioRecord | AttioList;
+
+/**
+ * @deprecated Use UniversalRecord instead
+ * AttioListRecord: Transitional type that extends AttioRecord (requires values)
+ *
+ * This type contradicts the list-native format goal and will be removed.
+ * Use UniversalRecord for code that needs to handle both records and lists.
+ *
+ * @see Issue #1068 - Fix universal tools list format
+ * @see src/services/search-strategies/ListSearchStrategy.ts
+ */
+export type AttioListRecord = AttioRecord & {
+  id: AttioRecord['id'] & {
+    list_id: string;
+  };
+};
+
+/**
  * Interface for a batch request item
  */
 export interface BatchRequestItem<T> {
@@ -319,6 +350,49 @@ export interface AttioList {
   entry_count?: number;
   [key: string]: unknown; // Additional fields
 }
+
+/**
+ * Partial list shape returned when field filtering is applied.
+ * `id` is always present, other list fields are optional.
+ */
+export type ListRecordSummary = {
+  id: AttioList['id'];
+} & Partial<Omit<AttioList, 'id'>>;
+
+/**
+ * Universal record result type for list field filtering.
+ */
+export type UniversalRecordResult = UniversalRecord | ListRecordSummary;
+
+/**
+ * Type guard for AttioRecord (record values wrapper present).
+ */
+export const isAttioRecord = (
+  record: UniversalRecordResult
+): record is AttioRecord => {
+  return (
+    typeof record === 'object' &&
+    record !== null &&
+    'values' in record &&
+    (record as { values?: unknown }).values !== undefined
+  );
+};
+
+/**
+ * Type guard for AttioList (list_id present).
+ */
+export const isAttioList = (
+  record: UniversalRecordResult
+): record is AttioList => {
+  return (
+    typeof record === 'object' &&
+    record !== null &&
+    'id' in record &&
+    typeof (record as { id?: unknown }).id === 'object' &&
+    (record as { id?: Record<string, unknown> }).id !== null &&
+    'list_id' in (record as { id: Record<string, unknown> }).id
+  );
+};
 
 /**
  * List entry record type
