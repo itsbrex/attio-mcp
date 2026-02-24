@@ -18,6 +18,8 @@ import { validateUniversalToolParams } from '@/handlers/tool-configs/universal/s
 import { formatResourceType } from '@/handlers/tool-configs/universal/shared-handlers.js';
 import { getPluralResourceType } from '@/handlers/tool-configs/universal/core/utils.js';
 import { ErrorService } from '@/services/ErrorService.js';
+import { getFormatArgString } from '@/handlers/tool-configs/universal/shared/format-args.js';
+import { formatLocationSearchResultLine } from '@/handlers/tool-configs/universal/shared/location-search-format.js';
 
 /**
  * Universal advanced search tool
@@ -148,7 +150,7 @@ export const advancedSearchConfig: UniversalToolConfig<
     }
   },
   formatResult: (results: UniversalRecordResult[], ...args: unknown[]) => {
-    const resourceType = args[0] as string | undefined;
+    const resourceType = getFormatArgString(args, 'resource_type', 0);
     const count = Array.isArray(results) ? results.length : 0;
     const typeName = resourceType
       ? formatResourceType(resourceType as UniversalResourceType)
@@ -165,6 +167,10 @@ export const advancedSearchConfig: UniversalToolConfig<
 
     const lines = results.map(
       (record: Record<string, unknown>, index: number) => {
+        if (resourceType === UniversalResourceType.LOCATIONS) {
+          return formatLocationSearchResultLine(record, index);
+        }
+
         const values = safeExtractRecordValues(record);
         const recordId = record.id as Record<string, unknown>;
 

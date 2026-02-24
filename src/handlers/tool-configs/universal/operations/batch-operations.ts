@@ -13,6 +13,7 @@ import { formatBatchResult } from './batch-format.js';
 import { executeOperationsArray } from './operations-array.js';
 import { executeLegacyBatch } from './legacy-handlers.js';
 import type { JsonObject } from '../../../../types/attio.js';
+import { getFormatArgString } from '@/handlers/tool-configs/universal/shared/format-args.js';
 
 export const batchOperationsConfig: UniversalToolConfig<
   Record<string, unknown>,
@@ -53,8 +54,12 @@ export const batchOperationsConfig: UniversalToolConfig<
     results: Record<string, unknown> | Record<string, unknown>[],
     ...args: unknown[]
   ) => {
-    const operationType = args[0] as BatchOperationType | undefined;
-    const resourceType = args[1] as UniversalResourceType | undefined;
+    const operationType = getFormatArgString(args, 'operation_type', 0) as
+      | BatchOperationType
+      | undefined;
+    const resourceType = getFormatArgString(args, 'resource_type', 1) as
+      | UniversalResourceType
+      | undefined;
     return formatBatchResult(
       results as
         | Record<string, unknown>

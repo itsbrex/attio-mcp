@@ -13,6 +13,8 @@ import {
 import { handleSearchError } from '@/handlers/tool-configs/universal/core/error-utils.js';
 import { handleUniversalSearch } from '@/handlers/tool-configs/universal/shared-handlers.js';
 import { formatToolDescription } from '@/handlers/tools/standards/index.js';
+import { getFormatArgString } from '@/handlers/tool-configs/universal/shared/format-args.js';
+import { formatLocationSearchResultLine } from '@/handlers/tool-configs/universal/shared/location-search-format.js';
 
 /**
  * Universal search records tool configuration.
@@ -45,7 +47,9 @@ export const searchRecordsConfig: UniversalToolConfig<
     results: UniversalRecordResult[] | { data: UniversalRecordResult[] },
     ...args: unknown[]
   ): string => {
-    const resourceType = args[0] as UniversalResourceType | undefined;
+    const resourceType = getFormatArgString(args, 'resource_type', 0) as
+      | UniversalResourceType
+      | undefined;
     if (!results) {
       const typeName = resourceType
         ? getPluralResourceType(resourceType)
@@ -156,19 +160,10 @@ export const searchRecordsConfig: UniversalToolConfig<
           const contactInfo = website || domain || email;
           identifier = contactInfo ? `${name} (${contactInfo})` : name;
         } else if (resourceType === UniversalResourceType.LOCATIONS) {
-          const tenant =
-            typeof values.tenant_name === 'string'
-              ? values.tenant_name
-              : getFirstValue(values.tenant_name);
-          const building =
-            typeof values.building_name === 'string'
-              ? values.building_name
-              : getFirstValue(values.building_name);
-          const address =
-            typeof values.address === 'string'
-              ? values.address
-              : getFirstValue(values.address);
-          identifier = tenant || building || address || 'Unnamed';
+          return formatLocationSearchResultLine(
+            record as Record<string, unknown>,
+            index
+          );
         } else {
           const nameValue = getFirstValue(values.name);
           const titleValue = getFirstValue(values.title);

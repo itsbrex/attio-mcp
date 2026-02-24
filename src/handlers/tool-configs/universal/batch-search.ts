@@ -18,6 +18,8 @@ import { ErrorService } from '@/services/ErrorService.js';
 import { type UniversalRecordResult } from '@/types/attio.js';
 import { validateBatchOperation } from '@/utils/batch-validation.js';
 import { extractRecordDisplayName } from '@/handlers/tool-configs/universal/core/value-extractors.js';
+import { getFormatArgString } from '@/handlers/tool-configs/universal/shared/format-args.js';
+import { formatLocationSearchResultLine } from '@/handlers/tool-configs/universal/shared/location-search-format.js';
 
 // Note: Batch processing is now handled by the optimized universalBatchSearch API
 
@@ -79,11 +81,15 @@ export const batchSearchConfig = {
   },
   formatResult: (
     results: UniversalBatchSearchResult[] | unknown,
-    resourceType?: UniversalResourceType
+    ...args: unknown[]
   ) => {
     if (!results || !Array.isArray(results)) {
       return 'Batch search failed or returned no results';
     }
+
+    const resourceType = getFormatArgString(args, 'resource_type', 0) as
+      | UniversalResourceType
+      | undefined;
 
     // Cast to the proper type for enhanced batch search results
     const batchResults = results as UniversalBatchSearchResult[];
@@ -124,6 +130,14 @@ export const batchSearchConfig = {
             records
               .slice(0, displayCount)
               .forEach((record: UniversalRecordResult, recordIndex: number) => {
+                if (resourceType === UniversalResourceType.LOCATIONS) {
+                  summary += `   ${formatLocationSearchResultLine(
+                    record as Record<string, unknown>,
+                    recordIndex
+                  )}\n`;
+                  return;
+                }
+
                 const recordId = record.id as Record<string, unknown>;
                 const name = extractRecordDisplayName(
                   record as Record<string, unknown>,

@@ -22,6 +22,8 @@ import { getPluralResourceType } from '@/handlers/tool-configs/universal/core/ut
 import { normalizeOperator } from '@/utils/AttioFilterOperators.js';
 import { mapFieldName } from '@/utils/AttioFieldMapper.js';
 import { extractRecordDisplayName } from '@/handlers/tool-configs/universal/core/value-extractors.js';
+import { getFormatArgString } from '@/handlers/tool-configs/universal/shared/format-args.js';
+import { formatLocationSearchResultLine } from '@/handlers/tool-configs/universal/shared/location-search-format.js';
 
 export const searchByTimeframeConfig: UniversalToolConfig<
   TimeframeSearchParams,
@@ -208,8 +210,12 @@ export const searchByTimeframeConfig: UniversalToolConfig<
     }
   },
   formatResult: (results: UniversalRecordResult[], ...args: unknown[]) => {
-    const timeframeType = args[0] as TimeframeType | undefined;
-    const resourceType = args[1] as UniversalResourceType | undefined;
+    const timeframeType = getFormatArgString(args, 'timeframe_type', 0) as
+      | TimeframeType
+      | undefined;
+    const resourceType = getFormatArgString(args, 'resource_type', 1) as
+      | UniversalResourceType
+      | undefined;
     if (!Array.isArray(results)) {
       return 'Found 0 records (timeframe search)\nTip: Ensure your workspace has data in the requested date range.';
     }
@@ -230,6 +236,10 @@ export const searchByTimeframeConfig: UniversalToolConfig<
       results.length
     } ${resourceTypeName} by ${timeframeName}:\n${results
       .map((record: Record<string, unknown>, index: number) => {
+        if (resourceType === UniversalResourceType.LOCATIONS) {
+          return formatLocationSearchResultLine(record, index);
+        }
+
         const recordObj = record as Record<string, unknown>;
         const name = extractRecordDisplayName(
           recordObj,

@@ -9,6 +9,7 @@ import {
 } from '@/handlers/tool-configs/shared/type-utils.js';
 import type { UniversalBatchSearchResult } from '@/api/operations/batch.js';
 import type { JsonObject } from '@/types/attio.js';
+import { formatLocationSearchResultLine } from '@/handlers/tool-configs/universal/shared/location-search-format.js';
 
 function isJsonObject(value: unknown): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -102,7 +103,8 @@ function extractRecordDisplayName(
 
 function formatBatchSearchResults(
   batchResults: UniversalBatchSearchResult[],
-  resourceTypeName: string
+  resourceTypeName: string,
+  resourceType?: UniversalResourceType
 ): string {
   const successCount = batchResults.filter((r) => r.success).length;
   const failureCount = batchResults.length - successCount;
@@ -123,6 +125,14 @@ function formatBatchSearchResults(
         records.slice(0, 3).forEach((record: unknown, recordIndex: number) => {
           if (!isJsonObject(record)) {
             summary += `   ${recordIndex + 1}. Invalid record format\n`;
+            return;
+          }
+
+          if (resourceType === UniversalResourceType.LOCATIONS) {
+            summary += `   ${formatLocationSearchResultLine(
+              record,
+              recordIndex
+            )}\n`;
             return;
           }
 
@@ -227,13 +237,18 @@ function formatFailedOperations(operations: JsonObject[]): string {
 
 function formatSearchRecords(
   records: JsonObject[],
-  resourceTypeName: string
+  resourceTypeName: string,
+  resourceType?: UniversalResourceType
 ): string {
   if (!records.length) {
     return `Batch search found 0 ${pluralizeResource(resourceTypeName, 0)}`;
   }
 
   const lines = records.map((record: JsonObject, index: number) => {
+    if (resourceType === UniversalResourceType.LOCATIONS) {
+      return formatLocationSearchResultLine(record, index);
+    }
+
     const values = safeExtractRecordValues(record);
     const recordId = isJsonObject(record.id) ? record.id : undefined;
     const name = extractDisplayName(values, 'Unnamed');
@@ -273,7 +288,11 @@ export function formatBatchResult(
   }
 
   if (operationType === BatchOperationType.SEARCH) {
-    return formatSearchOperationResults(results, resourceTypeName);
+    return formatSearchOperationResults(
+      results,
+      resourceTypeName,
+      resourceType
+    );
   }
 
   return formatStandardOperationResults(
@@ -298,13 +317,14 @@ function formatInvalidResultsStructure(
  */
 function formatSearchOperationResults(
   results: JsonObject[],
-  resourceTypeName: string
+  resourceTypeName: string,
+  resourceType?: UniversalResourceType
 ): string {
   if (isUniversalBatchSearchResultArray(results)) {
-    return formatBatchSearchResults(results, resourceTypeName);
+    return formatBatchSearchResults(results, resourceTypeName, resourceType);
   }
 
-  return formatSearchRecords(results, resourceTypeName);
+  return formatSearchRecords(results, resourceTypeName, resourceType);
 }
 
 /**
