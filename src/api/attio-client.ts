@@ -64,6 +64,7 @@ function validateAndThrowForApiKey(
 
 // LEGACY: Global API client instance - replaced by ClientCache
 let apiInstance: AxiosInstance | null = null;
+let cachedClientApiKey: string | null = null;
 
 /**
  * UNIFIED CLIENT FACTORY: Support new createAttioClient(config) signature
@@ -99,21 +100,24 @@ export function createAttioClient(
 
   // Get API key from config, environment, or context
   // Supports both API keys and OAuth access tokens (Issue #928)
+  const contextApiKey = getContextApiKey();
   const apiKey =
     config.apiKey ??
+    contextApiKey ??
     process.env.ATTIO_API_KEY ??
     process.env.ATTIO_ACCESS_TOKEN ??
-    getContextApiKey() ??
     '';
 
   // Determine the source for better error messages
   const apiKeySource = config.apiKey
     ? 'config parameter'
-    : process.env.ATTIO_API_KEY
-      ? 'ATTIO_API_KEY environment variable'
-      : process.env.ATTIO_ACCESS_TOKEN
-        ? 'ATTIO_ACCESS_TOKEN environment variable'
-        : 'context configuration';
+    : contextApiKey
+      ? 'context configuration'
+      : process.env.ATTIO_API_KEY
+        ? 'ATTIO_API_KEY environment variable'
+        : process.env.ATTIO_ACCESS_TOKEN
+          ? 'ATTIO_ACCESS_TOKEN environment variable'
+          : 'provided configuration';
 
   // Validate API key using standardized validation
   validateAndThrowForApiKey(apiKey, apiKeySource);
@@ -376,6 +380,7 @@ export async function getStatusOptions(
  */
 export function initializeAttioClient(apiKey: string): AxiosInstance {
   apiInstance = createAttioClient(apiKey); // This will use the legacy signature
+  cachedClientApiKey = apiKey;
   ClientCache.setInstance(apiInstance);
   return apiInstance;
 }
@@ -404,6 +409,7 @@ export function getAttioClient(opts?: { rawE2E?: boolean }): AxiosInstance {
     // Clear cache to ensure fresh client
     ClientCache.clearInstance();
     apiInstance = null;
+    cachedClientApiKey = null;
 
     // Determine mode based on rawE2E option
     const mode = opts?.rawE2E
@@ -418,6 +424,26 @@ export function getAttioClient(opts?: { rawE2E?: boolean }): AxiosInstance {
     const client = createAttioClient(config);
     debug('attio-client', 'Returning fresh E2E client');
     return client;
+  }
+
+  const currentApiKey =
+    process.env.ATTIO_API_KEY ??
+    process.env.ATTIO_ACCESS_TOKEN ??
+    getContextApiKey() ??
+    null;
+
+  if (
+    (apiInstance || ClientCache.hasInstance()) &&
+    currentApiKey &&
+    cachedClientApiKey !== currentApiKey
+  ) {
+    debug(
+      'attio-client',
+      'Detected API key/context change - rebuilding cached client'
+    );
+    ClientCache.clearInstance();
+    apiInstance = null;
+    cachedClientApiKey = null;
   }
 
   // Check cache first
@@ -443,6 +469,7 @@ export function getAttioClient(opts?: { rawE2E?: boolean }): AxiosInstance {
     // Cache the client in both new and legacy systems
     ClientCache.setInstance(client);
     apiInstance = client;
+    cachedClientApiKey = currentApiKey;
 
     debug('attio-client', 'Created and cached new client');
     return client;

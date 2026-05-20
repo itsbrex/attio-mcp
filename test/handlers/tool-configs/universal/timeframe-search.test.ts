@@ -7,15 +7,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { UniversalSearchService } from '../../../../src/services/UniversalSearchService.js';
 import { UniversalResourceType } from '../../../../src/handlers/tool-configs/universal/types.js';
 import type { UniversalSearchParams } from '../../../../src/handlers/tool-configs/universal/types.js';
-
-// Mock external dependencies
-vi.mock('../../../../src/api/attio-client.js');
-vi.mock('../../../../src/objects/companies/index.js', () => ({
-  advancedSearchCompanies: vi.fn().mockResolvedValue([]),
-}));
-vi.mock('../../../../src/objects/people/index.js', () => ({
-  advancedSearchPeople: vi.fn().mockResolvedValue({ results: [] }),
-}));
+import { searchByTimeframeConfig } from '../../../../src/handlers/tool-configs/universal/operations/timeframe-search.js';
 
 describe('Timeframe Search Integration', () => {
   const mockDate = new Date('2023-08-15T12:00:00.000Z');
@@ -24,18 +16,6 @@ describe('Timeframe Search Integration', () => {
     vi.useFakeTimers();
     vi.setSystemTime(mockDate);
     vi.clearAllMocks();
-
-    // Mock the companies search function
-    const mockCompanies = vi.fn().mockResolvedValue([]);
-    vi.doMock('../../../../src/objects/companies/index.js', () => ({
-      advancedSearchCompanies: mockCompanies,
-    }));
-
-    // Mock the people search function
-    const mockPeople = vi.fn().mockResolvedValue({ results: [] });
-    vi.doMock('../../../../src/objects/people/index.js', () => ({
-      advancedSearchPeople: mockPeople,
-    }));
   });
 
   afterEach(() => {
@@ -86,12 +66,27 @@ describe('Timeframe Search Integration', () => {
         resource_type: UniversalResourceType.PEOPLE,
         date_from: '2023-08-01T00:00:00Z',
         date_to: '2023-08-15T23:59:59Z',
-        date_field: 'updated_at',
+        date_field: 'created_at',
       };
 
       // Should not throw error and should return results (even if empty)
       const results = await UniversalSearchService.searchRecords(params);
       expect(Array.isArray(results)).toBe(true);
+    });
+
+    it('should reject unsupported updated_at date ranges for people', async () => {
+      const params: UniversalSearchParams = {
+        resource_type: UniversalResourceType.PEOPLE,
+        date_from: '2023-08-01T00:00:00Z',
+        date_to: '2023-08-15T23:59:59Z',
+        date_field: 'updated_at',
+      };
+
+      await expect(
+        UniversalSearchService.searchRecords(params)
+      ).rejects.toThrow(
+        /Modified timeframe searches are not supported by Attio/
+      );
     });
 
     it('should prioritize timeframe over absolute dates', async () => {
@@ -126,9 +121,8 @@ describe('Timeframe Search Integration', () => {
   describe('API Path Structure Validation', () => {
     it('should build correct API path structure for timeframe queries', async () => {
       // Import the createTimeframeQuery function to test directly
-      const { createTimeframeQuery } = await import(
-        '../../../../src/utils/filters/builders/query-api.js'
-      );
+      const { createTimeframeQuery } =
+        await import('../../../../src/utils/filters/builders/query-api.js');
 
       // Test companies path structure
       const companiesConfig = {
@@ -178,6 +172,34 @@ describe('Timeframe Search Integration', () => {
         $gte: '2023-08-01T00:00:00.000Z',
         $lte: '2023-08-15T23:59:59.999Z',
       });
+    });
+  });
+
+  describe('Formatter labels', () => {
+    it('uses custom object labels with dispatcher-style args', () => {
+      const formatted = (
+        searchByTimeframeConfig.formatResult as (
+          results: unknown,
+          ...args: unknown[]
+        ) => string
+      )(
+        [
+          {
+            id: { record_id: 'enrollment-1' },
+            values: {
+              name: [{ value: 'Spring 2026' }],
+            },
+            created_at: '2026-03-01T10:30:00Z',
+          },
+        ],
+        {
+          resource_type: 'enrollments',
+          timeframe_type: 'created',
+        }
+      );
+
+      expect(formatted).toContain('Found 1 enrollments by created');
+      expect(formatted).toContain('1. Spring 2026');
     });
   });
 });

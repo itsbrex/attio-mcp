@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
+  pull-requests: read
   issues: write
   actions: read
 
@@ -38,32 +38,36 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            scripts/workflows/claude/
-          sparse-checkout-cone-mode: false
-
       - name: Classify command
         id: classify
-        run: |
-          node scripts/workflows/claude/parse-command.mjs > classify.json
-          cat classify.json
-          should_run=$(jq -r '.shouldRun // false' classify.json)
-          command_type=$(jq -r '.command.type // ""' classify.json)
-          is_maintainer=$(jq -r '.isMaintainer // false' classify.json)
-          issue=$(jq -r '.issue // ""' classify.json)
-          actor=$(jq -r '.actor // ""' classify.json)
-          association=$(jq -r '.association // ""' classify.json)
-          echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
-          echo "command_type=$command_type" >> "$GITHUB_OUTPUT"
-          echo "is_maintainer=$is_maintainer" >> "$GITHUB_OUTPUT"
-          echo "issue=$issue" >> "$GITHUB_OUTPUT"
-          echo "actor=$actor" >> "$GITHUB_OUTPUT"
-          echo "association=$association" >> "$GITHUB_OUTPUT"
-        env:
-          CLAUDE_TRIGGER_PHRASE: '@claude'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const trigger = '@claude';
+            const event = context.payload;
+            const eventName = context.eventName;
+            const body = eventName === 'issue_comment'
+              ? (event.comment?.body || '')
+              : `${event.issue?.title || ''}\n${event.issue?.body || ''}`;
+
+            const shouldRun = body.includes(trigger);
+            const tokens = (body.toLowerCase().match(/@claude\s*:?[\s]+([^\n]*)/)?.[1] || '')
+              .trim()
+              .split(/\s+/)
+              .filter(Boolean);
+            const commandType = tokens.includes('review') ? 'review' : 'command';
+
+            const association = eventName === 'issue_comment'
+              ? (event.comment?.author_association || 'NONE')
+              : (event.issue?.author_association || 'NONE');
+            const isMaintainer = ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(association);
+
+            core.setOutput('should_run', String(shouldRun));
+            core.setOutput('command_type', commandType);
+            core.setOutput('is_maintainer', String(isMaintainer));
+            core.setOutput('issue', String(event.issue?.number || ''));
+            core.setOutput('actor', context.actor || '');
+            core.setOutput('association', association);
 
       - name: Skip non-command events
         if: steps.classify.outputs.should_run != 'true'
@@ -87,124 +91,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fetch issue context
-        if: steps.classify.outputs.should_run == 'true' && steps.classify.outputs.is_maintainer == 'true' && steps.classify.outputs.command_type != 'review'
-        id: context
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const issueNumber = '${{ steps.classify.outputs.issue }}';
-            if (!issueNumber) {
-              core.setOutput('issue_title', '');
-              core.setOutput('issue_body', '');
-              core.setOutput('comment_body', '');
-              core.setOutput('recent_comments', '');
-              core.setOutput('previous_analysis', '');
-              return;
-            }
-
-            // Fetch issue details
-            const { data: issue } = await github.rest.issues.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issueNumber
-            });
-
-            // Get the triggering comment
-            const commentId = context.payload.comment?.id;
-            let commentBody = '';
-            if (commentId) {
-              const { data: comment } = await github.rest.issues.getComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: commentId
-              });
-              commentBody = comment.body || '';
-            }
-
-            // Fetch all comments for context
-            const { data: allComments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issueNumber,
-              per_page: 100
-            });
-
-            // Find most recent Claude response (for follow-up context)
-            const claudeResponses = allComments
-              .filter(c => c.body.includes('<!-- claude-command-response -->'))
-              .reverse(); // Most recent first
-
-            const previousAnalysis = claudeResponses.length > 0
-              ? claudeResponses[0].body.replace('<!-- claude-command-response -->\n', '').slice(0, 8000)
-              : '';
-
-            // Get recent user comments (last 5, excluding triggering comment and bot comments)
-            const recentComments = allComments
-              .filter(c => c.id !== commentId) // Exclude triggering comment
-              .filter(c => c.user.type !== 'Bot') // Exclude bot comments
-              .filter(c => !c.body.includes('<!-- claude-command-response -->')) // Exclude previous Claude responses
-              .slice(-5) // Get last 5 user comments
-              .map(c => ({
-                author: c.user.login,
-                created_at: c.created_at,
-                body: c.body.slice(0, 2000) // Limit each comment to 2000 chars
-              }));
-
-            const recentCommentsFormatted = recentComments.length > 0
-              ? recentComments.map(c =>
-                  `**@${c.author}** (${new Date(c.created_at).toISOString().split('T')[0]}):\n${c.body}\n`
-                ).join('\n---\n\n')
-              : '';
-
-            // Parse issue body for related issues (e.g., #42, #100)
-            const issueRefPattern = /#(\d+)/g;
-            const referencedIssueNumbers = [...(issue.body || '').matchAll(issueRefPattern)]
-              .map(match => parseInt(match[1]))
-              .filter(num => num !== parseInt(issueNumber)) // Exclude self-reference
-              .slice(0, 3); // Limit to first 3 related issues
-
-            // Fetch related issues (title, state, first 500 chars of body)
-            const relatedIssues = [];
-            for (const relatedNum of referencedIssueNumbers) {
-              try {
-                const { data: relatedIssue } = await github.rest.issues.get({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: relatedNum
-                });
-                relatedIssues.push({
-                  number: relatedNum,
-                  title: relatedIssue.title,
-                  state: relatedIssue.state,
-                  body: (relatedIssue.body || '').slice(0, 500) // Limit to 500 chars
-                });
-              } catch (error) {
-                core.warning(`Failed to fetch related issue #${relatedNum}: ${error.message}`);
-              }
-            }
-
-            const relatedIssuesFormatted = relatedIssues.length > 0
-              ? relatedIssues.map(ri =>
-                  `**#${ri.number}** (${ri.state}): ${ri.title}\n${ri.body}${ri.body.length >= 500 ? '...' : ''}`
-                ).join('\n\n---\n\n')
-              : '';
-
-            core.setOutput('issue_title', issue.title || '');
-            core.setOutput('issue_body', issue.body || '');
-            core.setOutput('comment_body', commentBody);
-            core.setOutput('recent_comments', recentCommentsFormatted);
-            core.setOutput('previous_analysis', previousAnalysis);
-            core.setOutput('related_issues', relatedIssuesFormatted);
-            core.info(`Fetched context for issue #${issueNumber}: ${issue.title}`);
-            core.info(`Included ${recentComments.length} recent comments for context`);
-            if (previousAnalysis) {
-              core.info(`Found previous Claude analysis (${previousAnalysis.length} chars) - this is a follow-up`);
-            }
-            if (relatedIssues.length > 0) {
-              core.info(`Found ${relatedIssues.length} related issue(s): ${relatedIssues.map(ri => `#${ri.number}`).join(', ')}`);
-            }
-
       # Use default Claude Code Action behavior - it handles commenting automatically with track_progress
       - name: Claude Code Action (Default Behavior)
         if: steps.classify.outputs.should_run == 'true' && steps.classify.outputs.is_maintainer == 'true' && steps.classify.outputs.command_type != 'review'
@@ -214,46 +100,34 @@ jobs:
           github_token: ${{ github.token }}
           track_progress: true
           # No --max-turns = runs until completion (default action behavior)
-          # Full tool access for implementation
+          # Local edit/read access only; no repository mutation shell commands.
           claude_args: >-
             --model claude-sonnet-4-5
-            --allowedTools "Read,Edit,Write,Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(npx:*),Bash(node:*),Bash(rg:*),Bash(fd:*),Bash(cat:*),Bash(ls:*),Bash(head:*),Bash(tail:*),Bash(wc:*)"
+            --allowedTools "Read,Edit,Write,Bash(rg:*),Bash(cat:*),Bash(ls:*),Bash(head:*),Bash(tail:*),Bash(wc:*)"
           prompt: |
             You are Claude acting via GitHub Actions for the Attio MCP Server repository.
 
             ## Context
             - **Issue**: #${{ steps.classify.outputs.issue }}
-            - **Issue Title**: ${{ steps.context.outputs.issue_title }}
-            - **User Request**: ${{ steps.context.outputs.comment_body }}
-
-            **Issue Description**:
-            ${{ steps.context.outputs.issue_body }}
-
-            **Recent Discussion**:
-            ${{ steps.context.outputs.recent_comments || 'No recent comments' }}
-
-            **Related Issues**:
-            ${{ steps.context.outputs.related_issues || 'None referenced' }}
+            - **User Request**: ${{ github.event.comment.body || github.event.issue.body || github.event.issue.title }}
 
             ## Your Task
             Follow the user's request above. If they ask you to implement something:
 
             1. **Read AGENTS.md first** - it contains project conventions and standards
-            2. **Create a feature branch**: `git checkout -b feature/issue-${{ steps.classify.outputs.issue }}-description`
-            3. **Implement the changes** following project standards
-            4. **Run quality gates**:
-               - `npm run test:offline` (fast unit tests)
-               - `npm run fix:all` (lint/format)
-               - `npx tsc --noEmit` (TypeScript check)
-            5. **Commit with conventional format**: `Type: Description #${{ steps.classify.outputs.issue }}`
-            6. **Push and create a PR**: `gh pr create --title "Type: Description" --body "Fixes #${{ steps.classify.outputs.issue }}"`
+            2. **Implement the changes locally** following project standards
+            3. **Run quality gates**:
+               - `bun run test:offline` (fast unit tests)
+               - `bun run fix:all` (lint/format)
+               - `bun run typecheck` (TypeScript check)
+            4. **Provide a clear patch summary** in your response
 
             If they ask for analysis/advice, provide helpful guidance without implementing.
 
             ## Project Standards (from AGENTS.md)
             - Commit format: `Type: Description #issue-number` where Type = Feature|Fix|Docs|Refactor|Test|Chore
             - Use `@/` path aliases instead of relative imports
-            - Run `npm run test:offline` for fast validation
+            - Run `bun run test:offline` for fast validation
             - ESLint warnings threshold: ≤1030
 
             ## Constraints

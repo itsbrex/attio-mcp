@@ -13,11 +13,14 @@ enum UniversalResourceType {
   COMPANIES = 'companies',
   PEOPLE = 'people',
   RECORDS = 'records',
+  DEALS = 'deals',
   TASKS = 'tasks',
   LISTS = 'lists',
   NOTES = 'notes',
 }
 ```
+
+`search_records`, `search_records_advanced`, `search_records_by_timeframe`, `get_record_details`, `create_record`, `update_record`, and `delete_record` also accept custom object slugs discovered into the mapping configuration, such as `funds` or `investment_opportunities`.
 
 ## formatResult Architecture (Updated PR #483)
 
@@ -48,7 +51,7 @@ formatResult: (data: AttioRecord | AttioRecord[], resourceType?: UniversalResour
 
 ```typescript
 {
-  resource_type: 'companies' | 'people' | 'records' | 'tasks', // Required
+  resource_type: 'companies' | 'people' | 'records' | 'deals' | 'tasks' | '<custom_object_slug>', // Required
   query?: string,                    // Smart query string (names, emails, phones, domains)
   filters?: object,                  // Advanced filter conditions
   search_type?: 'basic' | 'content', // Search type (default: 'basic')
@@ -124,7 +127,7 @@ await client.callTool('records.search', {
 
 ```typescript
 {
-  resource_type: 'companies' | 'people' | 'records' | 'tasks', // Required
+  resource_type: 'companies' | 'people' | 'records' | 'deals' | 'tasks' | '<custom_object_slug>', // Required
   record_id: string,                 // Required - Record identifier
   fields?: string[]                  // Optional - Specific fields to include
 }
@@ -137,6 +140,12 @@ await client.callTool('records.search', {
 await client.callTool('records.get_details', {
   resource_type: 'companies',
   record_id: 'comp_123',
+});
+
+// Get custom object details
+await client.callTool('records.get_details', {
+  resource_type: 'funds',
+  record_id: 'fund_123',
 });
 
 // Get person details with specific fields
@@ -157,7 +166,7 @@ await client.callTool('records.get_details', {
 
 ```typescript
 {
-  resource_type: 'companies' | 'people' | 'records' | 'tasks', // Required
+  resource_type: 'companies' | 'people' | 'records' | 'deals' | 'tasks' | '<custom_object_slug>', // Required
   record_data: object,               // Required - Record creation data
   return_details?: boolean           // Optional - Return full record details
 }
@@ -186,6 +195,15 @@ await client.callTool('create-record', {
   },
   return_details: true,
 });
+
+// Create a custom object record
+await client.callTool('create-record', {
+  resource_type: 'funds',
+  record_data: {
+    name: 'Fund I',
+    stage: 'Active',
+  },
+});
 ```
 
 ### 4. update-record
@@ -198,7 +216,7 @@ await client.callTool('create-record', {
 
 ```typescript
 {
-  resource_type: 'companies' | 'people' | 'records' | 'tasks', // Required
+  resource_type: 'companies' | 'people' | 'records' | 'deals' | 'tasks' | '<custom_object_slug>', // Required
   record_id: string,                 // Required - Record identifier
   record_data: object,               // Required - Update data
   return_details?: boolean           // Optional - Return full record details
@@ -217,6 +235,15 @@ await client.callTool('update-record', {
     employee_count: 50,
   },
 });
+
+// Update a custom object record
+await client.callTool('update-record', {
+  resource_type: 'funds',
+  record_id: 'fund_123',
+  record_data: {
+    stage: 'Closed',
+  },
+});
 ```
 
 ### 5. delete-record
@@ -229,7 +256,7 @@ await client.callTool('update-record', {
 
 ```typescript
 {
-  resource_type: 'companies' | 'people' | 'records' | 'tasks', // Required
+  resource_type: 'companies' | 'people' | 'records' | 'deals' | 'tasks' | '<custom_object_slug>', // Required
   record_id: string                  // Required - Record identifier
 }
 ```
@@ -241,6 +268,12 @@ await client.callTool('update-record', {
 await client.callTool('delete-record', {
   resource_type: 'companies',
   record_id: 'comp_123',
+});
+
+// Delete a custom object record
+await client.callTool('delete-record', {
+  resource_type: 'funds',
+  record_id: 'fund_123',
 });
 ```
 
@@ -465,6 +498,8 @@ await client.callTool('records.search_by_content', {
 }
 ```
 
+`modified` remains part of the public vocabulary for backward compatibility, but Attio does not expose a live filterable modified timestamp for people or companies. Those requests now fail explicitly instead of returning a false empty result.
+
 **Supported Date Formats** (v0.2.1+):
 
 - ISO 8601: `'2024-01-01T00:00:00Z'`
@@ -489,11 +524,11 @@ await client.callTool('records.search_by_timeframe', {
   preset: 'last 30 days',
 });
 
-// Search companies modified this month
+// Search companies with interactions after January 1, 2024
 await client.callTool('records.search_by_timeframe', {
   resource_type: 'companies',
-  timeframe_type: 'modified',
-  preset: 'this month',
+  timeframe_type: 'last_interaction',
+  start_date: '2024-01-01T00:00:00Z',
 });
 
 // Search companies by last interaction using relative dates

@@ -84,5 +84,8 @@ tsconfig.tsbuildinfo
 .mcpregistry_*
 mcp-publisher
 
+.ai/
+.worktrees/
+
 # Local-only personal reporting scripts (contain workspace-specific logic)
 scripts/reports/

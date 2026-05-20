@@ -4,32 +4,23 @@ on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version tag to publish (e.g., v1.4.0)'
-        required: true
-        type: string
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   publish-npm:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     outputs:
       should_publish: ${{ steps.check.outputs.should_publish }}
       package_version: ${{ steps.extract.outputs.version }}
     steps:
       - name: Determine version
         id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
-          else
-            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          fi
+        run: echo "version=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -49,11 +40,6 @@ jobs:
           # Validate versions match
           if [ "$PKG_VERSION" != "$SERVER_VERSION" ]; then
             echo "::error::Version mismatch: package.json=$PKG_VERSION, server.json=$SERVER_VERSION"
-            exit 1
-          fi
-
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "$PKG_VERSION" != "$TAG_VERSION_STRIPPED" ]; then
-            echo "::error::Version mismatch: package.json=$PKG_VERSION, input tag=$TAG_VERSION_STRIPPED"
             exit 1
           fi
 
@@ -80,7 +66,8 @@ jobs:
         if: steps.check.outputs.should_publish == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # npm trusted publishing requires a recent Node/npm runtime.
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
@@ -95,25 +82,29 @@ jobs:
         if: steps.check.outputs.should_publish == 'true'
         run: bun run build
 
-      - name: Publish to NPM
+      - name: Show publish runtime versions
         if: steps.check.outputs.should_publish == 'true'
-        # Keep npm for publishing to npm registry
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          node --version
+          npm --version
+
+      - name: Publish to NPM with provenance
+        if: steps.check.outputs.should_publish == 'true'
+        # --provenance generates a Sigstore attestation linking the package to this CI build.
+        # Requires npm Trusted Publisher configuration for this repository/workflow.
+        # See: https://docs.npmjs.com/generating-provenance-statements
+        run: npm publish --ignore-scripts --access public --provenance
 
   publish-registry:
     needs: publish-npm
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Determine version
         id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
-          else
-            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          fi
+        run: echo "version=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
 
       - name: Checkout code
         uses: actions/checkout@v4

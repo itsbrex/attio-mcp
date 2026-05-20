@@ -8,7 +8,7 @@ import {
   GetPromptRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { ServerContext } from '@/server/createServer.js';
-import { setGlobalContext } from '@/api/lazy-client.js';
+import { withGlobalContext } from '@/api/lazy-client.js';
 import {
   getAllPrompts,
   getPromptById,
@@ -222,9 +222,26 @@ export async function getPromptDetails(
   req: Request,
   res: Response
 ): Promise<void> {
-  const promptId = req.params.id;
+  const promptId = Array.isArray(req.params.id)
+    ? req.params.id[0]
+    : req.params.id;
 
   try {
+    if (!promptId) {
+      const errorObj = new Error('Prompt not found');
+      const errorResult = createErrorResult(
+        errorObj,
+        'No prompt found with the requested ID',
+        404,
+        {
+          ...getRequestMetadata(req, 'prompts.get'),
+          context: { promptId },
+        }
+      );
+      res.status(errorResult.error.code).json(errorResult);
+      return;
+    }
+
     const prompt = getPromptById(promptId);
 
     if (!prompt) {
@@ -375,9 +392,22 @@ export async function executePrompt(
   req: Request,
   res: Response
 ): Promise<void> {
-  const promptId = req.params.id;
+  const promptId = Array.isArray(req.params.id)
+    ? req.params.id[0]
+    : req.params.id;
 
   try {
+    if (!promptId) {
+      const errorObj = new Error('Prompt not found');
+      const errorResult = createErrorResult(
+        errorObj,
+        'No prompt found with the requested ID',
+        404
+      );
+      res.status(errorResult.error.code).json(errorResult);
+      return;
+    }
+
     const prompt = getPromptById(promptId);
 
     if (!prompt) {
@@ -515,106 +545,109 @@ export function registerPromptHandlers(
   server: Server,
   context?: ServerContext
 ): void {
-  // Set the global context for lazy initialization if provided
-  if (context) {
-    setGlobalContext(context);
-  }
-
   // Register handler for prompts/list endpoint
   server.setRequestHandler(ListPromptsRequestSchema, async () => {
-    const legacyPrompts = getPromptsListPayload().prompts;
-    const v1Prompts = getAllPromptsV1().map((p) => ({
-      name: p.metadata.name,
-      description: p.metadata.description,
-      arguments: p.arguments.map((arg) => ({
-        name: arg.name,
-        description: arg.description,
-        required: arg.required,
-      })),
-    }));
+    const listPrompts = async () => {
+      const legacyPrompts = getPromptsListPayload().prompts;
+      const v1Prompts = getAllPromptsV1().map((p) => ({
+        name: p.metadata.name,
+        description: p.metadata.description,
+        arguments: p.arguments.map((arg) => ({
+          name: arg.name,
+          description: arg.description,
+          required: arg.required,
+        })),
+      }));
 
-    return {
-      prompts: [...legacyPrompts, ...v1Prompts],
+      return {
+        prompts: [...legacyPrompts, ...v1Prompts],
+      };
     };
+
+    return context ? withGlobalContext(context, listPrompts) : listPrompts();
   });
 
   // Register handler for prompts/get endpoint
   server.setRequestHandler(GetPromptRequestSchema, async (request) => {
-    const promptName = request.params.name as string;
-    const args = (request.params.arguments || {}) as Record<string, unknown>;
-    const startTime = Date.now();
+    const getPrompt = async () => {
+      const promptName = request.params.name as string;
+      const args = (request.params.arguments || {}) as Record<string, unknown>;
+      const startTime = Date.now();
 
-    // Check if this is a v1 prompt
-    if (isV1Prompt(promptName)) {
-      const promptDef = getPromptV1ByName(promptName);
+      // Check if this is a v1 prompt
+      if (isV1Prompt(promptName)) {
+        const promptDef = getPromptV1ByName(promptName);
 
-      if (!promptDef) {
+        if (!promptDef) {
+          throw new Error(`Prompt not found: ${promptName}`);
+        }
+
+        // Validate arguments
+        const validation = validateArguments(args, promptDef.arguments);
+        if (!validation.success) {
+          const error = createValidationError(validation.errors);
+          throw new Error(error.message);
+        }
+
+        // Build messages
+        const messages = promptDef.buildMessages(validation.data);
+
+        // Check token budget
+        const budgetCheck = await checkTokenBudget(promptName, messages);
+        if (!budgetCheck.withinBudget) {
+          const error = createBudgetExceededError(budgetCheck);
+          throw new Error(error.message);
+        }
+
+        // Calculate token metadata
+        const tokenMetadata = await calculatePromptTokens(messages);
+
+        // Log telemetry
+        const telemetryEvent = createTelemetryEvent(
+          promptName,
+          tokenMetadata,
+          messages.length,
+          startTime,
+          false // budget not exceeded (already checked above)
+        );
+        logPromptTelemetry(telemetryEvent);
+
+        // Build response
+        const response: Record<string, unknown> = {
+          description: promptDef.metadata.description,
+          messages: messages,
+        };
+
+        // Add dev metadata if enabled
+        if (isDevMetaEnabled()) {
+          response._meta = tokenMetadata;
+        }
+
+        return response;
+      }
+
+      // Handle legacy Handlebars prompts
+      const prompt = getPromptById(promptName);
+
+      if (!prompt) {
         throw new Error(`Prompt not found: ${promptName}`);
       }
 
-      // Validate arguments
-      const validation = validateArguments(args, promptDef.arguments);
-      if (!validation.success) {
-        const error = createValidationError(validation.errors);
-        throw new Error(error.message);
-      }
-
-      // Build messages
-      const messages = promptDef.buildMessages(validation.data);
-
-      // Check token budget
-      const budgetCheck = await checkTokenBudget(promptName, messages);
-      if (!budgetCheck.withinBudget) {
-        const error = createBudgetExceededError(budgetCheck);
-        throw new Error(error.message);
-      }
-
-      // Calculate token metadata
-      const tokenMetadata = await calculatePromptTokens(messages);
-
-      // Log telemetry
-      const telemetryEvent = createTelemetryEvent(
-        promptName,
-        tokenMetadata,
-        messages.length,
-        startTime,
-        false // budget not exceeded (already checked above)
-      );
-      logPromptTelemetry(telemetryEvent);
-
-      // Build response
-      const response: Record<string, unknown> = {
-        description: promptDef.metadata.description,
-        messages: messages,
-      };
-
-      // Add dev metadata if enabled
-      if (isDevMetaEnabled()) {
-        response._meta = tokenMetadata;
-      }
-
-      return response;
-    }
-
-    // Handle legacy Handlebars prompts
-    const prompt = getPromptById(promptName);
-
-    if (!prompt) {
-      throw new Error(`Prompt not found: ${promptName}`);
-    }
-
-    return {
-      description: prompt.description,
-      messages: [
-        {
-          role: 'user',
-          content: {
-            type: 'text',
-            text: prompt.template,
+      return {
+        description: prompt.description,
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: prompt.template,
+            },
           },
-        },
-      ],
+        ],
+      };
     };
+
+    return context ? withGlobalContext(context, getPrompt) : getPrompt();
   });
 }
 function getRequestMetadata(req: Request, toolName: string) {

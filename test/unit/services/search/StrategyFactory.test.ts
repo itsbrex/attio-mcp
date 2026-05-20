@@ -9,17 +9,27 @@ import { UniversalResourceType } from '@/handlers/tool-configs/universal/types.j
 
 // Mock search strategies
 vi.mock('@/services/search-strategies/index.js', () => ({
-  CompanySearchStrategy: vi
-    .fn()
-    .mockImplementation(() => ({ search: vi.fn() })),
-  PeopleSearchStrategy: vi.fn().mockImplementation(() => ({ search: vi.fn() })),
-  DealSearchStrategy: vi.fn().mockImplementation(() => ({ search: vi.fn() })),
-  LocationSearchStrategy: vi
-    .fn()
-    .mockImplementation(() => ({ search: vi.fn() })),
-  TaskSearchStrategy: vi.fn().mockImplementation(() => ({ search: vi.fn() })),
-  ListSearchStrategy: vi.fn().mockImplementation(() => ({ search: vi.fn() })),
-  NoteSearchStrategy: vi.fn().mockImplementation(() => ({ search: vi.fn() })),
+  CompanySearchStrategy: class {
+    search = vi.fn();
+  },
+  PeopleSearchStrategy: class {
+    search = vi.fn();
+  },
+  DealSearchStrategy: class {
+    search = vi.fn();
+  },
+  LocationSearchStrategy: class {
+    search = vi.fn();
+  },
+  TaskSearchStrategy: class {
+    search = vi.fn();
+  },
+  ListSearchStrategy: class {
+    search = vi.fn();
+  },
+  NoteSearchStrategy: class {
+    search = vi.fn();
+  },
 }));
 
 // Mock SearchUtilities

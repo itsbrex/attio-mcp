@@ -7,43 +7,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-05-14
+
+**TL;DR for Users**: New dedicated list configuration tools, npm provenance for supply chain verification, and Docker build fix.
+
+### Added
+
+- **`create-list` tool** (#1195, #1196) - Dedicated list creation with template expansion (`sales_pipeline`, `recruiting_tracker`, `support_queue`), parent-object validation against workspace objects, and dry-run preview
+- **`update-list-configuration` tool** (#1195, #1196) - Dedicated list update with immutable field detection (rejects `parent_object` changes), dry-run preview, and categorized error guidance
+- Shared `ListConfigurationValidator` for parent-object validation, immutable field detection, template expansion, and error categorization — consumed by both dedicated tools and universal create/update strategies (#1195)
+- **npm provenance publishing** — every release is now cryptographically linked to the GitHub Actions build and source commit via Sigstore, enabling supply chain verification with `npm view attio-mcp --json | jq .attestations`
+- `.npmrc` with `save-exact` and `strict-peer-dependencies` for safer installs
+
 ### Changed
 
-- **Consolidated list filter tools (5 → 1)** (#1069) - Part of Issue #1059 list tools consolidation (11 → 4 tools) - PR #2 of 4
-  - Enhanced `filter-list-entries` with 4 auto-detected parameter modes:
-    - Mode 1 (Simple): Single attribute filtering
-    - Mode 2 (Advanced): Multi-condition AND/OR filtering
-    - Mode 3 (Parent Attribute): Filter by parent record attributes
-    - Mode 4 (Parent UUID): Filter by exact parent record UUID
-  - Deprecated tools (removal in v2.0.0): `advanced-filter-list-entries`, `filter-list-entries-by-parent`, `filter-list-entries-by-parent-id`
-  - Full backward compatibility maintained - all existing Mode 1 calls work unchanged
-  - Simpler API surface - one tool to learn instead of five
-- **Consolidated list entry management tools (3 → 1)** (#1075) - Part of Issue #1059 list tools consolidation (11 → 4 tools) - PR #3 of 4
-  - Enhanced `manage-list-entry` with 3 auto-detected parameter modes:
-    - Mode 1 (Add): Add company/person to list with optional initial values
-    - Mode 2 (Remove): Remove entry from list
-    - Mode 3 (Update): Update entry attributes (stage, status, custom fields)
-  - Deprecated tools (removal in v2.0.0): `add-record-to-list`, `remove-record-from-list`, `update-list-entry`
-  - Full backward compatibility maintained - all existing calls work unchanged with identical parameter structure
-  - Simpler API surface - one tool to learn instead of three
-- **List tools consolidation complete** (#1071) - Part of Issue #1059 list tools consolidation (11 → 4 tools) - PR #4 of 4
-  - Added runtime deprecation warnings for 8 legacy list tools (removal in v2.0.0):
-    - Filter operations: `advanced-filter-list-entries`, `filter-list-entries-by-parent`, `filter-list-entries-by-parent-id`
-    - Entry management: `add-record-to-list`, `remove-record-from-list`, `update-list-entry`
-    - List discovery: `get-lists`, `get-list-details` (migrate to universal tools)
-  - Comprehensive migration guide at `/docs/migration/v2-list-tools.md` with all 8 tools documented
-  - Updated tool count: 11 → 4 (64% reduction achieved)
-  - See [Migration Guide](./docs/migration/v2-list-tools.md) for migration examples
+- Universal list create and update paths now validate `parent_object` and detect immutable fields before API calls (#1195)
+- List error categorization prefers HTTP status codes over fragile string matching (#1196)
+- Docker build stage now uses `oven/bun:1` instead of `node:20-slim` for consistency with the project's package manager
+
+## [1.6.0] - 2026-05-05
+
+**TL;DR for Users**: This release makes common company and deal writes easier, completes universal record support for custom objects, and fixes workspace-member lookups returned by list tools.
+
+### Added
+
+- Scoped `create_company`, `update_company`, `create_deal`, and `update_deal` tools for high-frequency company/deal writes without manually selecting `resource_type` (#1175)
+
+### Changed
+
+- Maintenance updates for npm trusted publishing reliability and current runtime/dependency compatibility (#1172, #1178)
 
 ### Fixed
 
-- Universal tools (`search_records`, `get_record_details`) now return proper list format matching list-specific tools instead of generic record format with values wrapper (#1068)
-- Universal update/search flows now preserve list-native shapes across the UniversalRecord union without values wrapper coercion (#1073)
+- Universal record tools now support config-discovered custom objects for details, create, update, and delete, matching existing search support (#1161)
+- `get-workspace-member` now accepts valid `workspace_member_id` values returned by `list-workspace-members` (#1173, #1176)
+
+## [1.5.0] - 2026-04-09
+
+**TL;DR for Users**: This release adds record interaction history, expands search support for custom objects, and fixes several high-friction update, search, and validation issues across the Attio MCP server.
+
+### Added
+
+- **`get_record_interactions` tool** (#1116) - Retrieve interaction history for a record without leaving the MCP workflow
+
+### Changed
+
+- Search tools now accept config-discovered custom object slugs and preserve custom object labels in search output and errors (#1138)
+- `update_record` is more forgiving with legacy payload shapes by accepting `data`, top-level field updates, JSON string updates, and normalized stage title/status inputs (#1099, #1100)
+
+### Fixed
+
+- Restored live timeframe search behavior for one-sided `created_at` and `last_interaction` queries, and made unsupported people/company `modified` timeframe requests fail clearly instead of returning misleading empty results (#1126)
+- Fixed search translation regressions that could block valid queries from reaching Attio (#1131)
+- Hardened people/company relationship validation so direct IDs, nested references, and array-based company payloads consistently trigger company existence checks during people updates (#1125, #1129, #1130)
+- Fixed task creation so `linked_records` are passed through correctly and deal updates no longer fail on valid status values such as `MQL` (#1098, #1109)
+- Increased response size handling for bulk search results from 40 KB to 500 KB to avoid truncating larger result sets (#1110)
+- Redacted credential-derived metadata from Smithery diagnostics and hardened internal debug logging so runtime troubleshooting no longer exposes secret-derived details (#1141, #1142, #1147, #1169, #1170)
+
+## [1.4.1] - 2026-01-28
+
+### Added
+
+- **UniversalRecord type guards** (#1073) - Type discrimination functions for list/record handling
+  - `isAttioRecord()`: Check if record has values wrapper (companies, people, deals, tasks)
+  - `isAttioList()`: Check if record has list_id in id object
+  - `getRecordId()`: Extract record_id or list_id based on type
+  - Foundation for enforcing UniversalRecord type across universal tools
+  - Re-exported from `@/handlers/tool-configs/universal/core/utils` for convenience
+
+### Changed
+
+- **Consolidated list filter tools (5 → 1)** (#1069) - Part of Issue #1059 list tools consolidation (11 → 4 tools)
+  - Enhanced `filter-list-entries` with 4 auto-detected parameter modes
+  - Deprecated tools (removal in v2.0.0): `advanced-filter-list-entries`, `filter-list-entries-by-parent`, `filter-list-entries-by-parent-id`
+  - Full backward compatibility maintained
+- **Consolidated list entry management tools (3 → 1)** (#1075) - Part of Issue #1059 list tools consolidation (11 → 4 tools)
+  - Enhanced `manage-list-entry` with 3 auto-detected parameter modes
+  - Deprecated tools (removal in v2.0.0): `add-record-to-list`, `remove-record-from-list`, `update-list-entry`
+  - Full backward compatibility maintained
+- **List tools consolidation complete** (#1071) - Part of Issue #1059 list tools consolidation (11 → 4 tools)
+  - Added runtime deprecation warnings for 8 legacy list tools
+  - Comprehensive migration guide at `/docs/migration/v2-list-tools.md`
+  - Updated tool count: 11 → 4 (64% reduction achieved)
+- **Smithery references temporarily removed** (#1097) - Smithery changed their deployment model to require external hosting
+  - Removed Smithery badge from README
+  - Updated installation tiers (Tier 1-3 instead of 1-4)
+  - ChatGPT users should use Cloudflare Worker deployment
+  - Will be restored when Cloudflare Worker hosting is set up for Smithery
+
+### Fixed
+
+- Universal tools (`search_records`, `get_record_details`) now return proper list format matching list-specific tools (#1068)
+- Universal update/search flows now preserve list-native shapes across the UniversalRecord union (#1073)
+- `update_record` now accepts legacy `data` payloads, wraps top-level field updates into `record_data`, parses JSON string updates, and normalizes status/title inputs for stage updates (#1099)
+- `update_record` input normalization now uses immutable transformations to prevent shared state mutations (#1100)
 - MCP Registry publishing workflow schema version and re-publish errors (#1066)
 - Operations playbook validation tests now work across all workspaces via dynamic attribute discovery (#973, #1081)
-  - Added `is_empty` operator support to advanced-search
-  - Tests discover available attributes at runtime instead of hardcoding field names
-  - Proper error handling for API failures (auth, rate limits, server errors)
 
 ## [1.4.0] - 2025-12-29
 
@@ -897,7 +956,17 @@ Users upgrading from v0.1.x should note:
 - Troubleshooting guides
 - Development and contribution guidelines
 
-[Unreleased]: https://github.com/kesslerio/attio-mcp-server/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/kesslerio/attio-mcp-server/compare/v1.6.1...HEAD
+[1.6.1]: https://github.com/kesslerio/attio-mcp-server/compare/v1.6.0...v1.6.1
+[1.6.0]: https://github.com/kesslerio/attio-mcp-server/compare/v1.5.0...v1.6.0
+[1.5.0]: https://github.com/kesslerio/attio-mcp-server/compare/v1.4.1...v1.5.0
+[1.4.1]: https://github.com/kesslerio/attio-mcp-server/compare/v1.4.0...v1.4.1
+[1.4.0]: https://github.com/kesslerio/attio-mcp-server/compare/v1.3.6...v1.4.0
+[1.3.6]: https://github.com/kesslerio/attio-mcp-server/compare/v1.3.5...v1.3.6
+[1.3.5]: https://github.com/kesslerio/attio-mcp-server/compare/v1.3.0...v1.3.5
+[1.3.0]: https://github.com/kesslerio/attio-mcp-server/compare/v1.2.2...v1.3.0
+[1.2.2]: https://github.com/kesslerio/attio-mcp-server/compare/v1.2.1...v1.2.2
+[1.2.1]: https://github.com/kesslerio/attio-mcp-server/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/kesslerio/attio-mcp-server/compare/v1.1.10...v1.2.0
 [1.1.10]: https://github.com/kesslerio/attio-mcp-server/compare/v1.1.0...v1.1.10
 [1.1.0]: https://github.com/kesslerio/attio-mcp-server/compare/v1.0.0...v1.1.0

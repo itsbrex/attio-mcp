@@ -2,11 +2,11 @@ import { getFieldSuggestions } from '@/handlers/tool-configs/universal/field-map
 import {
   UniversalValidationError,
   ErrorType,
-} from '@/handlers/tool-configs/universal/schemas.js';
-import type { UniversalResourceType } from '@/handlers/tool-configs/universal/types.js';
+} from '@/handlers/tool-configs/universal/errors/validation-errors.js';
 import { updateList } from '@/objects/lists.js';
 import type { AttioList } from '@/types/attio.js';
 import type { UpdateStrategy } from '@/services/update/strategies/BaseUpdateStrategy.js';
+import { ListConfigurationValidator } from '@/services/lists/ListConfigurationValidator.js';
 
 /**
  * ListUpdateStrategy - Handles updates for Attio Lists
@@ -18,8 +18,11 @@ export class ListUpdateStrategy implements UpdateStrategy {
   async update(
     recordId: string,
     values: Record<string, unknown>,
-    resourceType: UniversalResourceType
+    resourceType: string
   ): Promise<AttioList> {
+    // Detect immutable fields before API call (Issue #1195)
+    ListConfigurationValidator.detectImmutableFields(values);
+
     try {
       const list = await updateList(recordId, values);
       return {

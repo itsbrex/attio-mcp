@@ -122,7 +122,7 @@ export * from './shared-handlers.js';
 
 /**
  * All universal tool configurations
- * These replace 40+ resource-specific tools with 14 universal operations
+ * These expose the universal tool group plus focused scoped write tools.
  */
 export const universalToolConfigs = {
   // Ensure health-check is listed first alphabetically for best-guess scanners
@@ -150,18 +150,23 @@ export const universalToolDefinitions = {
 };
 
 /**
- * Core universal operations (8 tools)
+ * Core universal operations (13 tools)
  * These consolidate the majority of CRUD and basic search operations
  */
 export const coreUniversalTools = [
   'search_records',
   'get_record_details',
+  'create_company',
+  'update_company',
+  'create_deal',
+  'update_deal',
   'create_record',
   'update_record',
   'delete_record',
   'get_record_attributes',
   'discover_record_attributes',
   'get_record_info',
+  'get_record_interactions',
 ];
 
 /**

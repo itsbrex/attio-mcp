@@ -42,7 +42,11 @@ import {
   handleNotesOperation,
   handleCreateNoteOperation,
 } from '@/handlers/tools/dispatcher/operations/notes.js';
-import { handleGetListsOperation } from '@/handlers/tools/dispatcher/operations/lists.js';
+import {
+  handleGetListsOperation,
+  handleCreateListOperation,
+  handleUpdateListConfigurationOperation,
+} from '@/handlers/tools/dispatcher/operations/lists.js';
 
 // Import CRUD operation handlers
 import {
@@ -97,6 +101,8 @@ import {
   NotesToolConfig,
   CreateNoteToolConfig,
   GetListsToolConfig,
+  CreateListToolConfig,
+  UpdateListConfigurationToolConfig,
 } from '@/handlers/tool-types.js';
 
 /**
@@ -141,10 +147,15 @@ export async function executeToolRequest(request: CallToolRequest) {
     // Handle Universal and General tools first (Issue #352)
     if (resourceType === 'UNIVERSAL') {
       // For universal tools, use the tool's own handler directly
-      const args = request.params.arguments as Record<string, unknown>;
+      // Shallow-clone to avoid mutating the caller's object (e.g. shared params in Promise.all)
+      const rawArgs = (request.params.arguments ?? {}) as Record<
+        string,
+        unknown
+      >;
+      const args = { ...rawArgs };
 
       // Canonicalize and freeze resource_type to prevent mutation
-      if (args && 'resource_type' in args) {
+      if ('resource_type' in args) {
         args.resource_type = canonicalizeResourceType(args.resource_type);
         Object.defineProperty(args, 'resource_type', {
           value: args.resource_type,
@@ -307,6 +318,16 @@ export async function executeToolRequest(request: CallToolRequest) {
       result = await handleGetListsOperation(
         request,
         toolConfig as GetListsToolConfig
+      );
+    } else if (toolType === 'createList') {
+      result = await handleCreateListOperation(
+        request,
+        toolConfig as CreateListToolConfig
+      );
+    } else if (toolType === 'updateListConfiguration') {
+      result = await handleUpdateListConfigurationOperation(
+        request,
+        toolConfig as UpdateListConfigurationToolConfig
       );
 
       // Handle CRUD operations (from emergency fix)

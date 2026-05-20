@@ -3,7 +3,10 @@ import {
   UniversalSearchParams,
   UniversalResourceType,
 } from '@/handlers/tool-configs/universal/types.js';
-import { getPluralResourceType } from '@/handlers/tool-configs/universal/core/utils.js';
+import {
+  extractResourceTypeFromFormatArgs,
+  getPluralResourceLabel,
+} from '@/handlers/tool-configs/universal/core/utils.js';
 import type { UniversalRecordResult } from '@/types/attio.js';
 import { isAttioRecord } from '@/types/attio.js';
 import {
@@ -13,7 +16,6 @@ import {
 import { handleSearchError } from '@/handlers/tool-configs/universal/core/error-utils.js';
 import { handleUniversalSearch } from '@/handlers/tool-configs/universal/shared-handlers.js';
 import { formatToolDescription } from '@/handlers/tools/standards/index.js';
-import { getFormatArgString } from '@/handlers/tool-configs/universal/shared/format-args.js';
 import { formatLocationSearchResultLine } from '@/handlers/tool-configs/universal/shared/location-search-format.js';
 
 /**
@@ -47,13 +49,9 @@ export const searchRecordsConfig: UniversalToolConfig<
     results: UniversalRecordResult[] | { data: UniversalRecordResult[] },
     ...args: unknown[]
   ): string => {
-    const resourceType = getFormatArgString(args, 'resource_type', 0) as
-      | UniversalResourceType
-      | undefined;
+    const resourceType = extractResourceTypeFromFormatArgs(args);
     if (!results) {
-      const typeName = resourceType
-        ? getPluralResourceType(resourceType)
-        : 'records';
+      const typeName = getPluralResourceLabel(resourceType);
       return `Found 0 ${typeName}`;
     }
 
@@ -62,15 +60,11 @@ export const searchRecordsConfig: UniversalToolConfig<
       : (results?.data ?? []);
 
     if (!Array.isArray(recordsArray) || recordsArray.length === 0) {
-      const typeName = resourceType
-        ? getPluralResourceType(resourceType)
-        : 'records';
+      const typeName = getPluralResourceLabel(resourceType);
       return `Found 0 ${typeName}`;
     }
 
-    const typeName = resourceType
-      ? getPluralResourceType(resourceType)
-      : 'records';
+    const typeName = getPluralResourceLabel(resourceType);
 
     const formattedResults = recordsArray
       .map((record, index) => {

@@ -87,8 +87,10 @@ const createErrorResult = (
 };
 
 import { getSingularResourceType } from '@/handlers/tool-configs/universal/shared-handlers.js';
-import { UniversalResourceType } from '@/handlers/tool-configs/universal/types.js';
-import type { ValidationMetadata } from '@/handlers/tool-configs/universal/core/utils.js';
+import {
+  getPluralResourceLabel,
+  type ValidationMetadata,
+} from '@/handlers/tool-configs/universal/core/utils.js';
 import { sanitizedLog } from '@/handlers/tool-configs/universal/core/pii-sanitizer.js';
 
 const logger = createScopedLogger('crud-error-handlers');
@@ -255,9 +257,7 @@ export const handleCreateError = async (
       logger
     );
     if (enhancedMessage) {
-      const resourceName = getSingularResourceType(
-        resourceType as UniversalResourceType
-      );
+      const resourceName = getSingularResourceType(resourceType);
       throw createErrorResult(
         `Failed to create ${resourceName}: ${enhancedMessage}`,
         enhancer.errorName,
@@ -276,7 +276,7 @@ export const handleCreateError = async (
       ? `${baseError}. Details: ${attioMessage}`
       : baseError;
   const errorResult = createErrorResult(
-    `Failed to create ${getSingularResourceType(resourceType as UniversalResourceType)}: ${errorMessage}`,
+    `Failed to create ${getSingularResourceType(resourceType)}: ${errorMessage}`,
     'create_error',
     { context, original: error }
   );
@@ -313,17 +313,19 @@ export const handleUpdateError = async (
 
   // Handle validation-specific errors with enhanced context
   if (error instanceof Error && error.message.includes('validation')) {
-    const resourceName = getSingularResourceType(
-      resourceType as UniversalResourceType
-    );
+    const resourceName = getSingularResourceType(resourceType);
     let errorMessage = `Failed to update ${resourceName}: Validation failed.`;
 
     if (validationMetadata?.warnings?.length) {
-      errorMessage += `\n\nValidation warnings:\n${validationMetadata.warnings.join('\n')}`;
+      errorMessage += `\n\nValidation warnings:\n${validationMetadata.warnings.join(
+        '\n'
+      )}`;
     }
 
     if (validationMetadata?.suggestions?.length) {
-      errorMessage += `\n\nSuggestions:\n${validationMetadata.suggestions.join('\n')}`;
+      errorMessage += `\n\nSuggestions:\n${validationMetadata.suggestions.join(
+        '\n'
+      )}`;
     }
 
     const errorResult = createErrorResult(errorMessage, 'validation_error', {
@@ -342,9 +344,7 @@ export const handleUpdateError = async (
       logger
     );
     if (enhancedMessage) {
-      const resourceName = getSingularResourceType(
-        resourceType as UniversalResourceType
-      );
+      const resourceName = getSingularResourceType(resourceType);
       throw createErrorResult(
         `Failed to update ${resourceName}: ${enhancedMessage}`,
         enhancer.errorName,
@@ -355,9 +355,7 @@ export const handleUpdateError = async (
 
   // Handle record not found errors
   if (error instanceof Error && error.message.includes('not found')) {
-    const resourceName = getSingularResourceType(
-      resourceType as UniversalResourceType
-    );
+    const resourceName = getSingularResourceType(resourceType);
     const errorResult = createErrorResult(
       `Failed to update ${resourceName}: Record not found. Please verify the record ID: ${recordId}`,
       'not_found_error',
@@ -377,7 +375,7 @@ export const handleUpdateError = async (
       ? `${baseErrorMessage}. Details: ${attioMessage}`
       : baseErrorMessage;
   const errorResult = createErrorResult(
-    `Failed to update ${getSingularResourceType(resourceType as UniversalResourceType)}: ${errorMessage}`,
+    `Failed to update ${getSingularResourceType(resourceType)}: ${errorMessage}`,
     'update_error',
     { context, original: error }
   );
@@ -406,9 +404,7 @@ export const handleDeleteError = async (
 
   // Handle delete-specific error patterns
   if (error instanceof Error && error.message.includes('not found')) {
-    const resourceName = getSingularResourceType(
-      resourceType as UniversalResourceType
-    );
+    const resourceName = getSingularResourceType(resourceType);
     const errorResult = createErrorResult(
       `Failed to delete ${resourceName}: Record not found. The record may have already been deleted.`,
       'not_found_error',
@@ -418,9 +414,7 @@ export const handleDeleteError = async (
   }
 
   if (error instanceof Error && error.message.includes('referenced')) {
-    const resourceName = getSingularResourceType(
-      resourceType as UniversalResourceType
-    );
+    const resourceName = getSingularResourceType(resourceType);
     const errorResult = createErrorResult(
       `Failed to delete ${resourceName}: Record is referenced by other records and cannot be deleted.`,
       'reference_constraint_error',
@@ -432,7 +426,7 @@ export const handleDeleteError = async (
   // Fallback to general delete error handling
   const errorMessage = error instanceof Error ? error.message : String(error);
   const errorResult = createErrorResult(
-    `Failed to delete ${getSingularResourceType(resourceType as UniversalResourceType)}: ${errorMessage}`,
+    `Failed to delete ${getSingularResourceType(resourceType)}: ${errorMessage}`,
     'delete_error',
     { context, original: error }
   );
@@ -463,11 +457,9 @@ export const handleSearchError = async (
 
   // Handle search-specific error patterns
   if (error instanceof Error && error.message.includes('invalid filter')) {
-    const resourceName = getSingularResourceType(
-      resourceType as UniversalResourceType
-    );
+    const resourceName = getPluralResourceLabel(resourceType);
     const errorResult = createErrorResult(
-      `Failed to search ${resourceName}s: Invalid search filters. Please check your search criteria.`,
+      `Failed to search ${resourceName}: Invalid search filters. Please check your search criteria.`,
       'invalid_filter_error',
       { context }
     );
@@ -475,11 +467,9 @@ export const handleSearchError = async (
   }
 
   if (error instanceof Error && error.message.includes('timeout')) {
-    const resourceName = getSingularResourceType(
-      resourceType as UniversalResourceType
-    );
+    const resourceName = getPluralResourceLabel(resourceType);
     const errorResult = createErrorResult(
-      `Search for ${resourceName}s timed out. Please try with more specific search criteria.`,
+      `Search for ${resourceName} timed out. Please try with more specific search criteria.`,
       'timeout_error',
       { context }
     );
@@ -489,7 +479,7 @@ export const handleSearchError = async (
   // Fallback to general search error handling
   const errorMessage = error instanceof Error ? error.message : String(error);
   const errorResult = createErrorResult(
-    `Failed to search ${getSingularResourceType(resourceType as UniversalResourceType)}s: ${errorMessage}`,
+    `Failed to search ${getPluralResourceLabel(resourceType)}: ${errorMessage}`,
     'search_error',
     { context, original: error }
   );

@@ -20,9 +20,7 @@ import type {
   MetadataTransformService,
 } from './types.js';
 
-export class DefaultMetadataDiscoveryService
-  implements MetadataDiscoveryService
-{
+export class DefaultMetadataDiscoveryService implements MetadataDiscoveryService {
   private readonly runner: DiscoveryRunner;
 
   constructor(
@@ -165,7 +163,7 @@ export class DefaultMetadataDiscoveryService
   }
 
   private async performAttributeDiscovery(
-    resourceType: UniversalResourceType,
+    resourceType: string,
     options?: { categories?: string[] }
   ): Promise<MetadataResult> {
     const client = getLazyAttioClient();

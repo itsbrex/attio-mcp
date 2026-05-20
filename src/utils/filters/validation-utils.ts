@@ -11,10 +11,7 @@ import {
 } from '../../errors/api-errors.js';
 import { ListEntryFilter, ListEntryFilters } from './types.js';
 import { ValidatedListEntryFilters } from '../../api/operations/types.js';
-import {
-  isValidFilterCondition,
-  normalizeFilterCondition,
-} from '../../types/attio.js';
+import { normalizeFilterCondition } from '../../types/attio.js';
 
 /**
  * Error message templates for consistent error formatting
@@ -207,9 +204,13 @@ export function collectInvalidFilters(
       return;
     }
 
-    // Validate condition if enabled (with alias normalization)
+    // Validate condition if enabled (with alias normalization).
+    // Defensive: condition may be non-string in malformed input.
     if (validateConditions) {
-      const normalizedCondition = normalizeFilterCondition(filter.condition);
+      const normalizedCondition =
+        typeof filter.condition === 'string'
+          ? normalizeFilterCondition(filter.condition)
+          : undefined;
       if (!normalizedCondition) {
         invalidFilters.push({
           index,
@@ -328,6 +329,31 @@ export function validateFilters(
     throw new FilterValidationError(errorMessage, category);
   }
 
+  const normalizedFilters = validatedFilters.filters.map((filter) => {
+    const normalizedCondition =
+      typeof filter.condition === 'string'
+        ? normalizeFilterCondition(filter.condition)
+        : undefined;
+
+    return normalizedCondition && normalizedCondition !== filter.condition
+      ? {
+          ...filter,
+          condition: normalizedCondition,
+        }
+      : filter;
+  });
+
+  const hasNormalizedConditions = normalizedFilters.some(
+    (filter, index) => filter !== validatedFilters.filters[index]
+  );
+
+  if (hasNormalizedConditions) {
+    return {
+      ...validatedFilters,
+      filters: normalizedFilters,
+    };
+  }
+
   return validatedFilters;
 }
 
@@ -356,7 +382,10 @@ export function getInvalidFilterReason(filter: unknown): string {
     return ERROR_MESSAGES.MISSING_CONDITION;
   }
 
-  if (!isValidFilterCondition(filterObj.condition as string)) {
+  if (
+    typeof filterObj.condition !== 'string' ||
+    !normalizeFilterCondition(filterObj.condition)
+  ) {
     return `invalid condition '${filterObj.condition as string}'`;
   }
 

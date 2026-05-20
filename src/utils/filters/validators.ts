@@ -16,7 +16,6 @@
 // External dependencies
 import {
   DateRangePreset,
-  isValidFilterCondition,
   normalizeFilterCondition,
 } from '../../types/attio.js';
 import { FilterValidationError } from '../../errors/api-errors.js';
@@ -407,8 +406,7 @@ export function validateFilterCondition(
   }
 
   const normalizedCondition = normalizeFilterCondition(condition);
-
-  if (!normalizedCondition || !isValidFilterCondition(normalizedCondition)) {
+  if (!normalizedCondition) {
     const validConditions = Object.values(FilterConditionType);
     throw new FilterValidationError(
       `Invalid filter condition: "${condition}". ` +
@@ -470,7 +468,7 @@ export function validateFilterWithConditions(
 
   if (validateConditions) {
     const normalizedCondition = normalizeFilterCondition(filter.condition);
-    if (!normalizedCondition || !isValidFilterCondition(normalizedCondition)) {
+    if (!normalizedCondition) {
       throw new FilterValidationError(
         `Invalid filter condition '${filter.condition}' for attribute '${slug}'. ` +
           `Valid conditions are: ${Object.values(FilterConditionType).join(', ')}`

@@ -7,7 +7,6 @@
  * @see Issue #984 - Extend display name resolution to create/update operations
  */
 
-import { UniversalResourceType } from '@/handlers/tool-configs/universal/types.js';
 import { validateFields } from '@/handlers/tool-configs/universal/field-mapper.js';
 import { ValidationService } from '@/services/ValidationService.js';
 import { debug, OperationType } from '@/utils/logger.js';
@@ -45,7 +44,7 @@ export class FieldValidationHandler {
    * @returns Validation result with warnings, suggestions, and resolved field names
    */
   static async validateAndResolve(
-    resourceType: UniversalResourceType,
+    resourceType: string,
     values: Record<string, unknown>,
     objectSlug?: string,
     enableDisplayNameResolution: boolean = true
@@ -108,9 +107,8 @@ export class FieldValidationHandler {
     suggestions: string[];
   }> {
     try {
-      const { applyDealDefaultsWithValidation } = await import(
-        '@/config/deal-defaults.js'
-      );
+      const { applyDealDefaultsWithValidation } =
+        await import('@/config/deal-defaults.js');
 
       const dealValidation = await applyDealDefaultsWithValidation(
         values,
@@ -211,9 +209,8 @@ export class FieldValidationHandler {
     fieldName: string
   ): Promise<string | null> {
     try {
-      const { resolveAttributeDisplayName } = await import(
-        '@/handlers/tool-configs/universal/shared-handlers.js'
-      );
+      const { resolveAttributeDisplayName } =
+        await import('@/handlers/tool-configs/universal/shared-handlers.js');
       return await resolveAttributeDisplayName(objectSlug, fieldName);
     } catch (err) {
       debug(

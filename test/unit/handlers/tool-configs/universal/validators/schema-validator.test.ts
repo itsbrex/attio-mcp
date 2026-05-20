@@ -1,9 +1,19 @@
 /**
- * Unit tests for InputSanitizer - particularly multiline content preservation
+ * Unit tests for InputSanitizer and validateUniversalToolParams
  * @see Issue #1052: Preserve line breaks in note content
+ * @see Issue #1099: Fix task immutability for nested values
  */
-import { describe, it, expect } from 'vitest';
-import { InputSanitizer } from '@/handlers/tool-configs/universal/validators/schema-validator.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/utils/config-loader.js', () => ({
+  loadMappingConfig: vi.fn(),
+}));
+
+import {
+  InputSanitizer,
+  validateUniversalToolParams,
+} from '../../../../../../src/handlers/tool-configs/universal/validators/schema-validator.js';
+import { loadMappingConfig } from '@/utils/config-loader.js';
 
 describe('InputSanitizer', () => {
   describe('sanitizeString', () => {
@@ -254,6 +264,343 @@ describe('InputSanitizer', () => {
       expect(result.content).toContain('## Attendees');
       expect(result.content).toContain('- John');
       expect((result.content as string).split('\n').length).toBeGreaterThan(5);
+    });
+  });
+});
+
+describe('validateUniversalToolParams', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(loadMappingConfig).mockReturnValue({
+      version: '1.0',
+      mappings: {
+        attributes: {
+          common: {},
+          objects: {},
+          custom: {},
+        },
+        objects: {},
+        lists: {},
+        relationships: {},
+      },
+    });
+  });
+
+  describe('search tool resource_type validation', () => {
+    it('accepts config-discovered custom objects for search_records', () => {
+      vi.mocked(loadMappingConfig).mockReturnValue({
+        version: '1.0',
+        mappings: {
+          attributes: {
+            common: {},
+            objects: {
+              funds: { name: 'Name' },
+              channels: { name: 'Name' },
+            },
+            custom: {},
+          },
+          objects: {},
+          lists: {},
+          relationships: {},
+        },
+      });
+
+      const result = validateUniversalToolParams('search_records', {
+        resource_type: 'FUNDS',
+        query: 'growth',
+      });
+
+      expect(result.resource_type).toBe('funds');
+      expect(result.query).toBe('growth');
+    });
+
+    it('accepts config-discovered custom objects for advanced and timeframe search tools', () => {
+      vi.mocked(loadMappingConfig).mockReturnValue({
+        version: '1.0',
+        mappings: {
+          attributes: {
+            common: {},
+            objects: {
+              channels: { name: 'Name' },
+            },
+            custom: {},
+          },
+          objects: {},
+          lists: {},
+          relationships: {},
+        },
+      });
+
+      expect(
+        validateUniversalToolParams('search_records_advanced', {
+          resource_type: 'channels',
+        }).resource_type
+      ).toBe('channels');
+
+      expect(
+        validateUniversalToolParams('search_records_by_timeframe', {
+          resource_type: 'channels',
+          start_date: '2025-01-01',
+        }).resource_type
+      ).toBe('channels');
+    });
+
+    it('still rejects unknown custom objects for search tools', () => {
+      expect(() =>
+        validateUniversalToolParams('search_records', {
+          resource_type: 'unknown_object',
+        })
+      ).toThrow("Invalid resource_type: 'unknown_object'");
+    });
+
+    it('accepts config-discovered custom objects for detail and CRUD tools', () => {
+      vi.mocked(loadMappingConfig).mockReturnValue({
+        version: '1.0',
+        mappings: {
+          attributes: {
+            common: {},
+            objects: {
+              funds: { name: 'Name' },
+            },
+            custom: {},
+          },
+          objects: {},
+          lists: {},
+          relationships: {},
+        },
+      });
+
+      expect(
+        validateUniversalToolParams('get_record_details', {
+          resource_type: 'FUNDS',
+          record_id: 'record_123',
+        }).resource_type
+      ).toBe('funds');
+
+      expect(
+        validateUniversalToolParams('create_record', {
+          resource_type: 'funds',
+          record_data: { name: 'Fund I' },
+        }).resource_type
+      ).toBe('funds');
+
+      expect(
+        validateUniversalToolParams('update_record', {
+          resource_type: 'funds',
+          record_id: 'record_123',
+          record_data: { name: 'Fund II' },
+        }).resource_type
+      ).toBe('funds');
+
+      expect(
+        validateUniversalToolParams('delete_record', {
+          resource_type: 'funds',
+          record_id: 'record_123',
+        }).resource_type
+      ).toBe('funds');
+    });
+
+    it('rejects unknown custom objects for detail and CRUD tools with discovered options', () => {
+      vi.mocked(loadMappingConfig).mockReturnValue({
+        version: '1.0',
+        mappings: {
+          attributes: {
+            common: {},
+            objects: {
+              funds: { name: 'Name' },
+            },
+            custom: {},
+          },
+          objects: {},
+          lists: {},
+          relationships: {},
+        },
+      });
+
+      const cases = [
+        {
+          toolName: 'get_record_details',
+          params: { resource_type: 'unknown_object', record_id: 'record_123' },
+        },
+        {
+          toolName: 'create_record',
+          params: {
+            resource_type: 'unknown_object',
+            record_data: { name: 'Unknown' },
+          },
+        },
+        {
+          toolName: 'update_record',
+          params: {
+            resource_type: 'unknown_object',
+            record_id: 'record_123',
+            record_data: { name: 'Unknown' },
+          },
+        },
+        {
+          toolName: 'delete_record',
+          params: { resource_type: 'unknown_object', record_id: 'record_123' },
+        },
+      ];
+
+      for (const { toolName, params } of cases) {
+        expect(() => validateUniversalToolParams(toolName, params)).toThrow(
+          /unknown_object.*funds/
+        );
+      }
+    });
+  });
+
+  describe('update_record - input normalization', () => {
+    it('should normalize data field to record_data', () => {
+      const params = {
+        resource_type: 'companies',
+        record_id: 'comp_123',
+        data: { name: 'Test Company' },
+      };
+      const result = validateUniversalToolParams('update_record', params);
+      expect(result.record_data).toEqual({ name: 'Test Company' });
+    });
+
+    it('should collect extra fields into record_data without leftover fields', () => {
+      const params = {
+        resource_type: 'companies',
+        record_id: 'comp_123',
+        name: 'Test Company',
+        website: 'https://example.com',
+      };
+      const result = validateUniversalToolParams('update_record', params);
+      expect(result.record_data).toEqual({
+        name: 'Test Company',
+        website: 'https://example.com',
+      });
+      // Verify flat fields are NOT left at top level (single source of truth)
+      expect(result).not.toHaveProperty('name');
+      expect(result).not.toHaveProperty('website');
+    });
+
+    it('should not mutate original params when normalizing', () => {
+      const original = {
+        resource_type: 'companies',
+        record_id: 'comp_123',
+        name: 'Test Company',
+      };
+      const originalCopy = JSON.parse(JSON.stringify(original));
+
+      validateUniversalToolParams('update_record', original);
+
+      // Original should be unchanged (except for sanitization of existing fields)
+      expect(original.resource_type).toBe(originalCopy.resource_type);
+      expect(original.record_id).toBe(originalCopy.record_id);
+    });
+  });
+
+  describe('update_record - task immutability validation', () => {
+    it('should reject task content updates at top level', () => {
+      const params = {
+        resource_type: 'tasks',
+        record_id: 'task_123',
+        record_data: { content: 'Updated content' },
+      };
+      expect(() =>
+        validateUniversalToolParams('update_record', params)
+      ).toThrow('Task content is immutable');
+    });
+
+    it('should reject task content_markdown updates at top level', () => {
+      const params = {
+        resource_type: 'tasks',
+        record_id: 'task_123',
+        record_data: { content_markdown: '# Updated' },
+      };
+      expect(() =>
+        validateUniversalToolParams('update_record', params)
+      ).toThrow('Task content is immutable');
+    });
+
+    it('should reject task content_plaintext updates at top level', () => {
+      const params = {
+        resource_type: 'tasks',
+        record_id: 'task_123',
+        record_data: { content_plaintext: 'Plain text' },
+      };
+      expect(() =>
+        validateUniversalToolParams('update_record', params)
+      ).toThrow('Task content is immutable');
+    });
+
+    it('should reject task content updates in nested values structure', () => {
+      const params = {
+        resource_type: 'tasks',
+        record_id: 'task_123',
+        record_data: { values: { content: 'Updated content' } },
+      };
+      expect(() =>
+        validateUniversalToolParams('update_record', params)
+      ).toThrow('Task content is immutable');
+    });
+
+    it('should reject task content_markdown updates in nested values', () => {
+      const params = {
+        resource_type: 'tasks',
+        record_id: 'task_123',
+        record_data: { values: { content_markdown: '# Updated' } },
+      };
+      expect(() =>
+        validateUniversalToolParams('update_record', params)
+      ).toThrow('Task content is immutable');
+    });
+
+    it('should reject task content_plaintext updates in nested values', () => {
+      const params = {
+        resource_type: 'tasks',
+        record_id: 'task_123',
+        record_data: { values: { content_plaintext: 'Plain text' } },
+      };
+      expect(() =>
+        validateUniversalToolParams('update_record', params)
+      ).toThrow('Task content is immutable');
+    });
+
+    it('should allow task status updates (not content)', () => {
+      const params = {
+        resource_type: 'tasks',
+        record_id: 'task_123',
+        record_data: { status: 'completed' },
+      };
+      const result = validateUniversalToolParams('update_record', params);
+      expect(result.record_data).toEqual({ status: 'completed' });
+    });
+
+    it('should allow task status updates in nested values structure', () => {
+      const params = {
+        resource_type: 'tasks',
+        record_id: 'task_123',
+        record_data: { values: { status: 'completed', assignees: 'user_123' } },
+      };
+      const result = validateUniversalToolParams('update_record', params);
+      expect(result.record_data).toEqual({
+        values: { status: 'completed', assignees: 'user_123' },
+      });
+    });
+  });
+
+  describe('note operations - note_id validation', () => {
+    it('should reject traversal-style note_id values for update-note', () => {
+      expect(() =>
+        validateUniversalToolParams('update-note', {
+          note_id: '../objects/companies',
+          title: 'Updated note',
+        })
+      ).toThrow('Invalid note_id format');
+    });
+
+    it('should reject traversal-style note_id values for delete-note', () => {
+      expect(() =>
+        validateUniversalToolParams('delete-note', {
+          note_id: '../objects/companies',
+        })
+      ).toThrow('Invalid note_id format');
     });
   });
 });

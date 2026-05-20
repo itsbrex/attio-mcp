@@ -10,6 +10,11 @@ import {
   validateIdFields,
   validatePaginationParams,
 } from './field-validator.js';
+import {
+  canonicalizeResourceType,
+  getValidResourceTypes,
+} from '@/handlers/tools/dispatcher/utils.js';
+import { RecordDataNormalizer } from '@/utils/normalization/record-data-normalization.js';
 
 /**
  * Fields that should preserve newlines during sanitization.
@@ -244,21 +249,25 @@ const toolValidators: Record<string, ToolValidator> = {
     return p;
   },
   update_record: (p) => {
-    if (!p.resource_type) {
+    // Normalize input format - use normalized result directly (no leftover fields)
+    const params = RecordDataNormalizer.needsNormalization(p)
+      ? (RecordDataNormalizer.normalize(p) as SanitizedObject)
+      : p;
+    if (!params.resource_type) {
       throw new UniversalValidationError(
         'Missing required parameter: resource_type',
         ErrorType.USER_ERROR,
         { field: 'resource_type', example: `resource_type: 'companies'` }
       );
     }
-    if (!p.record_id) {
+    if (!params.record_id) {
       throw new UniversalValidationError(
         'Missing required parameter: record_id',
         ErrorType.USER_ERROR,
         { field: 'record_id', example: `record_id: 'comp_abc123'` }
       );
     }
-    if (!p.record_data) {
+    if (!params.record_data) {
       throw new UniversalValidationError(
         'Missing required parameter: record_data',
         ErrorType.USER_ERROR,
@@ -269,12 +278,18 @@ const toolValidators: Record<string, ToolValidator> = {
         }
       );
     }
-    if (p.resource_type === 'tasks') {
+    if (params.resource_type === 'tasks') {
       const forbidden = ['content', 'content_markdown', 'content_plaintext'];
-      if (p.record_data && typeof p.record_data === 'object') {
-        const recordData = p.record_data as Record<string, unknown>;
+      if (params.record_data && typeof params.record_data === 'object') {
+        const recordData = params.record_data as Record<string, unknown>;
+        // Check both nesting patterns: direct and wrapped in values
+        const valuesToCheck = (
+          recordData.values && typeof recordData.values === 'object'
+            ? recordData.values
+            : recordData
+        ) as Record<string, unknown>;
         for (const k of forbidden) {
-          if (k in recordData) {
+          if (k in valuesToCheck) {
             throw new UniversalValidationError(
               'Task content is immutable and cannot be updated'
             );
@@ -282,7 +297,7 @@ const toolValidators: Record<string, ToolValidator> = {
         }
       }
     }
-    return p;
+    return params;
   },
   delete_record: (p) => {
     if (!p.resource_type) {
@@ -560,6 +575,59 @@ toolValidators.execute_workflow = (p) => {
   return p;
 };
 
+const TOOLS_WITH_DYNAMIC_RESOURCE_TYPES = new Set([
+  'search_records',
+  'search_records_advanced',
+  'search_records_by_timeframe',
+  'get_record_details',
+  'records_get_details',
+  'create_record',
+  'update_record',
+  'delete_record',
+]);
+
+function validateStandardResourceType(resourceType: string): string {
+  if (
+    !Object.values(UniversalResourceType).includes(
+      resourceType as UniversalResourceType
+    )
+  ) {
+    const suggestion = suggestResourceType(resourceType);
+    const validTypes = Object.values(UniversalResourceType).join(', ');
+    throw new UniversalValidationError(
+      `Invalid resource_type: '${resourceType}'`,
+      ErrorType.USER_ERROR,
+      {
+        field: 'resource_type',
+        suggestion: suggestion ? `Did you mean '${suggestion}'?` : undefined,
+        example: `Expected one of: ${validTypes}`,
+        httpStatusCode: HttpStatusCode.UNPROCESSABLE_ENTITY,
+      }
+    );
+  }
+
+  return resourceType;
+}
+
+function validateDynamicSearchResourceType(resourceType: string): string {
+  try {
+    return canonicalizeResourceType(resourceType);
+  } catch {
+    const suggestion = suggestResourceType(resourceType);
+    const validTypes = getValidResourceTypes().join(', ');
+    throw new UniversalValidationError(
+      `Invalid resource_type: '${resourceType}'. Expected one of: ${validTypes}`,
+      ErrorType.USER_ERROR,
+      {
+        field: 'resource_type',
+        suggestion: suggestion ? `Did you mean '${suggestion}'?` : undefined,
+        example: `Expected one of: ${validTypes}`,
+        httpStatusCode: HttpStatusCode.UNPROCESSABLE_ENTITY,
+      }
+    );
+  }
+}
+
 export function validateUniversalToolParams(
   toolName: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -586,24 +654,11 @@ export function validateUniversalToolParams(
   validateIdFields(sanitizedParams);
   if (sanitizedParams.resource_type) {
     const resourceType = String(sanitizedParams.resource_type);
-    if (
-      !Object.values(UniversalResourceType).includes(
-        resourceType as UniversalResourceType
-      )
-    ) {
-      const suggestion = suggestResourceType(resourceType);
-      const validTypes = Object.values(UniversalResourceType).join(', ');
-      throw new UniversalValidationError(
-        `Invalid resource_type: '${resourceType}'`,
-        ErrorType.USER_ERROR,
-        {
-          field: 'resource_type',
-          suggestion: suggestion ? `Did you mean '${suggestion}'?` : undefined,
-          example: `Expected one of: ${validTypes}`,
-          httpStatusCode: HttpStatusCode.UNPROCESSABLE_ENTITY,
-        }
-      );
-    }
+    sanitizedParams.resource_type = TOOLS_WITH_DYNAMIC_RESOURCE_TYPES.has(
+      toolName
+    )
+      ? validateDynamicSearchResourceType(resourceType)
+      : validateStandardResourceType(resourceType);
   }
   const validator = toolValidators[toolName];
   if (validator) return validator(sanitizedParams);

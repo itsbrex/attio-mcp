@@ -4,6 +4,7 @@
  */
 
 import { createScopedLogger } from '@/utils/logger.js';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 const logger = createScopedLogger('client-context');
 
@@ -13,6 +14,7 @@ let contextKey: object | null = null;
 
 // Fallback for simple context storage (legacy compatibility)
 let clientContext: Record<string, unknown> | null = null;
+const requestContextStorage = new AsyncLocalStorage<Record<string, unknown>>();
 
 // Cache for failed context getter attempts to avoid repeated exceptions
 const failedContextCache = new Map<string, NodeJS.Timeout>();
@@ -24,16 +26,9 @@ const FAILED_CONTEXT_CACHE_TTL = 10000; // 10 seconds - increased for retry scen
  * Uses WeakMap for secure storage when possible.
  */
 export function setClientContext(context: Record<string, unknown>): void {
-  // Debug logging for Issue #891: Track context storage
-  const typedContext = context as {
-    getApiKey?: () => string | undefined;
-    ATTIO_API_KEY?: string;
-  };
   logger.debug('Storing context', {
     hasContext: Boolean(context),
-    contextKeys: Object.keys(context),
-    hasGetApiKeyFunction: typeof typedContext.getApiKey === 'function',
-    hasDirectApiKey: Boolean(typedContext.ATTIO_API_KEY),
+    contextKeyCount: Object.keys(context).length,
     timestamp: new Date().toISOString(),
   });
 
@@ -77,6 +72,11 @@ function clearFailedContextCache(): void {
  * Prioritizes WeakMap storage over fallback storage.
  */
 export function getClientContext(): Record<string, unknown> | null {
+  const requestContext = requestContextStorage.getStore();
+  if (requestContext) {
+    return requestContext;
+  }
+
   // Try WeakMap storage first
   if (contextKey && contextStorage.has(contextKey)) {
     return contextStorage.get(contextKey) || null;
@@ -84,6 +84,13 @@ export function getClientContext(): Record<string, unknown> | null {
 
   // Fallback to legacy storage
   return clientContext;
+}
+
+export async function runWithClientContext<T>(
+  context: Record<string, unknown>,
+  operation: () => Promise<T>
+): Promise<T> {
+  return await requestContextStorage.run({ ...context }, operation);
 }
 
 /**
@@ -121,26 +128,20 @@ export function getContextApiKey(): string | undefined {
 
   logger.debug('Attempting API key/token resolution', {
     hasContext: Boolean(context),
-    hasGetApiKeyFunction: typeof typedContext.getApiKey === 'function',
     shouldSkipGetter,
-    hasDirectApiKey: Boolean(typedContext.ATTIO_API_KEY),
-    hasDirectAccessToken: Boolean(typedContext.ATTIO_ACCESS_TOKEN),
-    directKeyLength: typedContext.ATTIO_API_KEY?.length || 0,
-    directTokenLength: typedContext.ATTIO_ACCESS_TOKEN?.length || 0,
   });
 
   if (typeof typedContext.getApiKey === 'function' && !shouldSkipGetter) {
+    logger.debug('Calling context credential getter');
     try {
       const key = typedContext.getApiKey();
-      logger.debug('Function call result', {
-        resolved: Boolean(key),
-        keyLength: key?.length || 0,
-      });
       if (key && typeof key === 'string' && key.trim()) {
+        logger.debug('Context credential getter returned a usable credential');
         return key;
       }
-    } catch (error) {
-      logger.debug('Function call failed', { error });
+      logger.debug('Context credential getter returned no usable credential');
+    } catch (_error) {
+      logger.debug('Context credential getter failed');
       // Cache this failure to avoid repeated exceptions
       // Clear existing timer if present to prevent duplicates
       const existingTimer = failedContextCache.get(getApiKeyIdentifier);
@@ -163,7 +164,7 @@ export function getContextApiKey(): string | undefined {
     typeof typedContext.ATTIO_API_KEY === 'string' &&
     typedContext.ATTIO_API_KEY.trim()
   ) {
-    logger.debug('Using direct ATTIO_API_KEY property');
+    logger.debug('Using direct context credential property');
     return typedContext.ATTIO_API_KEY;
   }
 
@@ -172,11 +173,11 @@ export function getContextApiKey(): string | undefined {
     typeof typedContext.ATTIO_ACCESS_TOKEN === 'string' &&
     typedContext.ATTIO_ACCESS_TOKEN.trim()
   ) {
-    logger.debug('Using direct ATTIO_ACCESS_TOKEN property');
+    logger.debug('Using direct context credential property');
     return typedContext.ATTIO_ACCESS_TOKEN;
   }
 
-  logger.debug('No API key or access token found in context');
+  logger.debug('No usable credential found in context');
 
   return undefined;
 }
