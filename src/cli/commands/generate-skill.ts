@@ -12,12 +12,14 @@ import {
   OutputWriterService,
 } from '@/services/skill-generator/index.js';
 import type { GenerateSkillConfig } from '@/services/skill-generator/types.js';
+import { getAvailableObjects } from './attributes.js';
 
 /**
  * Interface for command arguments
  */
 interface GenerateSkillArgs {
   object?: string;
+  objects?: string;
   all?: boolean;
   format?: 'skill' | 'markdown' | 'json';
   output?: string;
@@ -55,7 +57,25 @@ export async function generateSkill(argv: GenerateSkillArgs): Promise<void> {
     // 2. Determine objects to process
     let objects: string[];
     if (argv.all) {
-      objects = PHASE_1_OBJECTS;
+      spinner.text = 'Discovering workspace objects...';
+      const available = await getAvailableObjects(apiKey);
+      objects = available
+        .map((o) => o.api_slug)
+        .filter((s): s is string => typeof s === 'string' && s.length > 0);
+      if (objects.length === 0) {
+        spinner.fail('No objects discovered in workspace.');
+        process.exit(1);
+      }
+      spinner.text = `Generating skill for ${objects.length} object(s): ${objects.join(', ')}...`;
+    } else if (argv.objects) {
+      objects = argv.objects
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (objects.length === 0) {
+        spinner.fail('--objects requires at least one slug.');
+        process.exit(1);
+      }
       spinner.text = `Generating skill for ${objects.join(', ')}...`;
     } else {
       objects = [argv.object!];

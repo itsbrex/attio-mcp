@@ -68,13 +68,17 @@ yargs(hideBin(process.argv))
       yargs
         .option('object', {
           alias: 'o',
-          description: 'Object to generate skill for (e.g., companies, people)',
+          description: 'Single object to generate skill for (e.g., companies)',
+          type: 'string',
+        })
+        .option('objects', {
+          description:
+            'Comma-separated subset of object slugs (e.g., companies,people,custom_x)',
           type: 'string',
         })
         .option('all', {
           alias: 'a',
-          description:
-            'Generate for Phase 1 objects (companies, people, deals)',
+          description: 'Generate for all workspace objects (standard + custom)',
           type: 'boolean',
           default: false,
         })
@@ -117,10 +121,19 @@ yargs(hideBin(process.argv))
           description: 'Attio API key (defaults to ATTIO_API_KEY env var)',
           type: 'string',
         })
-        .conflicts('object', 'all')
         .check((argv) => {
-          if (!argv.object && !argv.all) {
-            throw new Error('You must specify either --object or --all');
+          const provided = [
+            argv.object ? 'object' : null,
+            argv.objects ? 'objects' : null,
+            argv.all ? 'all' : null,
+          ].filter(Boolean);
+          if (provided.length === 0) {
+            throw new Error('You must specify --object, --objects, or --all');
+          }
+          if (provided.length > 1) {
+            throw new Error(
+              `--${provided.join(', --')} are mutually exclusive; pick one`
+            );
           }
           if (
             typeof argv.optionFetchDelay !== 'number' ||
