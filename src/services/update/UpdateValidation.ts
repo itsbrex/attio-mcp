@@ -3,6 +3,7 @@ import {
   isAttioRecord,
   type UniversalRecord,
 } from '@/types/attio.js';
+import { UniversalResourceType } from '@/handlers/tool-configs/universal/types.js';
 import { FilterValidationError } from '@/errors/api-errors.js';
 import { shouldUseMockData } from '@/services/create/index.js';
 import { UniversalUtilityService } from '@/services/UniversalUtilityService.js';

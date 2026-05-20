@@ -204,8 +204,8 @@ export function collectInvalidFilters(
       return;
     }
 
-    // Validate condition if enabled (with alias normalization).
-    // Defensive: condition may be non-string in malformed input.
+    // Validate condition if enabled. Read-only: validateFilters() is
+    // responsible for producing the normalized output copy.
     if (validateConditions) {
       const normalizedCondition =
         typeof filter.condition === 'string'
@@ -219,9 +219,6 @@ export function collectInvalidFilters(
         });
         return;
       }
-
-      // Mutate in place so downstream translation consistently uses canonical tokens.
-      filter.condition = normalizedCondition;
     }
   });
 

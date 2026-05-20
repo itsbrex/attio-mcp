@@ -3,6 +3,7 @@
  */
 
 import {
+  UniversalResourceType,
   UniversalToolConfig,
   AdvancedSearchParams,
 } from '@/handlers/tool-configs/universal/types.js';

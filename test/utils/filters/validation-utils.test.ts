@@ -160,7 +160,7 @@ describe('Filter Validation Utilities', () => {
       expect(invalidFilters).toEqual([]);
     });
 
-    it('should accept and normalize legacy date operator aliases', () => {
+    it('should accept legacy date operator aliases without flagging them as invalid', () => {
       const filters = [
         {
           attribute: { slug: 'exp_date' },
@@ -176,10 +176,10 @@ describe('Filter Validation Utilities', () => {
 
       const invalidFilters = collectInvalidFilters(filters, true);
       expect(invalidFilters).toEqual([]);
-      expect(filters[0].condition).toBe(FilterConditionType.GREATER_THAN);
-      expect(filters[1].condition).toBe(
-        FilterConditionType.LESS_THAN_OR_EQUALS
-      );
+      // Read-only: collectInvalidFilters must not mutate input.
+      // Canonical-form output is produced by validateFilters() instead.
+      expect(filters[0].condition).toBe('greater_than');
+      expect(filters[1].condition).toBe('less_than_or_equal_to');
     });
   });
 

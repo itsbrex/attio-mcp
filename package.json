@@ -208,6 +208,7 @@
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
     "fast-safe-stringify": "^2.1.1",
+    "fflate": "0.8.3",
     "handlebars": "^4.7.8",
     "libphonenumber-js": "^1.12.30",
     "lru-cache": "^11.2.2",

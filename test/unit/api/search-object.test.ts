@@ -11,6 +11,7 @@ vi.mock('@api/lazy-client.js', () => ({
   getLazyAttioClient: () => ({
     post: postMock,
   }),
+  getGlobalContext: () => null,
 }));
 
 vi.mock('@api/operations/retry.js', () => ({

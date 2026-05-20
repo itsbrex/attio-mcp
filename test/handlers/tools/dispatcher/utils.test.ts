@@ -264,6 +264,7 @@ describe('Dispatcher Utils', () => {
           'tasks',
           'deals',
           'notes',
+          'locations',
           'funds',
           'channels',
         ]);

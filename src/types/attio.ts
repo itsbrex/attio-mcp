@@ -100,6 +100,12 @@ export enum FilterConditionType {
   IS_NOT_SET = 'is_not_set',
 }
 
+/**
+ * Backward-compatible aliases accepted from tool inputs.
+ * Combines short tokens (gt, lt), canonical names (greater_than),
+ * legacy long-form (greater_than_or_equal_to), and $-prefixed variants.
+ * All normalize to canonical FilterConditionType values.
+ */
 const FILTER_CONDITION_ALIASES: Record<string, FilterConditionType> = {
   equals: FilterConditionType.EQUALS,
   eq: FilterConditionType.EQUALS,
@@ -113,8 +119,12 @@ const FILTER_CONDITION_ALIASES: Record<string, FilterConditionType> = {
   less_than: FilterConditionType.LESS_THAN,
   gte: FilterConditionType.GREATER_THAN_OR_EQUALS,
   greater_than_or_equals: FilterConditionType.GREATER_THAN_OR_EQUALS,
+  greater_than_or_equal_to: FilterConditionType.GREATER_THAN_OR_EQUALS,
+  greater_than_or_equal: FilterConditionType.GREATER_THAN_OR_EQUALS,
   lte: FilterConditionType.LESS_THAN_OR_EQUALS,
   less_than_or_equals: FilterConditionType.LESS_THAN_OR_EQUALS,
+  less_than_or_equal_to: FilterConditionType.LESS_THAN_OR_EQUALS,
+  less_than_or_equal: FilterConditionType.LESS_THAN_OR_EQUALS,
   between: FilterConditionType.BETWEEN,
   is_empty: FilterConditionType.IS_EMPTY,
   empty: FilterConditionType.IS_EMPTY,
@@ -138,54 +148,22 @@ const FILTER_CONDITION_ALIASES: Record<string, FilterConditionType> = {
   $not_empty: FilterConditionType.IS_NOT_EMPTY,
 };
 
-export function normalizeFilterCondition(
-  condition: string
-): FilterConditionType | undefined {
-  const normalizedCondition = FILTER_CONDITION_ALIASES[condition];
-  if (normalizedCondition) {
-    return normalizedCondition;
-  }
-
-  if (!condition.startsWith('$')) {
-    return undefined;
-  }
-
-  const unprefixedCondition = condition.slice(1);
-  return (
-    FILTER_CONDITION_ALIASES[unprefixedCondition] ??
-    (isValidFilterCondition(unprefixedCondition)
-      ? unprefixedCondition
-      : undefined)
-  );
-}
-
-/**
- * Backward-compatible aliases accepted from tool inputs.
- * These are normalized to canonical FilterConditionType values.
- */
-const FILTER_CONDITION_ALIASES: Record<string, FilterConditionType> = {
-  greater_than: FilterConditionType.GREATER_THAN,
-  less_than: FilterConditionType.LESS_THAN,
-  greater_than_or_equals: FilterConditionType.GREATER_THAN_OR_EQUALS,
-  less_than_or_equals: FilterConditionType.LESS_THAN_OR_EQUALS,
-  greater_than_or_equal_to: FilterConditionType.GREATER_THAN_OR_EQUALS,
-  less_than_or_equal_to: FilterConditionType.LESS_THAN_OR_EQUALS,
-  greater_than_or_equal: FilterConditionType.GREATER_THAN_OR_EQUALS,
-  less_than_or_equal: FilterConditionType.LESS_THAN_OR_EQUALS,
-};
-
 /**
  * Normalize an input condition to a canonical FilterConditionType value.
  *
- * Accepts both canonical tokens (e.g., "gt") and legacy aliases
- * (e.g., "greater_than", "greater_than_or_equal_to").
+ * Accepts canonical tokens (e.g., "gt"), legacy aliases (e.g.,
+ * "greater_than", "greater_than_or_equal_to"), and $-prefixed Mongo-style
+ * operators. Input is trimmed and lowercased.
+ *
+ * Returns the canonical FilterConditionType, or undefined if no match.
  */
 export function normalizeFilterCondition(
   condition: string
-): FilterConditionType | null {
+): FilterConditionType | undefined {
   const normalized = condition?.trim().toLowerCase();
-  if (!normalized) return null;
+  if (!normalized) return undefined;
 
+  // Already canonical (e.g., 'equals', 'contains').
   if (
     Object.values(FilterConditionType).includes(
       normalized as FilterConditionType
@@ -194,7 +172,24 @@ export function normalizeFilterCondition(
     return normalized as FilterConditionType;
   }
 
-  return FILTER_CONDITION_ALIASES[normalized] || null;
+  // Direct alias lookup.
+  const aliased = FILTER_CONDITION_ALIASES[normalized];
+  if (aliased) return aliased;
+
+  // $-prefixed variants — strip prefix and re-check (after lowercase).
+  if (normalized.startsWith('$')) {
+    const unprefixed = normalized.slice(1);
+    return (
+      FILTER_CONDITION_ALIASES[unprefixed] ??
+      (Object.values(FilterConditionType).includes(
+        unprefixed as FilterConditionType
+      )
+        ? (unprefixed as FilterConditionType)
+        : undefined)
+    );
+  }
+
+  return undefined;
 }
 
 /**

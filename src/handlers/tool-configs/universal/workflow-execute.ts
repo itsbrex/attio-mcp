@@ -10,13 +10,13 @@ const MAX_OUTPUT_PREVIEW_LENGTH = 500;
 
 const workflowCompensationSchema = z.object({
   tool: z.string().trim().min(1).max(100),
-  arguments: z.record(z.unknown()).optional().default({}),
+  arguments: z.record(z.string(), z.unknown()).optional().default({}),
 });
 
 const workflowStepSchema = z.object({
   id: z.string().trim().min(1).max(120).optional(),
   tool: z.string().trim().min(1).max(100),
-  arguments: z.record(z.unknown()).optional().default({}),
+  arguments: z.record(z.string(), z.unknown()).optional().default({}),
   on_error: z.enum(['stop', 'continue']).optional().default('stop'),
   compensation: workflowCompensationSchema.optional(),
 });
@@ -311,9 +311,9 @@ function getTextFromMcpResult(result: unknown): string {
 function isMcpError(result: unknown): boolean {
   return Boolean(
     result &&
-      typeof result === 'object' &&
-      'isError' in result &&
-      (result as { isError?: unknown }).isError === true
+    typeof result === 'object' &&
+    'isError' in result &&
+    (result as { isError?: unknown }).isError === true
   );
 }
 
@@ -321,9 +321,8 @@ async function executeStepTool(
   toolName: string,
   args: Record<string, unknown>
 ): Promise<unknown> {
-  const { executeToolRequest } = await import(
-    '@/handlers/tools/dispatcher/core.js'
-  );
+  const { executeToolRequest } =
+    await import('@/handlers/tools/dispatcher/core.js');
   return executeToolRequest({
     params: {
       name: toolName,
