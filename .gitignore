@@ -89,3 +89,9 @@ mcp-publisher
 
 # Local-only personal reporting scripts (contain workspace-specific logic)
 scripts/reports/
+
+# Claude Code session transcripts (have historically leaked credentials)
+.specstory/
+
+# Test output from `generate-skill --all`
+output-test2/
