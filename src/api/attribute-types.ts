@@ -1,10 +1,14 @@
 /**
  * Attribute type detection and management for Attio attributes
  */
-import { getLazyAttioClient } from '../api/lazy-client.js';
-import { parsePersonalName } from '../utils/personal-name-parser.js';
-import { debug, error } from '../utils/logger.js';
-import { TTLCache } from '../utils/ttl-cache.js';
+import { getLazyAttioClient } from '@/api/lazy-client.js';
+import {
+  validateLocationValue,
+  validatePersonalNameValue,
+  validatePhoneNumberValue,
+} from '@/utils/complex-type-validation.js';
+import { debug, error } from '@/utils/logger.js';
+import { TTLCache } from '@/utils/ttl-cache.js';
 
 /**
  * Interface for Attio attribute metadata
@@ -57,13 +61,24 @@ export interface AttioAttributeMetadata {
  * Reduces API calls while preventing stale data (15-minute expiration)
  * Per PR #905 performance optimization
  */
-const attributeCache = new TTLCache<
+let attributeCache: TTLCache<
   string,
   Map<string, AttioAttributeMetadata>
->(
-  15 * 60 * 1000, // 15 minutes TTL
-  5 * 60 * 1000 // 5 minutes cleanup interval
-);
+> | null = null;
+
+function getAttributeCache(): TTLCache<
+  string,
+  Map<string, AttioAttributeMetadata>
+> {
+  if (!attributeCache) {
+    attributeCache = new TTLCache(
+      15 * 60 * 1000, // 15 minutes TTL
+      5 * 60 * 1000 // 5 minutes cleanup interval
+    );
+  }
+
+  return attributeCache;
+}
 
 /**
  * Fetches and caches attribute metadata for a specific object type
@@ -74,9 +89,10 @@ const attributeCache = new TTLCache<
 export async function getObjectAttributeMetadata(
   objectSlug: string
 ): Promise<Map<string, AttioAttributeMetadata>> {
+  const cache = getAttributeCache();
   // Check cache first
-  if (attributeCache.has(objectSlug)) {
-    return attributeCache.get(objectSlug)!;
+  if (cache.has(objectSlug)) {
+    return cache.get(objectSlug)!;
   }
 
   try {
@@ -84,7 +100,7 @@ export async function getObjectAttributeMetadata(
     if (objectSlug === 'tasks') {
       // Tasks have predefined fields, not dynamic attributes
       const taskMetadata = createTaskAttributeMetadata();
-      attributeCache.set(objectSlug, taskMetadata);
+      cache.set(objectSlug, taskMetadata);
       return taskMetadata;
     }
 
@@ -128,7 +144,7 @@ export async function getObjectAttributeMetadata(
     });
 
     // Cache the result
-    attributeCache.set(objectSlug, metadataMap);
+    cache.set(objectSlug, metadataMap);
 
     return metadataMap;
   } catch (err: unknown) {
@@ -232,8 +248,11 @@ export async function detectFieldType(
       return isMultiple ? 'array' : 'string';
 
     case 'select':
-      // For select fields, check if multiselect is enabled
-      return isMultiple ? 'array' : 'string';
+      // Select fields are ALWAYS arrays in Attio, even single-select
+      // Single-select: ["uuid"], Multi-select: ["uuid1", "uuid2"]
+      // (isMultiple flag is intentionally ignored - both formats use array)
+      // See Issue #1019, #1030, #1045
+      return 'array';
 
     case 'record-reference':
       return isMultiple ? 'array' : 'object';
@@ -327,7 +346,12 @@ export async function getAttributeTypeInfo(
 
   return {
     fieldType,
-    isArray: attrMetadata.is_multiselect || false,
+    // For select fields, isArray should match fieldType (always true)
+    // For other types, use is_multiselect flag
+    isArray:
+      attrMetadata.type === 'select'
+        ? true
+        : attrMetadata.is_multiselect || false,
     isRequired: attrMetadata.is_required || false,
     isUnique: attrMetadata.is_unique || false,
     attioType: attrMetadata.type,
@@ -341,10 +365,11 @@ export async function getAttributeTypeInfo(
  * @param objectSlug - Optional object type to clear (clears all if not provided)
  */
 export function clearAttributeCache(objectSlug?: string): void {
+  const cache = getAttributeCache();
   if (objectSlug) {
-    attributeCache.delete(objectSlug);
+    cache.delete(objectSlug);
   } else {
-    attributeCache.clear();
+    cache.clear();
   }
 }
 
@@ -476,15 +501,10 @@ export async function formatAttributeValue(
   // Different field types need different formatting
   switch (typeInfo.attioType) {
     case 'select':
-      // Select fields expect direct string values (title or ID)
-      if (typeInfo.isArray) {
-        // Multiselect: array of strings
-        const arrayValue = Array.isArray(value) ? value : [value];
-        return arrayValue;
-      } else {
-        // Single select: direct string
-        return value;
-      }
+      // Select fields are represented as string arrays in Attio "values",
+      // even for single-select (Issue #1019 / #1030). Single-select uses a
+      // one-element array like ["option-uuid"].
+      return Array.isArray(value) ? value : [value];
 
     case 'text':
       // Text fields for people object don't need wrapping for certain slugs
@@ -537,7 +557,7 @@ export async function formatAttributeValue(
     case 'personal-name': {
       // Personal name fields need special handling
       // Use the dedicated parser utility
-      const parsedName = parsePersonalName(value);
+      const parsedName = validatePersonalNameValue(value, attributeSlug);
       debug(
         'attribute-types',
         `[formatAttributeValue] Personal name parsing:`,
@@ -561,13 +581,15 @@ export async function formatAttributeValue(
       }
 
     case 'phone-number':
-      // Phone fields are like email - array but no value wrapping
+      // Phone fields are like email - array but no value wrapping, but validate shape first
       if (typeInfo.isArray) {
+        if (value === null || value === undefined) {
+          return value;
+        }
         const arrayValue = Array.isArray(value) ? value : [value];
-        return arrayValue;
-      } else {
-        return value;
+        return validatePhoneNumberValue(arrayValue, attributeSlug);
       }
+      return validatePhoneNumberValue(value, attributeSlug);
 
     case 'email-address': {
       // Email is an array field but doesn't need value wrapping
@@ -589,6 +611,28 @@ export async function formatAttributeValue(
       } else {
         return value;
       }
+
+    case 'location': {
+      // Location fields expect object format directly (not wrapped in { value: ... })
+      // Attio requires ALL 10 location fields to be present, even if null
+      // Issue #987: Normalize location objects with all required fields
+      // Note: Avoid logging raw location data (PII risk) - log only metadata
+      debug('attribute-types', `[formatAttributeValue] Location field:`, {
+        hasValue: !!value,
+        isObject: typeof value === 'object' && value !== null,
+        objectSlug,
+        attributeSlug,
+      });
+
+      if (typeInfo.isArray) {
+        if (value === null || value === undefined) {
+          return value;
+        }
+        const arrayValue = Array.isArray(value) ? value : [value];
+        return validateLocationValue(arrayValue, attributeSlug);
+      }
+      return validateLocationValue(value, attributeSlug);
+    }
 
     case 'number':
     case 'currency':

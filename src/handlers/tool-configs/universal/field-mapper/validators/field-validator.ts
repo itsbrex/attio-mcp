@@ -13,14 +13,16 @@ import { findSimilarStrings } from './similarity-utils.js';
  * Provides concrete examples based on resource type
  */
 function getRequiredFieldErrorMessage(
-  resourceType: UniversalResourceType,
+  resourceType: string,
   fieldName: string
 ): string {
   const baseMessage = `Required field "${fieldName}" is missing`;
 
   // Add resource-specific examples for common required fields
   if (resourceType === UniversalResourceType.DEALS && fieldName === 'stage') {
-    return `${baseMessage}. Example: stage: "Interested" (common values: "Interested", "Qualified", "Proposal", "Negotiation", "Closed Won", "Closed Lost")`;
+    // Don't hard-code stage examples - they vary by workspace
+    // Instead, guide users to discover valid options
+    return `${baseMessage}. Tip: Use records_get_attribute_options(resource_type="deals", attribute="stage") to see valid stages for your workspace.`;
   }
 
   if (resourceType === UniversalResourceType.DEALS && fieldName === 'name') {
@@ -54,10 +56,10 @@ function getRequiredFieldErrorMessage(
  * Provides context-aware error messages and suggestions
  */
 export function getFieldSuggestions(
-  resourceType: UniversalResourceType,
+  resourceType: string,
   fieldName: string
 ): string {
-  const mapping = FIELD_MAPPINGS[resourceType];
+  const mapping = FIELD_MAPPINGS[resourceType as UniversalResourceType];
   if (!mapping) {
     return `Unable to provide suggestions for resource type ${resourceType}`;
   }
@@ -91,7 +93,7 @@ export function getFieldSuggestions(
  * Performs comprehensive field validation with error categorization
  */
 export function validateFields(
-  resourceType: UniversalResourceType,
+  resourceType: string,
   recordData: Record<string, unknown>
 ): {
   valid: boolean;
@@ -99,7 +101,7 @@ export function validateFields(
   warnings: string[];
   suggestions: string[];
 } {
-  const mapping = FIELD_MAPPINGS[resourceType];
+  const mapping = FIELD_MAPPINGS[resourceType as UniversalResourceType];
   if (!mapping) {
     return {
       valid: true,
@@ -173,6 +175,8 @@ export function validateFields(
  * Get valid fields for a resource type
  * Used for error messages and validation
  */
-export function getValidFields(resourceType: UniversalResourceType): string[] {
-  return FIELD_MAPPINGS[resourceType]?.validFields || [];
+export function getValidFields(resourceType: string): string[] {
+  return (
+    FIELD_MAPPINGS[resourceType as UniversalResourceType]?.validFields || []
+  );
 }

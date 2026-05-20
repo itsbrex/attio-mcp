@@ -13,7 +13,10 @@
  */
 
 import { executeToolRequest } from '../../../src/handlers/tools/dispatcher.js';
-import type { CallToolRequest } from '@modelcontextprotocol/sdk/types.js';
+import type {
+  CallToolRequest,
+  CallToolResult,
+} from '@modelcontextprotocol/sdk/types.js';
 import {
   transformToolCall,
   transformResponse,
@@ -53,6 +56,33 @@ export interface ToolCallResult {
   isError?: boolean;
 }
 
+function captureDebugResult(
+  toolName: string,
+  params: ToolParameters,
+  result: CallToolResult
+) {
+  if (process.env.MCP_DEBUG_CAPTURE !== 'true') {
+    return;
+  }
+
+  try {
+    console.error(
+      JSON.stringify(
+        {
+          type: 'MCP_DEBUG_RESULT',
+          toolName,
+          params,
+          result,
+        },
+        null,
+        2
+      )
+    );
+  } catch (error) {
+    // Ignore serialization errors
+  }
+}
+
 /**
  * Preprocess parameters to handle special cases like URI-to-record_id extraction
  */
@@ -62,7 +92,7 @@ function preprocessParameters(
 ): ToolParameters {
   // Handle URI parameter for note creation tools
   if (
-    toolName === 'create-note' &&
+    toolName === 'create_note' &&
     'uri' in parameters &&
     !('record_id' in parameters)
   ) {
@@ -117,7 +147,7 @@ export async function callToolWithEnhancements(
       process.env.E2E_MODE === 'true' &&
       process.env.USE_MOCK_DATA !== 'false' &&
       // Tools that provide E2E-safe fallbacks (no real API needed)
-      ['list-notes'].includes(toolName);
+      ['list_notes'].includes(toolName);
 
     if (
       !apiKeyStatus.available &&
@@ -172,12 +202,12 @@ export async function callToolWithEnhancements(
         arguments: actualParams,
       },
     };
-
-    const response = await executeToolRequest(request);
+    const response = (await executeToolRequest(request)) as CallToolResult;
     const endTime = Date.now();
 
     // Step 3: Transform response if needed
     const finalResponse = transformResponse(originalToolName, response);
+    captureDebugResult(actualToolName, actualParams, finalResponse as any);
 
     // Step 4: Log the tool call
     const timing = {
@@ -455,7 +485,7 @@ export async function callUniversalTool(
 function isCreationTool(toolName: string): boolean {
   return (
     toolName.includes('create-') ||
-    toolName === 'create-record' ||
+    toolName === 'create_record' ||
     toolName.startsWith('create')
   );
 }

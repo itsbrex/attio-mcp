@@ -5,17 +5,21 @@
 import {
   UniversalToolConfig,
   AdvancedSearchParams,
-  UniversalResourceType,
-} from '../types.js';
-import { AttioRecord } from '../../../../types/attio.js';
+} from '@/handlers/tool-configs/universal/types.js';
+import type { UniversalRecordResult } from '@/types/attio.js';
 import {
   safeExtractRecordValues,
   safeExtractFirstValue,
-} from '../../shared/type-utils.js';
+} from '@/handlers/tool-configs/shared/type-utils.js';
 
-import { validateUniversalToolParams } from '../schemas.js';
-import { ErrorService } from '../../../../services/ErrorService.js';
-import { formatResourceType } from '../shared-handlers.js';
+import { validateUniversalToolParams } from '@/handlers/tool-configs/universal/schemas.js';
+import {
+  extractResourceTypeFromFormatArgs,
+  getPluralResourceLabel,
+  getSingularResourceLabel,
+} from '@/handlers/tool-configs/universal/core/utils.js';
+import { ErrorService } from '@/services/ErrorService.js';
+import { normalizeFilterCondition } from '@/types/attio.js';
 
 /**
  * Universal advanced search tool
@@ -23,66 +27,24 @@ import { formatResourceType } from '../shared-handlers.js';
  */
 export const advancedSearchConfig: UniversalToolConfig<
   AdvancedSearchParams,
-  AttioRecord[]
+  UniversalRecordResult[]
 > = {
-  name: 'records_search_advanced',
-  handler: async (params: AdvancedSearchParams): Promise<AttioRecord[]> => {
+  name: 'search_records_advanced',
+  handler: async (
+    params: AdvancedSearchParams
+  ): Promise<UniversalRecordResult[]> => {
     try {
       const sanitizedParams = validateUniversalToolParams(
-        'records_search_advanced',
+        'search_records_advanced',
         params
       );
 
       const { resource_type } = sanitizedParams;
 
-      // Advanced search uses Attio's non-$ operator dialect (equals, contains, gte/lte, is_not_empty, ...).
-      // Perform a light de-normalization: translate any $-prefixed operators to the expected strings
-      // and coerce is_not_empty value to true when omitted.
+      // Normalize public operator aliases before downstream validation so the
+      // tool schema, docs, and translation layer accept the same vocabulary.
       let filters = sanitizedParams.filters as Record<string, unknown>;
       try {
-        const deDollar = (cond: string): string => {
-          if (!cond) return cond;
-          if (cond.startsWith('$')) {
-            const raw = cond.slice(1);
-            switch (raw) {
-              case 'eq':
-                return 'equals';
-              case 'contains':
-                return 'contains';
-              case 'starts_with':
-                return 'starts_with';
-              case 'ends_with':
-                return 'ends_with';
-              case 'gt':
-                return 'gt';
-              case 'gte':
-                return 'gte';
-              case 'lt':
-                return 'lt';
-              case 'lte':
-                return 'lte';
-              case 'not_empty':
-                return 'is_not_empty';
-              default:
-                return raw; // fallback
-            }
-          }
-          // Also accept already-correct tokens and legacy typos
-          if (
-            cond === 'is_not_empty' ||
-            cond === 'equals' ||
-            cond === 'contains' ||
-            cond === 'starts_with' ||
-            cond === 'ends_with' ||
-            cond === 'gt' ||
-            cond === 'gte' ||
-            cond === 'lt' ||
-            cond === 'lte'
-          )
-            return cond;
-          return cond;
-        };
-
         if (
           filters &&
           typeof filters === 'object' &&
@@ -99,10 +61,14 @@ export const advancedSearchConfig: UniversalToolConfig<
               if (!f || typeof f !== 'object') return f;
               const next = { ...f } as Record<string, unknown>;
               if (typeof next.condition === 'string') {
-                next.condition = deDollar(next.condition);
+                next.condition =
+                  normalizeFilterCondition(next.condition) ?? next.condition;
               }
               if (
-                next.condition === 'is_not_empty' &&
+                (next.condition === 'is_not_empty' ||
+                  next.condition === 'is_empty' ||
+                  next.condition === 'is_set' ||
+                  next.condition === 'is_not_set') &&
                 (next.value == null || next.value === '')
               ) {
                 next.value = true;
@@ -118,7 +84,8 @@ export const advancedSearchConfig: UniversalToolConfig<
 
       // Delegate to universal search handler defined elsewhere
       // We intentionally avoid importing the handler here to keep concerns separated
-      const { handleUniversalSearch } = await import('../shared-handlers.js');
+      const { handleUniversalSearch } =
+        await import('@/handlers/tool-configs/universal/shared-handlers.js');
       return await handleUniversalSearch({
         resource_type,
         query: sanitizedParams.query,
@@ -131,22 +98,22 @@ export const advancedSearchConfig: UniversalToolConfig<
         ? String((params as { resource_type: unknown }).resource_type)
         : '';
       throw ErrorService.createUniversalError(
-        'records_search_advanced',
+        'search_records_advanced',
         ctx,
         error
       );
     }
   },
-  formatResult: (results: AttioRecord[], ...args: unknown[]) => {
-    const resourceType = args[0] as string | undefined;
+  formatResult: (results: UniversalRecordResult[], ...args: unknown[]) => {
+    const resourceType = extractResourceTypeFromFormatArgs(args);
     const count = Array.isArray(results) ? results.length : 0;
     const typeName = resourceType
-      ? formatResourceType(resourceType as UniversalResourceType)
+      ? getSingularResourceLabel(resourceType)
       : 'record';
     const headerType = resourceType
       ? count === 1
         ? typeName
-        : `${typeName}s`
+        : getPluralResourceLabel(resourceType)
       : 'records';
 
     if (!Array.isArray(results)) {
@@ -174,7 +141,10 @@ export const advancedSearchConfig: UniversalToolConfig<
         const industry = coerce(values?.industry);
         const location = coerce(values?.location);
         const website = coerce(values?.website);
-        const id = (recordId?.record_id as string) || 'unknown';
+        const id =
+          (recordId?.record_id as string) ||
+          (recordId?.list_id as string) ||
+          'unknown';
 
         let details = name;
         if (industry) details += ` [${industry}]`;

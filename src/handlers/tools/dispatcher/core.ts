@@ -42,7 +42,11 @@ import {
   handleNotesOperation,
   handleCreateNoteOperation,
 } from '@/handlers/tools/dispatcher/operations/notes.js';
-import { handleGetListsOperation } from '@/handlers/tools/dispatcher/operations/lists.js';
+import {
+  handleGetListsOperation,
+  handleCreateListOperation,
+  handleUpdateListConfigurationOperation,
+} from '@/handlers/tools/dispatcher/operations/lists.js';
 
 // Import CRUD operation handlers
 import {
@@ -57,6 +61,7 @@ import {
   handleAddRecordToListOperation,
   handleRemoveRecordFromListOperation,
   handleUpdateListEntryOperation,
+  handleManageListEntryOperation,
   handleGetListDetailsOperation,
   handleGetListEntriesOperation,
   handleFilterListEntriesOperation,
@@ -96,6 +101,8 @@ import {
   NotesToolConfig,
   CreateNoteToolConfig,
   GetListsToolConfig,
+  CreateListToolConfig,
+  UpdateListConfigurationToolConfig,
 } from '@/handlers/tool-types.js';
 
 /**
@@ -140,10 +147,15 @@ export async function executeToolRequest(request: CallToolRequest) {
     // Handle Universal and General tools first (Issue #352)
     if (resourceType === 'UNIVERSAL') {
       // For universal tools, use the tool's own handler directly
-      const args = request.params.arguments as Record<string, unknown>;
+      // Shallow-clone to avoid mutating the caller's object (e.g. shared params in Promise.all)
+      const rawArgs = (request.params.arguments ?? {}) as Record<
+        string,
+        unknown
+      >;
+      const args = { ...rawArgs };
 
       // Canonicalize and freeze resource_type to prevent mutation
-      if (args && 'resource_type' in args) {
+      if ('resource_type' in args) {
         args.resource_type = canonicalizeResourceType(args.resource_type);
         Object.defineProperty(args, 'resource_type', {
           value: args.resource_type,
@@ -180,9 +192,12 @@ export async function executeToolRequest(request: CallToolRequest) {
         formattedResult = JSON.stringify(rawResult, null, 2);
       } else if (toolConfig.formatResult) {
         try {
+          // Pass full args object as first param for tools that need access to all params
+          // (e.g., records_get_attribute_options needs args.attribute)
+          // Fall back to resource_type/info_type for backward compatibility
           formattedResult = (toolConfig.formatResult as FormatResultFunction)(
             rawResult,
-            args?.resource_type,
+            args, // Pass full args object
             args?.info_type
           );
         } catch {
@@ -194,10 +209,27 @@ export async function executeToolRequest(request: CallToolRequest) {
         formattedResult = JSON.stringify(rawResult, null, 2);
       }
 
-      result = {
-        content: [{ type: 'text', text: formattedResult }],
-        isError: false,
-      };
+      // If structuredOutput is defined, return dual content for programmatic parsing
+      // content[0]: JSON string for parsing, content[1]: human-readable text
+      if (toolConfig.structuredOutput) {
+        const resourceTypeArg = args?.resource_type as string | undefined;
+        const structured = toolConfig.structuredOutput(
+          rawResult,
+          resourceTypeArg
+        );
+        result = {
+          content: [
+            { type: 'text', text: JSON.stringify(structured) },
+            { type: 'text', text: formattedResult },
+          ],
+          isError: false,
+        };
+      } else {
+        result = {
+          content: [{ type: 'text', text: formattedResult }],
+          isError: false,
+        };
+      }
     } else if (resourceType === 'GENERAL') {
       // For general tools, use the tool's own handler directly
       const args = request.params.arguments as Record<string, unknown>;
@@ -287,6 +319,16 @@ export async function executeToolRequest(request: CallToolRequest) {
         request,
         toolConfig as GetListsToolConfig
       );
+    } else if (toolType === 'createList') {
+      result = await handleCreateListOperation(
+        request,
+        toolConfig as CreateListToolConfig
+      );
+    } else if (toolType === 'updateListConfiguration') {
+      result = await handleUpdateListConfigurationOperation(
+        request,
+        toolConfig as UpdateListConfigurationToolConfig
+      );
 
       // Handle CRUD operations (from emergency fix)
     } else if (toolType === 'create') {
@@ -343,6 +385,8 @@ export async function executeToolRequest(request: CallToolRequest) {
       result = await handleRemoveRecordFromListOperation(request, toolConfig);
     } else if (toolType === 'updateListEntry') {
       result = await handleUpdateListEntryOperation(request, toolConfig);
+    } else if (toolType === 'manageListEntry') {
+      result = await handleManageListEntryOperation(request, toolConfig);
     } else if (toolType === 'getListDetails') {
       result = await handleGetListDetailsOperation(request, toolConfig);
     } else if (toolType === 'getListEntries') {

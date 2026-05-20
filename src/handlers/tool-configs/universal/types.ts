@@ -5,9 +5,9 @@
  * tool count from 70 to ~30 tools while maintaining full functionality.
  */
 
-import { AttioRecord } from '../../../types/attio.js';
-import { ToolConfig } from '../../tool-types.js';
-import { ListEntryFilters } from '../../../api/operations/index.js';
+import type { ListEntryFilters } from '@/api/operations/index.js';
+import type { ToolConfig } from '@/handlers/tool-types.js';
+import type { UniversalRecord, UniversalRecordResult } from '@/types/attio.js';
 
 /**
  * Supported resource types for universal operations
@@ -172,7 +172,12 @@ export type RelativeTimeframe =
 /**
  * Date field options for timeframe filtering
  */
-export type DateField = 'created_at' | 'updated_at' | 'due_date';
+export type DateField =
+  | 'created_at'
+  | 'updated_at'
+  | 'modified_at'
+  | 'last_interaction'
+  | 'due_date';
 
 /**
  * Universal search parameters
@@ -207,23 +212,31 @@ export interface UniversalSearchParams {
   updated_after?: string;
   updated_before?: string;
   timeframe?: RelativeTimeframe;
-  date_field?: 'created_at' | 'updated_at';
+  date_field?: 'created_at' | 'updated_at' | 'last_interaction';
 }
 
 /**
  * Universal record details parameters
  */
 export interface UniversalRecordDetailsParams {
-  resource_type: UniversalResourceType;
+  resource_type: string;
   record_id: string;
   fields?: string[];
+}
+
+/**
+ * Get record interactions parameters (Issue #1116)
+ */
+export interface GetRecordInteractionsParams {
+  resource_type: UniversalResourceType;
+  record_id: string;
 }
 
 /**
  * Universal create record parameters
  */
 export interface UniversalCreateParams {
-  resource_type: UniversalResourceType;
+  resource_type: string;
   record_data: Record<string, unknown>;
   return_details?: boolean;
 }
@@ -232,7 +245,7 @@ export interface UniversalCreateParams {
  * Universal update record parameters
  */
 export interface UniversalUpdateParams {
-  resource_type: UniversalResourceType;
+  resource_type: string;
   record_id: string;
   record_data: Record<string, unknown>;
   return_details?: boolean;
@@ -242,7 +255,7 @@ export interface UniversalUpdateParams {
  * Universal delete record parameters
  */
 export interface UniversalDeleteParams {
-  resource_type: UniversalResourceType;
+  resource_type: string;
   record_id: string;
 }
 
@@ -254,6 +267,16 @@ export interface UniversalAttributesParams {
   record_id?: string;
   categories?: string[];
   fields?: string[];
+}
+
+/**
+ * Universal get attribute options parameters
+ * Used for retrieving valid options for select, multi-select, and status attributes
+ */
+export interface UniversalGetAttributeOptionsParams {
+  resource_type: UniversalResourceType;
+  attribute: string;
+  show_archived?: boolean;
 }
 
 /**
@@ -311,7 +334,7 @@ export interface TimeframeSearchParams {
   // New parameters to support relative timeframe searches (Issue #475)
   relative_range?: string;
   invert_range?: boolean;
-  date_field?: 'created_at' | 'updated_at' | 'modified_at';
+  date_field?: 'created_at' | 'updated_at' | 'modified_at' | 'last_interaction';
   limit?: number;
   offset?: number;
 }
@@ -370,22 +393,23 @@ export interface ResourceTypeHandler {
 
 /**
  * Universal tool result formatting interface
+ * Updated for Issue #1073 to use UniversalRecord (AttioRecord | AttioList)
  */
 export interface UniversalResultFormatter {
   formatSearch: (
-    results: AttioRecord[],
+    results: UniversalRecord[],
     resourceType: UniversalResourceType
   ) => string;
   formatDetails: (
-    record: AttioRecord,
+    record: UniversalRecordResult,
     resourceType: UniversalResourceType
   ) => string;
   formatCreate: (
-    record: AttioRecord,
+    record: UniversalRecord,
     resourceType: UniversalResourceType
   ) => string;
   formatUpdate: (
-    record: AttioRecord,
+    record: UniversalRecord,
     resourceType: UniversalResourceType
   ) => string;
   formatDelete: (

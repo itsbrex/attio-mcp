@@ -6,6 +6,57 @@ import {
 } from '../errors/validation-errors.js';
 import { getLazyAttioClient } from '../../../../api/lazy-client.js';
 
+function asNonEmptyString(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function extractReferenceId(
+  value: Record<string, unknown>
+): string | undefined {
+  return (
+    asNonEmptyString(value.target_record_id) ??
+    asNonEmptyString(value.record_id) ??
+    asNonEmptyString(value.id)
+  );
+}
+
+function extractCompanyId(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const id = extractCompanyId(entry);
+      if (id) {
+        return id;
+      }
+    }
+
+    return undefined;
+  }
+
+  const directId = asNonEmptyString(value);
+  if (directId) {
+    return directId;
+  }
+
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const companyObject = value as Record<string, unknown>;
+  const targetObject = asNonEmptyString(companyObject.target_object);
+  if (targetObject && targetObject.toLowerCase() !== 'companies') {
+    return undefined;
+  }
+
+  return (
+    extractReferenceId(companyObject) ?? extractCompanyId(companyObject.id)
+  );
+}
+
 export class CrossResourceValidator {
   static async validateCompanyExists(companyId: string): Promise<{
     exists: boolean;
@@ -76,22 +127,11 @@ export class CrossResourceValidator {
     switch (resourceType) {
       case UniversalResourceType.PEOPLE: {
         const recordDataObj = recordData as Record<string, unknown>;
-        const companyField = recordDataObj.company as
-          | Record<string, unknown>
-          | string
-          | undefined;
-        const nestedCompanyId =
-          typeof companyField === 'object' &&
-          companyField !== null &&
-          'id' in companyField
-            ? (companyField as Record<string, unknown>).id
-            : undefined;
         const companyId =
-          recordDataObj.company_id ?? nestedCompanyId ?? companyField;
+          extractCompanyId(recordDataObj.company_id) ??
+          extractCompanyId(recordDataObj.company);
         if (companyId) {
-          const companyIdString = String(companyId);
-          const validationResult =
-            await this.validateCompanyExists(companyIdString);
+          const validationResult = await this.validateCompanyExists(companyId);
           if (!validationResult.exists) {
             const error = validationResult.error!;
             throw new UniversalValidationError(

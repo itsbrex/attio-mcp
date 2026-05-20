@@ -100,6 +100,65 @@ export enum FilterConditionType {
   IS_NOT_SET = 'is_not_set',
 }
 
+const FILTER_CONDITION_ALIASES: Record<string, FilterConditionType> = {
+  equals: FilterConditionType.EQUALS,
+  eq: FilterConditionType.EQUALS,
+  contains: FilterConditionType.CONTAINS,
+  not_contains: FilterConditionType.NOT_CONTAINS,
+  starts_with: FilterConditionType.STARTS_WITH,
+  ends_with: FilterConditionType.ENDS_WITH,
+  gt: FilterConditionType.GREATER_THAN,
+  greater_than: FilterConditionType.GREATER_THAN,
+  lt: FilterConditionType.LESS_THAN,
+  less_than: FilterConditionType.LESS_THAN,
+  gte: FilterConditionType.GREATER_THAN_OR_EQUALS,
+  greater_than_or_equals: FilterConditionType.GREATER_THAN_OR_EQUALS,
+  lte: FilterConditionType.LESS_THAN_OR_EQUALS,
+  less_than_or_equals: FilterConditionType.LESS_THAN_OR_EQUALS,
+  between: FilterConditionType.BETWEEN,
+  is_empty: FilterConditionType.IS_EMPTY,
+  empty: FilterConditionType.IS_EMPTY,
+  is_not_empty: FilterConditionType.IS_NOT_EMPTY,
+  not_empty: FilterConditionType.IS_NOT_EMPTY,
+  is_set: FilterConditionType.IS_SET,
+  is_not_set: FilterConditionType.IS_NOT_SET,
+  not_equals: FilterConditionType.NOT_EQUALS,
+  ne: FilterConditionType.NOT_EQUALS,
+  $eq: FilterConditionType.EQUALS,
+  $contains: FilterConditionType.CONTAINS,
+  $starts_with: FilterConditionType.STARTS_WITH,
+  $ends_with: FilterConditionType.ENDS_WITH,
+  $gt: FilterConditionType.GREATER_THAN,
+  $lt: FilterConditionType.LESS_THAN,
+  $gte: FilterConditionType.GREATER_THAN_OR_EQUALS,
+  $lte: FilterConditionType.LESS_THAN_OR_EQUALS,
+  $empty: FilterConditionType.IS_EMPTY,
+  $is_empty: FilterConditionType.IS_EMPTY,
+  $is_not_empty: FilterConditionType.IS_NOT_EMPTY,
+  $not_empty: FilterConditionType.IS_NOT_EMPTY,
+};
+
+export function normalizeFilterCondition(
+  condition: string
+): FilterConditionType | undefined {
+  const normalizedCondition = FILTER_CONDITION_ALIASES[condition];
+  if (normalizedCondition) {
+    return normalizedCondition;
+  }
+
+  if (!condition.startsWith('$')) {
+    return undefined;
+  }
+
+  const unprefixedCondition = condition.slice(1);
+  return (
+    FILTER_CONDITION_ALIASES[unprefixedCondition] ??
+    (isValidFilterCondition(unprefixedCondition)
+      ? unprefixedCondition
+      : undefined)
+  );
+}
+
 /**
  * Type guard to check if a string is a valid filter condition
  *
@@ -240,6 +299,37 @@ export interface EnhancedAttioRecord extends AttioRecord {
 }
 
 /**
+ * Universal record type for operations that handle both regular records and lists
+ * Issue #1068: Lists don't have a values wrapper (list-native format)
+ *
+ * Use this union type in universal tool configs and services to support both:
+ * - AttioRecord: Regular records with values wrapper (companies, people, deals, tasks)
+ * - AttioList: Lists with top-level fields, no values wrapper
+ *
+ * This makes "lists don't have values" a first-class type contract.
+ *
+ * @see src/handlers/tool-configs/universal/core/*
+ * @see src/services/Universal*Service.ts
+ */
+export type UniversalRecord = AttioRecord | AttioList;
+
+/**
+ * @deprecated Use UniversalRecord instead
+ * AttioListRecord: Transitional type that extends AttioRecord (requires values)
+ *
+ * This type contradicts the list-native format goal and will be removed.
+ * Use UniversalRecord for code that needs to handle both records and lists.
+ *
+ * @see Issue #1068 - Fix universal tools list format
+ * @see src/services/search-strategies/ListSearchStrategy.ts
+ */
+export type AttioListRecord = AttioRecord & {
+  id: AttioRecord['id'] & {
+    list_id: string;
+  };
+};
+
+/**
  * Interface for a batch request item
  */
 export interface BatchRequestItem<T> {
@@ -318,6 +408,66 @@ export interface AttioList {
   updated_at: string;
   entry_count?: number;
   [key: string]: unknown; // Additional fields
+}
+
+/**
+ * Partial list shape returned when field filtering is applied.
+ * `id` is always present, other list fields are optional.
+ */
+export type ListRecordSummary = {
+  id: AttioList['id'];
+} & Partial<Omit<AttioList, 'id'>>;
+
+/**
+ * Universal record result type for list field filtering.
+ */
+export type UniversalRecordResult = UniversalRecord | ListRecordSummary;
+
+/**
+ * Type guard for AttioRecord (record values wrapper present).
+ */
+export const isAttioRecord = (
+  record: UniversalRecordResult
+): record is AttioRecord => {
+  return (
+    typeof record === 'object' &&
+    record !== null &&
+    'values' in record &&
+    (record as { values?: unknown }).values !== undefined
+  );
+};
+
+/**
+ * Type guard for AttioList (list_id present).
+ */
+export const isAttioList = (
+  record: UniversalRecordResult
+): record is AttioList => {
+  return (
+    typeof record === 'object' &&
+    record !== null &&
+    'id' in record &&
+    typeof (record as { id?: unknown }).id === 'object' &&
+    (record as { id?: Record<string, unknown> }).id !== null &&
+    'list_id' in (record as { id: Record<string, unknown> }).id
+  );
+};
+
+/**
+ * Get the record ID regardless of record type (record_id for AttioRecord, list_id for AttioList)
+ *
+ * @param record - The UniversalRecordResult to extract ID from
+ * @returns The record_id or list_id as a string
+ */
+export function getRecordId(record: UniversalRecordResult): string {
+  if (isAttioList(record)) {
+    return record.id.list_id;
+  }
+  if (isAttioRecord(record)) {
+    return record.id.record_id;
+  }
+  // Fallback for ListRecordSummary
+  return (record as { id?: { record_id?: string } }).id?.record_id ?? '';
 }
 
 /**

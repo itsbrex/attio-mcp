@@ -17,11 +17,16 @@ export const createNoteSchema = {
       description: 'ID of the record to attach the note to',
     },
     title: { type: 'string' as const, description: 'Title of the note' },
-    content: { type: 'string' as const, description: 'Content of the note' },
+    content: {
+      type: 'string' as const,
+      description:
+        'Note content. Use \\n for line breaks. With format="markdown": supports # headings, - bullets, 1. numbered lists, **bold**, `code`, nested lists (2-space indent).',
+    },
     format: {
       type: 'string' as const,
       enum: ['plaintext', 'markdown'],
-      description: 'Content format (default: plaintext)',
+      description:
+        'Content format. Use "markdown" for rich text: headings, lists, bold, code blocks. Default: plaintext.',
       // Note: Default value 'plaintext' is enforced in src/api/operations/notes.ts:57
       default: 'plaintext',
     },
@@ -58,7 +63,11 @@ export const getNotesSchema = {
 export const updateNoteSchema = {
   type: 'object' as const,
   properties: {
-    note_id: { type: 'string' as const, description: 'Note ID to update' },
+    note_id: {
+      type: 'string' as const,
+      pattern: '^[a-zA-Z0-9_-]+$',
+      description: 'Note ID to update',
+    },
     title: { type: 'string' as const, description: 'New title' },
     content: { type: 'string' as const, description: 'New content' },
   },
@@ -86,7 +95,11 @@ export const searchNotesSchema = {
 export const deleteNoteSchema = {
   type: 'object' as const,
   properties: {
-    note_id: { type: 'string' as const, description: 'Note ID to delete' },
+    note_id: {
+      type: 'string' as const,
+      pattern: '^[a-zA-Z0-9_-]+$',
+      description: 'Note ID to delete',
+    },
   },
   required: ['note_id' as const],
   additionalProperties: false,

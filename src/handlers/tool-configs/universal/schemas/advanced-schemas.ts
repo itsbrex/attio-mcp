@@ -59,7 +59,8 @@ Examples:
 - Deals by owner+stage: {"filters": [{"attribute": {"slug": "owner"}, "condition": "equals", "value": "workspace-member-uuid"}, {"attribute": {"slug": "stage"}, "condition": "equals", "value": "Demo"}]}
 - OR logic: {"filters": [...], "matchAny": true}
 
-Supported conditions: contains, equals, starts_with, ends_with, greater_than, less_than, is_empty, is_not_empty`,
+Supported canonical conditions: contains, equals, starts_with, ends_with, gt, gte, lt, lte, is_empty, is_not_empty
+Also accepted aliases: eq, greater_than, greater_than_or_equals, less_than, less_than_or_equals, not_empty, $gt, $gte, $lt, $lte`,
       additionalProperties: true,
     },
     sort_by: {
@@ -175,6 +176,17 @@ export const searchByTimeframeSchema = {
       format: 'date',
       description: 'End date (ISO 8601 format)',
     },
+    date_field: {
+      type: 'string' as const,
+      enum: [
+        'created_at',
+        'updated_at',
+        'modified_at',
+        'last_interaction',
+      ] as const,
+      description:
+        'Optional explicit date field override. last_interaction is supported for people and companies; updated_at and modified_at remain accepted aliases but are not supported live on those objects.',
+    },
     ...paginationProperties,
   },
   required: ['resource_type' as const],
@@ -196,6 +208,7 @@ export const batchOperationsSchema = {
     // New flexible format: operations array
     operations: {
       type: 'array' as const,
+      maxItems: 100,
       items: {
         type: 'object' as const,
         properties: {

@@ -18,8 +18,8 @@ import {
 import { resolveToolName } from '../../../../src/config/tool-aliases.js';
 
 describe('Universal Core Operations Search Tests', () => {
-  beforeEach(() => {
-    setupUnitTestMocks();
+  beforeEach(async () => {
+    await setupUnitTestMocks();
   });
 
   afterEach(() => {
@@ -38,9 +38,8 @@ describe('Universal Core Operations Search Tests', () => {
         },
       ];
 
-      const { handleUniversalSearch } = await import(
-        '../../../../src/handlers/tool-configs/universal/shared-handlers.js'
-      );
+      const { handleUniversalSearch } =
+        await import('../../../../src/handlers/tool-configs/universal/shared-handlers.js');
       vi.mocked(handleUniversalSearch).mockResolvedValue(mockResults);
 
       const params: UniversalSearchParams = {
@@ -64,9 +63,8 @@ describe('Universal Core Operations Search Tests', () => {
         },
       ];
 
-      const { handleUniversalSearch } = await import(
-        '../../../../src/handlers/tool-configs/universal/shared-handlers.js'
-      );
+      const { handleUniversalSearch } =
+        await import('../../../../src/handlers/tool-configs/universal/shared-handlers.js');
       vi.mocked(handleUniversalSearch).mockResolvedValue(mockResults);
 
       const params: UniversalSearchParams = {
@@ -82,9 +80,8 @@ describe('Universal Core Operations Search Tests', () => {
 
     it('should handle search errors properly', async () => {
       const mockError = new Error('API error');
-      const { handleUniversalSearch } = await import(
-        '../../../../src/handlers/tool-configs/universal/shared-handlers.js'
-      );
+      const { handleUniversalSearch } =
+        await import('../../../../src/handlers/tool-configs/universal/shared-handlers.js');
       vi.mocked(handleUniversalSearch).mockRejectedValue(mockError);
 
       const params: UniversalSearchParams = {
@@ -179,6 +176,23 @@ describe('Universal Core Operations Search Tests', () => {
       const formatted = (searchRecordsConfig.formatResult as any)([]);
       expect(formatted).toContain('Found 0 records');
     });
+
+    it('should use custom object labels from dispatcher-style args', () => {
+      const formatted = (searchRecordsConfig.formatResult as any)(
+        [
+          {
+            id: { record_id: 'channel-1' },
+            values: {
+              name: [{ value: 'Partner Channel' }],
+            },
+          },
+        ],
+        { resource_type: 'channels' }
+      );
+
+      expect(formatted).toContain('Found 1 channels');
+      expect(formatted).toContain('1. Partner Channel (ID: channel-1)');
+    });
   });
 
   describe('records_get_details tool', () => {
@@ -191,9 +205,8 @@ describe('Universal Core Operations Search Tests', () => {
         },
       };
 
-      const { handleUniversalGetDetails } = await import(
-        '../../../../src/handlers/tool-configs/universal/shared-handlers.js'
-      );
+      const { handleUniversalGetDetails } =
+        await import('../../../../src/handlers/tool-configs/universal/shared-handlers.js');
       vi.mocked(handleUniversalGetDetails).mockResolvedValue(mockRecord as any);
 
       const params: UniversalRecordDetailsParams = {
@@ -216,9 +229,8 @@ describe('Universal Core Operations Search Tests', () => {
         },
       };
 
-      const { handleUniversalGetDetails } = await import(
-        '../../../../src/handlers/tool-configs/universal/shared-handlers.js'
-      );
+      const { handleUniversalGetDetails } =
+        await import('../../../../src/handlers/tool-configs/universal/shared-handlers.js');
       // Cast to any to align with AttioRecord typing used by handler
       vi.mocked(handleUniversalGetDetails).mockResolvedValue(mockRecord as any);
 
@@ -242,9 +254,8 @@ describe('Universal Core Operations Search Tests', () => {
         },
       };
 
-      const { getSingularResourceType } = await import(
-        '../../../../src/handlers/tool-configs/universal/shared-handlers.js'
-      );
+      const { getSingularResourceType } =
+        await import('../../../../src/handlers/tool-configs/universal/shared-handlers.js');
       vi.mocked(getSingularResourceType).mockReturnValue('company');
 
       const formatted = (getRecordDetailsConfig.formatResult as any)(
@@ -257,13 +268,29 @@ describe('Universal Core Operations Search Tests', () => {
       expect(formatted).toContain('Domains: test.com');
       expect(formatted).toContain('Primary location: San Francisco, CA');
     });
+
+    it('should format custom object details from dispatcher-style args', () => {
+      const mockRecord = {
+        id: { record_id: 'fund-1' },
+        values: {
+          name: [{ value: 'Fund I' }],
+        },
+      };
+
+      const formatted = (getRecordDetailsConfig.formatResult as any)(
+        mockRecord,
+        { resource_type: 'funds' }
+      );
+
+      expect(formatted).toContain('Funds: Fund I');
+      expect(formatted).toContain('ID: fund-1');
+    });
   });
 
   describe('Cross-resource type validation', () => {
     it('should handle all resource types for search', async () => {
-      const { handleUniversalSearch } = await import(
-        '../../../../src/handlers/tool-configs/universal/shared-handlers.js'
-      );
+      const { handleUniversalSearch } =
+        await import('../../../../src/handlers/tool-configs/universal/shared-handlers.js');
       vi.mocked(handleUniversalSearch).mockResolvedValue([]);
 
       const resourceTypes = [
@@ -294,9 +321,8 @@ describe('Universal Core Operations Search Tests', () => {
         handleUniversalCreate,
         handleUniversalUpdate,
         handleUniversalDelete,
-      } = await import(
-        '../../../../src/handlers/tool-configs/universal/shared-handlers.js'
-      );
+      } =
+        await import('../../../../src/handlers/tool-configs/universal/shared-handlers.js');
 
       vi.mocked(handleUniversalGetDetails).mockResolvedValue({} as any);
       vi.mocked(handleUniversalCreate).mockResolvedValue({} as any);
@@ -326,7 +352,7 @@ describe('Universal Core Operations Search Tests', () => {
   describe('legacy alias compatibility', () => {
     it('resolves search-records alias to records.search', () => {
       const resolution = resolveToolName('search-records');
-      expect(resolution.name).toBe('records_search');
+      expect(resolution.name).toBe('search_records');
       expect(resolution.alias?.alias).toBe('search-records');
     });
   });

@@ -366,9 +366,8 @@ describe('Core Operations Workflow Integration', () => {
         values: { name: 'Test Deal' },
       };
 
-      const { UniversalUpdateService } = await import(
-        '@services/UniversalUpdateService.js'
-      );
+      const { UniversalUpdateService } =
+        await import('@services/UniversalUpdateService.js');
 
       vi.mocked(
         UniversalUpdateService.updateRecordWithValidation
@@ -534,9 +533,8 @@ describe('Core Operations Workflow Integration', () => {
 
   describe('Parameter Validation Integration', () => {
     it('should validate parameters before processing', async () => {
-      const { validateUniversalToolParams } = await import(
-        '@handlers/tool-configs/universal/schemas.js'
-      );
+      const { validateUniversalToolParams } =
+        await import('@handlers/tool-configs/universal/schemas.js');
 
       const createParams = {
         resource_type: UniversalResourceType.COMPANIES,
@@ -551,15 +549,14 @@ describe('Core Operations Workflow Integration', () => {
       await createRecordConfig.handler(createParams);
 
       expect(vi.mocked(validateUniversalToolParams)).toHaveBeenCalledWith(
-        'create-record',
+        'create_record',
         createParams
       );
     });
 
     it('should validate cross-resource relationships', async () => {
-      const { CrossResourceValidator } = await import(
-        '@handlers/tool-configs/universal/schemas.js'
-      );
+      const { CrossResourceValidator } =
+        await import('@handlers/tool-configs/universal/schemas.js');
 
       const createParams = {
         resource_type: UniversalResourceType.TASKS,

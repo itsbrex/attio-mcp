@@ -9,7 +9,7 @@
  * - TC-D04: Delete deal record
  */
 
-import { describe, it, beforeAll, afterAll, expect } from 'vitest';
+import { describe, it, beforeAll, afterAll, afterEach, expect } from 'vitest';
 import { MCPTestBase } from '../shared/mcp-test-base';
 import { QAAssertions } from '../shared/qa-assertions';
 import { TestDataFactory } from '../shared/test-data-factory';
@@ -63,7 +63,7 @@ describe('TC-D01 to TC-D04: Deal CRUD Operations', () => {
     try {
       const dealData = TestDataFactory.createDealData('TCD01');
 
-      const result = await testCase.executeToolCall('create-record', {
+      const result = await testCase.executeToolCall('create_record', {
         resource_type: 'deals',
         record_data: dealData,
       });
@@ -82,7 +82,7 @@ describe('TC-D01 to TC-D04: Deal CRUD Operations', () => {
       error = e instanceof Error ? e.message : String(e);
       throw e;
     } finally {
-      results.push({ test: testName, passed, error });
+      results.push({ testName, passed, error });
     }
   });
 
@@ -94,7 +94,7 @@ describe('TC-D01 to TC-D04: Deal CRUD Operations', () => {
     try {
       if (!testDealId) {
         const dealData = TestDataFactory.createDealData('TCD02');
-        const createResult = await testCase.executeToolCall('create-record', {
+        const createResult = await testCase.executeToolCall('create_record', {
           resource_type: 'deals',
           record_data: dealData,
         });
@@ -116,7 +116,7 @@ describe('TC-D01 to TC-D04: Deal CRUD Operations', () => {
       error = e instanceof Error ? e.message : String(e);
       throw e;
     } finally {
-      results.push({ test: testName, passed, error });
+      results.push({ testName, passed, error });
     }
   });
 
@@ -128,7 +128,7 @@ describe('TC-D01 to TC-D04: Deal CRUD Operations', () => {
     try {
       if (!testDealId) {
         const dealData = TestDataFactory.createDealData('TCD03');
-        const createResult = await testCase.executeToolCall('create-record', {
+        const createResult = await testCase.executeToolCall('create_record', {
           resource_type: 'deals',
           record_data: dealData,
         });
@@ -139,7 +139,7 @@ describe('TC-D01 to TC-D04: Deal CRUD Operations', () => {
 
       const updateData = TestDataFactory.createUpdateData('deals', 'TCD03');
 
-      const result = await testCase.executeToolCall('update-record', {
+      const result = await testCase.executeToolCall('update_record', {
         resource_type: 'deals',
         record_id: testDealId,
         record_data: updateData,
@@ -153,7 +153,7 @@ describe('TC-D01 to TC-D04: Deal CRUD Operations', () => {
       error = e instanceof Error ? e.message : String(e);
       throw e;
     } finally {
-      results.push({ test: testName, passed, error });
+      results.push({ testName, passed, error });
     }
   });
 
@@ -165,7 +165,7 @@ describe('TC-D01 to TC-D04: Deal CRUD Operations', () => {
     try {
       if (!testDealId) {
         const dealData = TestDataFactory.createDealData('TCD04');
-        const createResult = await testCase.executeToolCall('create-record', {
+        const createResult = await testCase.executeToolCall('create_record', {
           resource_type: 'deals',
           record_data: dealData,
         });
@@ -174,7 +174,7 @@ describe('TC-D01 to TC-D04: Deal CRUD Operations', () => {
         testCase.trackRecord('deals', testDealId);
       }
 
-      const result = await testCase.executeToolCall('delete-record', {
+      const result = await testCase.executeToolCall('delete_record', {
         resource_type: 'deals',
         record_id: testDealId,
       });
@@ -187,7 +187,7 @@ describe('TC-D01 to TC-D04: Deal CRUD Operations', () => {
       error = e instanceof Error ? e.message : String(e);
       throw e;
     } finally {
-      results.push({ test: testName, passed, error });
+      results.push({ testName, passed, error });
     }
   });
 });

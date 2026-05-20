@@ -14,6 +14,12 @@ import { z } from 'zod';
  */
 export const configSchema = z.object({
   ATTIO_API_KEY: z.string().describe('Your Attio API key').optional(),
+  ATTIO_ACCESS_TOKEN: z
+    .string()
+    .describe(
+      'Attio OAuth access token (alternative to API key for OAuth integrations)'
+    )
+    .optional(),
   ATTIO_WORKSPACE_ID: z
     .string()
     .describe('Optional Attio workspace ID')
@@ -48,12 +54,7 @@ export default function createServer({
   if (process.env.MCP_LOG_LEVEL === 'DEBUG') {
     console.error('[smithery:init] Config received:', {
       hasConfig: Boolean(config),
-      configKeys: config ? Object.keys(config) : [],
-      hasApiKeyInConfig: Boolean(config?.ATTIO_API_KEY),
-      apiKeyLength: config?.ATTIO_API_KEY?.length || 0,
       hasWorkspaceId: Boolean(config?.ATTIO_WORKSPACE_ID),
-      hasEnvApiKey: Boolean(process.env.ATTIO_API_KEY),
-      envApiKeyLength: process.env.ATTIO_API_KEY?.length || 0,
       toolMode:
         config?.ATTIO_MCP_TOOL_MODE ||
         process.env.ATTIO_MCP_TOOL_MODE ||
@@ -67,30 +68,27 @@ export default function createServer({
   process.env.MCP_SERVER_MODE = 'true';
 
   // CRITICAL: Tool mode configuration (Issue #869 final fix)
-  // Do NOT set environment variables - Smithery manages them at container level
-  // If user didn't provide ATTIO_MCP_TOOL_MODE, ensure env var is not set
-  // This allows isSearchOnlyMode() to return false (full tool access)
-  if (!config?.ATTIO_MCP_TOOL_MODE) {
-    delete process.env.ATTIO_MCP_TOOL_MODE;
-  } else if (config.ATTIO_MCP_TOOL_MODE === 'search') {
+  // Preserve operator-provided ATTIO_MCP_TOOL_MODE only when config omits tool mode.
+  if (config?.ATTIO_MCP_TOOL_MODE === 'search') {
     process.env.ATTIO_MCP_TOOL_MODE = 'search';
-  } else {
-    // User explicitly set 'full' mode
+  } else if (config?.ATTIO_MCP_TOOL_MODE === 'full') {
     delete process.env.ATTIO_MCP_TOOL_MODE;
   }
 
   // Create the MCP server with a context that provides access to config
   // The API key is only checked when tools are actually invoked
+  // Supports both API keys and OAuth access tokens (Issue #928)
   const server = buildServer({
     getApiKey: () => {
-      const apiKey = config?.ATTIO_API_KEY || process.env.ATTIO_API_KEY;
+      // Resolution order: ATTIO_API_KEY (config) > ATTIO_ACCESS_TOKEN (config) >
+      //                   ATTIO_API_KEY (env) > ATTIO_ACCESS_TOKEN (env)
+      const apiKey =
+        config?.ATTIO_API_KEY ||
+        config?.ATTIO_ACCESS_TOKEN ||
+        process.env.ATTIO_API_KEY ||
+        process.env.ATTIO_ACCESS_TOKEN;
       if (process.env.MCP_LOG_LEVEL === 'DEBUG' || config?.debug) {
-        console.error('[smithery:getApiKey] API key resolution:', {
-          fromConfig: Boolean(config?.ATTIO_API_KEY),
-          fromEnv: Boolean(process.env.ATTIO_API_KEY),
-          resolved: Boolean(apiKey),
-          keyLength: apiKey?.length || 0,
-        });
+        console.error('[smithery:getApiKey] Credential resolution attempted');
       }
       return apiKey;
     },

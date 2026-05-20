@@ -84,7 +84,7 @@ describe('Enhanced Universal Error Handling', () => {
       const params = { resource_type: UniversalResourceType.COMPANIES };
 
       try {
-        validateUniversalToolParams('create-record', params);
+        validateUniversalToolParams('create_record', params);
         expect.fail('Should have thrown validation error');
       } catch (error: unknown) {
         expect(error).toBeInstanceOf(UniversalValidationError);
@@ -204,6 +204,42 @@ describe('Cross-Resource Validation', () => {
         );
       } finally {
         // Restore original function
+        CrossResourceValidator.validateCompanyExists = originalValidate;
+      }
+    });
+
+    it('should validate legacy company record references on people updates', async () => {
+      const recordData = {
+        name: 'John Doe',
+        company: { record_id: 'comp_123' },
+      };
+
+      const originalValidate = CrossResourceValidator.validateCompanyExists;
+      CrossResourceValidator.validateCompanyExists = async () => ({
+        exists: false,
+        error: {
+          type: 'not_found' as const,
+          message: "Company with ID 'comp_123' does not exist",
+          httpStatusCode: HttpStatusCode.NOT_FOUND,
+        },
+      });
+
+      try {
+        await CrossResourceValidator.validateRecordRelationships(
+          UniversalResourceType.PEOPLE,
+          recordData
+        );
+        expect.fail(
+          'Should have thrown validation error for legacy company reference'
+        );
+      } catch (error: unknown) {
+        expect(error).toBeInstanceOf(UniversalValidationError);
+        const validationError = error as UniversalValidationError;
+        expect(validationError.field).toBe('company_id');
+        expect(validationError.suggestion).toContain(
+          'Verify the company ID exists'
+        );
+      } finally {
         CrossResourceValidator.validateCompanyExists = originalValidate;
       }
     });

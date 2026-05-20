@@ -20,6 +20,7 @@ export { CrossResourceValidator } from './validators/cross-resource-validator.js
 export {
   searchRecordsSchema,
   getRecordDetailsSchema,
+  getRecordInteractionsSchema,
   createRecordSchema,
   updateRecordSchema,
   deleteRecordSchema,
@@ -29,6 +30,7 @@ export {
 export {
   getAttributesSchema,
   discoverAttributesSchema,
+  getAttributeOptionsSchema,
 } from './schemas/validation-schemas.js';
 
 // Advanced and batch schemas

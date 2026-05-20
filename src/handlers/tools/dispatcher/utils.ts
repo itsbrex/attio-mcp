@@ -2,6 +2,12 @@
  * Dispatcher utilities
  */
 
+export {
+  STANDARD_RESOURCE_TYPES,
+  getValidResourceTypes,
+  canonicalizeResourceType,
+} from '@/utils/resource-types.js';
+
 /**
  * Normalize error messages by stripping tool execution prefixes.
  */
@@ -10,25 +16,5 @@ export function normalizeToolMsg(msg: string): string {
 }
 
 /**
- * Canonicalize resource type to valid values and prevent mutations
+ * Standard resource types always available in the system
  */
-export function canonicalizeResourceType(rt: unknown): string {
-  const value = String(rt ?? '').toLowerCase();
-  const validTypes = [
-    'records',
-    'lists',
-    'people',
-    'companies',
-    'tasks',
-    'deals',
-    'notes',
-  ];
-
-  if (!validTypes.includes(value)) {
-    throw new Error(
-      `Invalid resource_type: ${value}. Must be one of: ${validTypes.join(', ')}`
-    );
-  }
-
-  return value;
-}

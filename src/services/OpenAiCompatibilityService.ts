@@ -4,18 +4,18 @@
  * expect. All logic delegates to the existing universal services so we keep a
  * single behaviour surface for every client.
  */
-import { UniversalSearchService } from './UniversalSearchService.js';
-import { UniversalRetrievalService } from './UniversalRetrievalService.js';
+import { UniversalSearchService } from '@/services/UniversalSearchService.js';
+import { UniversalRetrievalService } from '@/services/UniversalRetrievalService.js';
 import {
   UniversalResourceType,
   UniversalSearchParams,
   SearchType,
   MatchType,
   SortType,
-} from '../handlers/tool-configs/universal/types.js';
-import type { AttioRecord } from '../types/attio.js';
-import { SearchUtilities } from './search-utilities/SearchUtilities.js';
-import { safeJsonStringify } from '../utils/json-serializer.js';
+} from '@/handlers/tool-configs/universal/types.js';
+import { SearchUtilities } from '@/services/search-utilities/SearchUtilities.js';
+import type { UniversalRecordResult } from '@/types/attio.js';
+import { safeJsonStringify } from '@/utils/json-serializer.js';
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 25;
@@ -156,13 +156,14 @@ function normalizeResourceType(value: string): UniversalResourceType {
 
 function transformRecordToSearchResult(
   resourceType: UniversalResourceType,
-  record: AttioRecord
+  record: UniversalRecordResult
 ): OpenAiSearchResult {
-  const recordId = record.id?.record_id ?? 'unknown';
+  // Support list_id for lists (Issue #1068 - lists use list_id, not record_id)
+  const recordId = (record.id?.list_id || record.id?.record_id) ?? 'unknown';
   return {
     id: `${resourceType}:${recordId}`,
     title: buildTitle(resourceType, record),
-    url: buildApiUrl(resourceType, recordId),
+    url: buildApiUrl(resourceType, String(recordId)),
     snippet: buildSnippet(resourceType, record),
     metadata: {
       resource_type: resourceType,
@@ -172,13 +173,14 @@ function transformRecordToSearchResult(
 
 function transformRecordToFetchResult(
   resourceType: UniversalResourceType,
-  record: AttioRecord
+  record: UniversalRecordResult
 ): OpenAiFetchResult {
-  const recordId = record.id?.record_id ?? 'unknown';
+  // Support list_id for lists (Issue #1068 - lists use list_id, not record_id)
+  const recordId = (record.id?.list_id || record.id?.record_id) ?? 'unknown';
   return {
     id: `${resourceType}:${recordId}`,
     title: buildTitle(resourceType, record),
-    url: buildApiUrl(resourceType, recordId),
+    url: buildApiUrl(resourceType, String(recordId)),
     text: safeJsonStringify(record, { indent: 2 }),
     metadata: {
       resource_type: resourceType,
@@ -188,7 +190,7 @@ function transformRecordToFetchResult(
 
 function buildTitle(
   resourceType: UniversalResourceType,
-  record: AttioRecord
+  record: UniversalRecordResult
 ): string {
   switch (resourceType) {
     case UniversalResourceType.COMPANIES:
@@ -204,9 +206,11 @@ function buildTitle(
         `Person ${record.id?.record_id ?? ''}`.trim()
       );
     case UniversalResourceType.LISTS:
+      // Issue #1068: Lists use list_id, not record_id
       return (
         SearchUtilities.getFieldValue(record, 'name') ||
-        `List ${record.id?.record_id ?? ''}`.trim()
+        SearchUtilities.getFieldValue(record, 'title') ||
+        `List ${(record.id as { list_id?: string })?.list_id ?? ''}`.trim()
       );
     case UniversalResourceType.TASKS:
       return (
@@ -221,7 +225,7 @@ function buildTitle(
 
 function buildSnippet(
   resourceType: UniversalResourceType,
-  record: AttioRecord
+  record: UniversalRecordResult
 ): string | undefined {
   if (resourceType === UniversalResourceType.COMPANIES) {
     return firstNonEmpty([

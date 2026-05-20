@@ -10,17 +10,77 @@ import {
   validateIdFields,
   validatePaginationParams,
 } from './field-validator.js';
+import {
+  canonicalizeResourceType,
+  getValidResourceTypes,
+} from '@/handlers/tools/dispatcher/utils.js';
+import { RecordDataNormalizer } from '@/utils/normalization/record-data-normalization.js';
+
+/**
+ * Fields that should preserve newlines during sanitization.
+ * These are content-heavy fields where multiline formatting is meaningful.
+ */
+const MULTILINE_FIELDS = new Set([
+  'content',
+  'content_markdown',
+  'content_plaintext',
+  'description',
+  'body',
+  'notes',
+]);
 
 export class InputSanitizer {
+  /**
+   * Strip XSS vectors: script tags, event handlers, HTML tags, and stray angle brackets.
+   * Shared by both single-line and multiline sanitization.
+   */
+  private static stripXss(s: string): string {
+    // Remove script tags (keep content inside)
+    s = s.replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gi, '$1');
+    // Remove event handlers
+    s = s.replace(/on\w+\s*=\s*([^>\s]*)/gi, '$1');
+    // Remove HTML tags
+    s = s.replace(/<\/?[^>]+>/g, '');
+    // Final safety: remove any remaining angle brackets to prevent partial tags
+    s = s.replace(/[<>]/g, '');
+    return s;
+  }
+
   static sanitizeString(input: unknown): string {
     if (typeof input !== 'string') {
       return String(input);
     }
-    let s = input;
-    s = s.replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gi, '$1');
-    s = s.replace(/on\w+\s*=\s*([^>\s]*)/gi, '$1');
-    s = s.replace(/<\/?[^>]+>/g, '');
+    const s = this.stripXss(input);
     return s.replace(/\s+/g, ' ').trim();
+  }
+
+  /**
+   * Sanitize a multiline string - preserves newlines but normalizes other whitespace.
+   * Still removes XSS/HTML tags and normalizes excessive whitespace within lines.
+   * Used for content fields where line breaks are meaningful (notes, descriptions).
+   */
+  static sanitizeMultilineString(input: unknown): string {
+    if (typeof input !== 'string') {
+      return String(input);
+    }
+    const s = this.stripXss(input);
+
+    // Normalize whitespace per line, but preserve newlines and leading indentation
+    const lines = s.split(/\r?\n/);
+    const normalizedLines = lines.map((line) => {
+      // Preserve leading whitespace (semantic for Markdown indentation)
+      const leadingWhitespace = line.match(/^[ \t]*/)?.[0] || '';
+      const rest = line.slice(leadingWhitespace.length);
+      // Normalize multiple spaces/tabs to single space in content, trim trailing only
+      const normalizedRest = rest.replace(/[ \t]+/g, ' ').trimEnd();
+      return leadingWhitespace + normalizedRest;
+    });
+    let result = normalizedLines.join('\n');
+
+    // Normalize excessive blank lines (more than 2 consecutive) to just 2
+    result = result.replace(/\n{3,}/g, '\n\n');
+
+    return result.trim();
   }
 
   static normalizeEmail(email: unknown): string {
@@ -62,6 +122,11 @@ export class InputSanitizer {
               ? this.normalizeEmail(v)
               : (this.sanitizeObject(v) as SanitizedValue)
           );
+          continue;
+        }
+        // Multiline field handling - preserve newlines for content fields
+        if (MULTILINE_FIELDS.has(lowerKey) && typeof value === 'string') {
+          result[key] = this.sanitizeMultilineString(value);
           continue;
         }
         result[key] = this.sanitizeObject(value);
@@ -162,7 +227,7 @@ const toolValidators: Record<string, ToolValidator> = {
     return p;
   },
   // Legacy CRUD tools (still using hyphenated names)
-  'create-record': (p) => {
+  create_record: (p) => {
     if (!p.resource_type) {
       throw new UniversalValidationError(
         'Missing required parameter: resource_type',
@@ -183,22 +248,26 @@ const toolValidators: Record<string, ToolValidator> = {
     }
     return p;
   },
-  'update-record': (p) => {
-    if (!p.resource_type) {
+  update_record: (p) => {
+    // Normalize input format - use normalized result directly (no leftover fields)
+    const params = RecordDataNormalizer.needsNormalization(p)
+      ? (RecordDataNormalizer.normalize(p) as SanitizedObject)
+      : p;
+    if (!params.resource_type) {
       throw new UniversalValidationError(
         'Missing required parameter: resource_type',
         ErrorType.USER_ERROR,
         { field: 'resource_type', example: `resource_type: 'companies'` }
       );
     }
-    if (!p.record_id) {
+    if (!params.record_id) {
       throw new UniversalValidationError(
         'Missing required parameter: record_id',
         ErrorType.USER_ERROR,
         { field: 'record_id', example: `record_id: 'comp_abc123'` }
       );
     }
-    if (!p.record_data) {
+    if (!params.record_data) {
       throw new UniversalValidationError(
         'Missing required parameter: record_data',
         ErrorType.USER_ERROR,
@@ -209,12 +278,18 @@ const toolValidators: Record<string, ToolValidator> = {
         }
       );
     }
-    if (p.resource_type === 'tasks') {
+    if (params.resource_type === 'tasks') {
       const forbidden = ['content', 'content_markdown', 'content_plaintext'];
-      if (p.record_data && typeof p.record_data === 'object') {
-        const recordData = p.record_data as Record<string, unknown>;
+      if (params.record_data && typeof params.record_data === 'object') {
+        const recordData = params.record_data as Record<string, unknown>;
+        // Check both nesting patterns: direct and wrapped in values
+        const valuesToCheck = (
+          recordData.values && typeof recordData.values === 'object'
+            ? recordData.values
+            : recordData
+        ) as Record<string, unknown>;
         for (const k of forbidden) {
-          if (k in recordData) {
+          if (k in valuesToCheck) {
             throw new UniversalValidationError(
               'Task content is immutable and cannot be updated'
             );
@@ -222,9 +297,9 @@ const toolValidators: Record<string, ToolValidator> = {
         }
       }
     }
-    return p;
+    return params;
   },
-  'delete-record': (p) => {
+  delete_record: (p) => {
     if (!p.resource_type) {
       throw new UniversalValidationError(
         'Missing required parameter: resource_type',
@@ -245,7 +320,7 @@ const toolValidators: Record<string, ToolValidator> = {
     }
     return p;
   },
-  'create-note': (p) => {
+  create_note: (p) => {
     if (!p.resource_type) {
       throw new UniversalValidationError(
         'Missing required parameter: resource_type',
@@ -401,7 +476,7 @@ const toolValidators: Record<string, ToolValidator> = {
     }
     return p;
   },
-  'list-notes': (p) => {
+  list_notes: (p) => {
     const candidateParams = p as Record<string, unknown>;
     if (!p.record_id && typeof candidateParams.parent_record_id === 'string') {
       p.record_id = candidateParams.parent_record_id;
@@ -427,6 +502,59 @@ const toolValidators: Record<string, ToolValidator> = {
     return p;
   },
 };
+
+const TOOLS_WITH_DYNAMIC_RESOURCE_TYPES = new Set([
+  'search_records',
+  'search_records_advanced',
+  'search_records_by_timeframe',
+  'get_record_details',
+  'records_get_details',
+  'create_record',
+  'update_record',
+  'delete_record',
+]);
+
+function validateStandardResourceType(resourceType: string): string {
+  if (
+    !Object.values(UniversalResourceType).includes(
+      resourceType as UniversalResourceType
+    )
+  ) {
+    const suggestion = suggestResourceType(resourceType);
+    const validTypes = Object.values(UniversalResourceType).join(', ');
+    throw new UniversalValidationError(
+      `Invalid resource_type: '${resourceType}'`,
+      ErrorType.USER_ERROR,
+      {
+        field: 'resource_type',
+        suggestion: suggestion ? `Did you mean '${suggestion}'?` : undefined,
+        example: `Expected one of: ${validTypes}`,
+        httpStatusCode: HttpStatusCode.UNPROCESSABLE_ENTITY,
+      }
+    );
+  }
+
+  return resourceType;
+}
+
+function validateDynamicSearchResourceType(resourceType: string): string {
+  try {
+    return canonicalizeResourceType(resourceType);
+  } catch {
+    const suggestion = suggestResourceType(resourceType);
+    const validTypes = getValidResourceTypes().join(', ');
+    throw new UniversalValidationError(
+      `Invalid resource_type: '${resourceType}'. Expected one of: ${validTypes}`,
+      ErrorType.USER_ERROR,
+      {
+        field: 'resource_type',
+        suggestion: suggestion ? `Did you mean '${suggestion}'?` : undefined,
+        example: `Expected one of: ${validTypes}`,
+        httpStatusCode: HttpStatusCode.UNPROCESSABLE_ENTITY,
+      }
+    );
+  }
+}
 
 export function validateUniversalToolParams(
   toolName: string,
@@ -454,24 +582,11 @@ export function validateUniversalToolParams(
   validateIdFields(sanitizedParams);
   if (sanitizedParams.resource_type) {
     const resourceType = String(sanitizedParams.resource_type);
-    if (
-      !Object.values(UniversalResourceType).includes(
-        resourceType as UniversalResourceType
-      )
-    ) {
-      const suggestion = suggestResourceType(resourceType);
-      const validTypes = Object.values(UniversalResourceType).join(', ');
-      throw new UniversalValidationError(
-        `Invalid resource_type: '${resourceType}'`,
-        ErrorType.USER_ERROR,
-        {
-          field: 'resource_type',
-          suggestion: suggestion ? `Did you mean '${suggestion}'?` : undefined,
-          example: `Expected one of: ${validTypes}`,
-          httpStatusCode: HttpStatusCode.UNPROCESSABLE_ENTITY,
-        }
-      );
-    }
+    sanitizedParams.resource_type = TOOLS_WITH_DYNAMIC_RESOURCE_TYPES.has(
+      toolName
+    )
+      ? validateDynamicSearchResourceType(resourceType)
+      : validateStandardResourceType(resourceType);
   }
   const validator = toolValidators[toolName];
   if (validator) return validator(sanitizedParams);

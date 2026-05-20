@@ -66,15 +66,16 @@ export function createServer(context?: ServerContext) {
   logger.info('Server creation started');
 
   // For backward compatibility: if no context provided (STDIO mode),
-  // create one that reads from environment variables
-  // If ATTIO_USE_TEST_WORKSPACE=true, use test credentials to prevent production changes
+  // create one that reads from environment variables.
+  // If ATTIO_USE_TEST_WORKSPACE=true, use test credentials to prevent production changes.
+  // Issue #928: Support both ATTIO_API_KEY and ATTIO_ACCESS_TOKEN (OAuth alternative).
   const useTestWorkspace =
     process.env.ATTIO_USE_TEST_WORKSPACE?.toLowerCase() === 'true';
   const ctx: ServerContext = context || {
     getApiKey: () =>
       useTestWorkspace
         ? process.env.ATTIO_TEST_API_KEY
-        : process.env.ATTIO_API_KEY,
+        : process.env.ATTIO_API_KEY || process.env.ATTIO_ACCESS_TOKEN,
     getWorkspaceId: () =>
       useTestWorkspace
         ? process.env.ATTIO_TEST_WORKSPACE_ID
@@ -87,7 +88,7 @@ export function createServer(context?: ServerContext) {
       getApiKey?: () => string | undefined;
       getWorkspaceId?: () => string | undefined;
     };
-    console.error('[createServer:init] Context configuration:', {
+    logger.debug('Context configuration', {
       hasContext: Boolean(context),
       contextKeys: context ? Object.keys(context) : [],
       hasGetApiKey: typeof typedContext.getApiKey === 'function',
@@ -113,8 +114,7 @@ export function createServer(context?: ServerContext) {
         resources: {},
         tools: {},
         prompts: {
-          list: {},
-          get: {},
+          listChanged: true,
         },
       },
     }
@@ -134,7 +134,7 @@ export function createServer(context?: ServerContext) {
 
   // Final debug summary for Issue #891
   if (process.env.MCP_LOG_LEVEL === 'DEBUG') {
-    console.error('[createServer:complete] Server initialization complete:', {
+    logger.debug('Server initialization complete', {
       duration: `${duration}ms`,
       serverVersion: '1.1.2',
       capabilities: ['resources', 'tools', 'prompts'],

@@ -22,6 +22,8 @@ import {
   ToolConfig,
   GetListEntriesToolConfig,
   ListActionToolConfig,
+  CreateListToolConfig,
+  UpdateListConfigurationToolConfig,
 } from '../tool-types.js';
 import { formatToolDescription } from '@/handlers/tools/standards/index.js';
 
@@ -166,6 +168,21 @@ export const listsToolConfigs = {
     },
   } as ToolConfig,
 
+  manageListEntry: {
+    name: 'manage-list-entry',
+    type: 'manageListEntry' as const,
+    handler: () => {
+      // Placeholder - actual routing happens in dispatcher
+      throw new Error('Direct handler call not supported - use dispatcher');
+    },
+    idParams: ['listId'],
+    formatResult: (result: AttioListEntry | boolean) => {
+      // Return JSON string
+      // Boolean result (from remove) is handled in dispatcher
+      return JSON.stringify(result);
+    },
+  } as ListActionToolConfig,
+
   filterListEntriesByParent: {
     name: 'filter-list-entries-by-parent',
     handler: filterListEntriesByParent,
@@ -183,6 +200,31 @@ export const listsToolConfigs = {
       return JSON.stringify(Array.isArray(results) ? results : []);
     },
   } as ToolConfig,
+
+  // Dedicated list configuration tools (Issue #1195)
+  createList: {
+    name: 'create-list',
+    type: 'createList' as const,
+    handler: () => {
+      // Placeholder - actual routing happens in dispatcher
+      throw new Error('Direct handler call not supported - use dispatcher');
+    },
+    formatResult: (result: unknown) => {
+      return JSON.stringify(result);
+    },
+  } as CreateListToolConfig,
+
+  updateListConfiguration: {
+    name: 'update-list-configuration',
+    type: 'updateListConfiguration' as const,
+    handler: () => {
+      // Placeholder - actual routing happens in dispatcher
+      throw new Error('Direct handler call not supported - use dispatcher');
+    },
+    formatResult: (result: unknown) => {
+      return JSON.stringify(result);
+    },
+  } as UpdateListConfigurationToolConfig,
 };
 
 // Lists tool definitions
@@ -304,31 +346,90 @@ export const listsToolDefinitions = [
   },
   {
     name: 'filter-list-entries',
-    description: formatToolDescription({
-      capability: 'Filter list entries by single attribute condition.',
-      boundaries:
-        'combine conditions; use advanced-filter for multi-condition.',
-      constraints: 'Requires listId, attributeSlug, condition, value.',
-      recoveryHint: 'Use get-list-details for valid attribute slugs.',
-    }),
+    description: `Filter list entries with flexible parameter modes. Auto-detects mode based on parameters provided.
+
+**Mode 1 - Simple Filtering (Single Attribute):**
+Filter entries by a single attribute condition.
+Required parameters: listId, attributeSlug, condition, value
+
+Example:
+{
+  "listId": "550e8400-e29b-41d4-a716-446655440000",
+  "attributeSlug": "status",
+  "condition": "equals",
+  "value": "active"
+}
+
+**Mode 2 - Advanced Filtering (Multi-Condition):**
+Filter entries with multiple conditions using AND/OR logic.
+Required parameters: listId, filters (object with filters array and matchAny flag)
+
+Example:
+{
+  "listId": "550e8400-e29b-41d4-a716-446655440000",
+  "filters": {
+    "filters": [
+      {"attribute": {"slug": "status"}, "condition": "equals", "value": "active"},
+      {"attribute": {"slug": "priority"}, "condition": "greater_than", "value": 5}
+    ],
+    "matchAny": false
+  }
+}
+
+**Mode 3 - Parent Attribute Filtering:**
+Filter entries by parent record attributes (e.g., company industry, person role).
+Required parameters: listId, parentObjectType, parentAttributeSlug, condition, value
+
+Example:
+{
+  "listId": "550e8400-e29b-41d4-a716-446655440000",
+  "parentObjectType": "companies",
+  "parentAttributeSlug": "categories",
+  "condition": "contains",
+  "value": "Technology"
+}
+
+**Mode 4 - Parent UUID Filtering:**
+Filter entries by exact parent record UUID (convenience mode, fastest).
+Required parameters: listId, parentRecordId
+
+Example:
+{
+  "listId": "550e8400-e29b-41d4-a716-446655440000",
+  "parentRecordId": "660e8400-e29b-41d4-a716-446655440001"
+}
+
+**Mode Detection:**
+The tool automatically detects which mode to use based on the parameters you provide.
+You must provide parameters for exactly ONE mode per call.
+
+**Pagination:**
+All modes support optional 'limit' and 'offset' parameters for pagination.
+
+**Migration Guide:**
+- Replaces: advanced-filter-list-entries → Use Mode 2 (filters parameter)
+- Replaces: filter-list-entries-by-parent → Use Mode 3 (parentObjectType + parentAttributeSlug)
+- Replaces: filter-list-entries-by-parent-id → Use Mode 4 (parentRecordId)`,
     inputSchema: {
       type: 'object',
       properties: {
         listId: {
           type: 'string',
-          description: 'ID of the list to filter entries from',
+          description:
+            'UUID of the list to filter entries from (required for all modes)',
           example: '550e8400-e29b-41d4-a716-446655440000',
         },
+        // Mode 1: Simple filtering parameters
         attributeSlug: {
           type: 'string',
           description:
-            "Slug of the attribute to filter by (e.g., 'stage', 'status')",
+            "Mode 1: Slug of the attribute to filter by (e.g., 'stage', 'status')",
           example: 'stage',
         },
         condition: {
           type: 'string',
           description:
-            "Filter condition (e.g., 'equals', 'contains', 'greater_than')",
+            "Mode 1 & 3: Filter condition (e.g., 'equals', 'contains', 'greater_than')",
           enum: [
             'equals',
             'not_equals',
@@ -348,32 +449,133 @@ export const listsToolDefinitions = [
           example: 'equals',
         },
         value: {
-          description: 'Value to filter by (type depends on the attribute)',
+          description:
+            'Mode 1 & 3: Value to filter by (type depends on the attribute)',
           example: 'Qualified',
         },
+        // Mode 2: Advanced multi-condition filtering
+        filters: {
+          type: 'object',
+          description:
+            'Mode 2: Advanced filter configuration with multiple conditions',
+          properties: {
+            filters: {
+              type: 'array',
+              description: 'Array of filter conditions to apply',
+              items: {
+                type: 'object',
+                properties: {
+                  attribute: {
+                    type: 'object',
+                    properties: {
+                      slug: {
+                        type: 'string',
+                        description:
+                          "Slug of the attribute to filter by (e.g., 'stage', 'status')",
+                      },
+                    },
+                    required: ['slug'],
+                  },
+                  condition: {
+                    type: 'string',
+                    description:
+                      "Filter condition (e.g., 'equals', 'contains', 'greater_than')",
+                    enum: [
+                      'equals',
+                      'not_equals',
+                      'contains',
+                      'not_contains',
+                      'starts_with',
+                      'ends_with',
+                      'greater_than',
+                      'less_than',
+                      'greater_than_or_equals',
+                      'less_than_or_equals',
+                      'is_empty',
+                      'is_not_empty',
+                      'is_set',
+                      'is_not_set',
+                    ],
+                  },
+                  value: {
+                    description:
+                      'Value to filter by (type depends on the attribute)',
+                  },
+                  logicalOperator: {
+                    type: 'string',
+                    description:
+                      "Logical operator to use with the next filter (default: 'and')",
+                    enum: ['and', 'or'],
+                  },
+                },
+                required: ['attribute', 'condition', 'value'],
+              },
+            },
+            matchAny: {
+              type: 'boolean',
+              description:
+                'When true, at least one filter must match (OR logic). When false, all filters must match (AND logic). Default: false',
+            },
+          },
+          required: ['filters'],
+        },
+        // Mode 3: Parent attribute filtering
+        parentObjectType: {
+          type: 'string',
+          description:
+            'Mode 3: Type of the parent record (e.g., "companies", "people")',
+          enum: ['companies', 'people'],
+          example: 'companies',
+        },
+        parentAttributeSlug: {
+          type: 'string',
+          description:
+            'Mode 3: Attribute of the parent record to filter by (e.g., "name", "email_addresses", "categories")',
+          example: 'categories',
+        },
+        // Mode 4: Parent UUID filtering
+        parentRecordId: {
+          type: 'string',
+          description:
+            'Mode 4: UUID of the parent record to filter by (fastest mode for exact record filtering)',
+          example: '660e8400-e29b-41d4-a716-446655440001',
+        },
+        // Common pagination parameters for all modes
         limit: {
           type: 'number',
-          description: 'Maximum number of entries to fetch (default: 20)',
+          description:
+            'Maximum number of entries to fetch (default: 20, applies to all modes)',
           example: 50,
         },
         offset: {
           type: 'number',
-          description: 'Number of entries to skip for pagination (default: 0)',
+          description:
+            'Number of entries to skip for pagination (default: 0, applies to all modes)',
           example: 0,
         },
       },
-      required: ['listId', 'attributeSlug', 'condition', 'value'],
+      required: ['listId'],
       additionalProperties: false,
     },
   },
   {
     name: 'advanced-filter-list-entries',
-    description: formatToolDescription({
-      capability: 'Filter entries with multi-condition queries (AND/OR logic).',
-      boundaries: 'modify entries; read-only.',
-      constraints: 'Requires listId, filters array; matchAny for OR logic.',
-      recoveryHint: 'Use filter-list-entries for single conditions.',
-    }),
+    description: `[DEPRECATED] This tool has been consolidated into 'filter-list-entries'.
+
+Please use 'filter-list-entries' with Mode 2 (Advanced) parameters instead:
+- Pass a 'filters' object with 'filters' array and 'matchAny' flag
+- All functionality remains identical
+
+This tool will be removed in version 2.0.0.
+
+---
+
+${formatToolDescription({
+  capability: 'Filter entries with multi-condition queries (AND/OR logic).',
+  boundaries: 'modify entries; read-only.',
+  constraints: 'Requires listId, filters array; matchAny for OR logic.',
+  recoveryHint: 'Use filter-list-entries for single conditions.',
+})}`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -463,13 +665,21 @@ export const listsToolDefinitions = [
   },
   {
     name: 'add-record-to-list',
-    description: formatToolDescription({
-      capability: 'Add company or person to list with optional initial values.',
-      boundaries: 'create records; record must exist first.',
-      requiresApproval: true,
-      constraints: 'Requires list UUID, record UUID, object type.',
-      recoveryHint: 'If not found, create record first with create-record.',
-    }),
+    description: `[DEPRECATED] This tool has been consolidated into 'manage-list-entry'.
+
+Please use 'manage-list-entry' with Mode 1 (Add) parameters instead:
+- Pass 'recordId', 'objectType', and optionally 'initialValues'
+- All functionality remains identical
+
+This tool will be removed in version 2.0.0.
+
+${formatToolDescription({
+  capability: 'Add company or person to list with optional initial values.',
+  boundaries: 'create records; record must exist first.',
+  requiresApproval: true,
+  constraints: 'Requires list UUID, record UUID, object type.',
+  recoveryHint: 'If not found, create record first with create-record.',
+})}`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -502,13 +712,21 @@ export const listsToolDefinitions = [
   },
   {
     name: 'remove-record-from-list',
-    description: formatToolDescription({
-      capability: 'Remove company or person from list (membership only).',
-      boundaries: 'delete underlying record; membership only.',
-      requiresApproval: true,
-      constraints: 'Requires list UUID, entry UUID (not record UUID).',
-      recoveryHint: 'Use get-list-entries to find entry UUID.',
-    }),
+    description: `[DEPRECATED] This tool has been consolidated into 'manage-list-entry'.
+
+Please use 'manage-list-entry' with Mode 2 (Remove) parameters instead:
+- Pass 'entryId' only (do not include 'attributes' or 'recordId')
+- All functionality remains identical
+
+This tool will be removed in version 2.0.0.
+
+${formatToolDescription({
+  capability: 'Remove company or person from list (membership only).',
+  boundaries: 'delete underlying record; membership only.',
+  requiresApproval: true,
+  constraints: 'Requires list UUID, entry UUID (not record UUID).',
+  recoveryHint: 'Use get-list-entries to find entry UUID.',
+})}`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -529,14 +747,21 @@ export const listsToolDefinitions = [
   },
   {
     name: 'update-list-entry',
-    description: formatToolDescription({
-      capability:
-        'Update list entry attributes (stage, status, custom fields).',
-      boundaries: 'update record attributes; use update-record for that.',
-      requiresApproval: true,
-      constraints: 'Requires list UUID, entry UUID, attributes object.',
-      recoveryHint: 'Use get-list-details for valid attributes and values.',
-    }),
+    description: `[DEPRECATED] This tool has been consolidated into 'manage-list-entry'.
+
+Please use 'manage-list-entry' with Mode 3 (Update) parameters instead:
+- Pass 'entryId' and 'attributes' parameters
+- All functionality remains identical
+
+This tool will be removed in version 2.0.0.
+
+${formatToolDescription({
+  capability: 'Update list entry attributes (stage, status, custom fields).',
+  boundaries: 'update record attributes; use update-record for that.',
+  requiresApproval: true,
+  constraints: 'Requires list UUID, entry UUID, attributes object.',
+  recoveryHint: 'Use get-list-details for valid attributes and values.',
+})}`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -569,15 +794,114 @@ export const listsToolDefinitions = [
     },
   },
   {
+    name: 'manage-list-entry',
+    description: `Manage list entries with flexible action modes. Auto-detects action based on parameters provided.
+
+**Mode 1 - Add Entry (Add record to list):**
+Add a company or person record to a list with optional initial values.
+Required parameters: listId, recordId, objectType
+Optional parameters: initialValues
+
+Example:
+{
+  "listId": "550e8400-e29b-41d4-a716-446655440000",
+  "recordId": "660e8400-e29b-41d4-a716-446655440001",
+  "objectType": "companies",
+  "initialValues": {"stage": "Prospect"}
+}
+
+**Mode 2 - Remove Entry:**
+Remove an entry from a list.
+Required parameters: listId, entryId
+
+Example:
+{
+  "listId": "550e8400-e29b-41d4-a716-446655440000",
+  "entryId": "770e8400-e29b-41d4-a716-446655440002"
+}
+
+**Mode 3 - Update Entry:**
+Update attributes on an existing list entry.
+Required parameters: listId, entryId, attributes
+
+Example:
+{
+  "listId": "550e8400-e29b-41d4-a716-446655440000",
+  "entryId": "770e8400-e29b-41d4-a716-446655440002",
+  "attributes": {"stage": "Qualified"}
+}
+
+**Mode Detection:**
+The tool automatically detects which action to perform based on the parameters you provide.
+You must provide parameters for exactly ONE mode per call.
+
+**Migration Guide:**
+- Replaces: add-record-to-list → Use Mode 1 (recordId + objectType)
+- Replaces: remove-record-from-list → Use Mode 2 (entryId only)
+- Replaces: update-list-entry → Use Mode 3 (entryId + attributes)`,
+    annotations: {
+      readOnlyHint: false,
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        listId: {
+          type: 'string',
+          description: 'UUID of the list (required for all modes)',
+          example: '550e8400-e29b-41d4-a716-446655440000',
+        },
+        // Mode 1 parameters
+        recordId: {
+          type: 'string',
+          description: 'Mode 1: UUID of the record to add to the list',
+          example: '660e8400-e29b-41d4-a716-446655440001',
+        },
+        objectType: {
+          type: 'string',
+          enum: ['companies', 'people'],
+          description: 'Mode 1: Type of record to add',
+        },
+        initialValues: {
+          type: 'object',
+          description: 'Mode 1: Initial attribute values for the list entry',
+          additionalProperties: true,
+        },
+        // Mode 2 & 3 parameters
+        entryId: {
+          type: 'string',
+          description: 'Mode 2 & 3: UUID of the list entry to remove or update',
+          example: '770e8400-e29b-41d4-a716-446655440002',
+        },
+        // Mode 3 parameters
+        attributes: {
+          type: 'object',
+          description: 'Mode 3: Attributes to update on the list entry',
+          additionalProperties: true,
+        },
+      },
+      required: ['listId'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'filter-list-entries-by-parent',
-    description: formatToolDescription({
-      capability:
-        'Filter entries by parent record attributes (industry, role).',
-      boundaries: 'search multiple lists or modify records.',
-      constraints:
-        'Requires listId, parentObjectType, parentAttributeSlug, condition, value.',
-      recoveryHint: 'Use records_discover_attributes for valid slugs.',
-    }),
+    description: `[DEPRECATED] This tool has been consolidated into 'filter-list-entries'.
+
+Please use 'filter-list-entries' with Mode 3 (Parent Attribute) parameters instead:
+- Pass 'parentObjectType', 'parentAttributeSlug', 'condition', and 'value'
+- All functionality remains identical
+
+This tool will be removed in version 2.0.0.
+
+---
+
+${formatToolDescription({
+  capability: 'Filter entries by parent record attributes (industry, role).',
+  boundaries: 'search multiple lists or modify records.',
+  constraints:
+    'Requires listId, parentObjectType, parentAttributeSlug, condition, value.',
+  recoveryHint: 'Use records_discover_attributes for valid slugs.',
+})}`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -648,14 +972,24 @@ export const listsToolDefinitions = [
   },
   {
     name: 'filter-list-entries-by-parent-id',
-    description: formatToolDescription({
-      capability: 'Filter entries by exact parent record UUID.',
-      boundaries: 'search multiple lists.',
-      constraints:
-        'Requires list UUID, record UUID; faster than attribute filtering.',
-      recoveryHint:
-        'Use get-record-list-memberships for workspace-wide search.',
-    }),
+    description: `[DEPRECATED] This tool has been consolidated into 'filter-list-entries'.
+
+Please use 'filter-list-entries' with Mode 4 (Parent UUID) parameters instead:
+- Pass 'parentRecordId' parameter
+- Note: Parameter renamed from 'recordId' to 'parentRecordId' for consistency
+- All functionality remains identical (fastest filtering mode)
+
+This tool will be removed in version 2.0.0.
+
+---
+
+${formatToolDescription({
+  capability: 'Filter entries by exact parent record UUID.',
+  boundaries: 'search multiple lists.',
+  constraints:
+    'Requires list UUID, record UUID; faster than attribute filtering.',
+  recoveryHint: 'Use get-record-list-memberships for workspace-wide search.',
+})}`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -681,6 +1015,95 @@ export const listsToolDefinitions = [
         },
       },
       required: ['listId', 'recordId'],
+      additionalProperties: false,
+    },
+  },
+  // Dedicated list configuration tools (Issue #1195)
+  {
+    name: 'create-list',
+    description: formatToolDescription({
+      capability:
+        'Create a new CRM list (sales pipeline, recruiting tracker, support queue). Supports templates for quick setup with smart defaults.',
+      boundaries: 'update existing lists or manage list entries.',
+      constraints:
+        'Requires name and parent_object. Template expansion fills defaults before validation. Dry-run mode previews without creating.',
+      recoveryHint:
+        'Use get-lists to verify the list was created. Use update-list-configuration to modify after creation.',
+    }),
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Name of the list to create',
+          example: 'My Sales Pipeline',
+        },
+        parent_object: {
+          type: 'string',
+          description:
+            'Object type this list is for (e.g., "companies", "people"). Auto-validated against workspace objects.',
+          example: 'companies',
+        },
+        description: {
+          type: 'string',
+          description: 'Optional description for the list',
+        },
+        template: {
+          type: 'string',
+          description:
+            'Optional template name for smart defaults. Expands before validation so errors reference actual values.',
+          enum: ['sales_pipeline', 'recruiting_tracker', 'support_queue'],
+        },
+        attributes: {
+          type: 'object',
+          description:
+            'Additional list attributes (e.g., stages, custom fields). Merged onto template defaults if template is specified.',
+          additionalProperties: true,
+        },
+        dry_run: {
+          type: 'boolean',
+          description:
+            'Preview the creation without committing. Returns normalized preview of what would be created.',
+          default: false,
+        },
+      },
+      required: ['name', 'parent_object'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'update-list-configuration',
+    description: formatToolDescription({
+      capability:
+        'Update configuration of an existing list (name, description, custom fields). Detects immutable fields and provides clear errors.',
+      boundaries: 'change parent_object (immutable) or manage list entries.',
+      constraints:
+        'Requires listId. Immutable fields (parent_object) are rejected before the API call. Dry-run mode previews changes.',
+      recoveryHint:
+        'Use get-list-details to inspect current configuration. Use create-list for a different parent_object.',
+    }),
+    inputSchema: {
+      type: 'object',
+      properties: {
+        listId: {
+          type: 'string',
+          description: 'UUID of the list to update',
+          example: '550e8400-e29b-41d4-a716-446655440000',
+        },
+        attributes: {
+          type: 'object',
+          description:
+            'Attributes to update. Immutable fields (parent_object) will be rejected with a clear error.',
+          additionalProperties: true,
+        },
+        dry_run: {
+          type: 'boolean',
+          description:
+            'Preview the update without committing. Returns normalized preview of what would change.',
+          default: false,
+        },
+      },
+      required: ['listId', 'attributes'],
       additionalProperties: false,
     },
   },

@@ -1,15 +1,14 @@
 /**
  * BaseCreateStrategy - Interface for resource-specific create strategies
  */
-import type { AttioRecord, AttioTask } from '../../../types/attio.js';
-import type { UniversalResourceType } from '../../../handlers/tool-configs/universal/types.js';
+import type { AttioTask, UniversalRecord } from '@/types/attio.js';
 
 export interface CreateStrategyParams {
-  resourceType: UniversalResourceType;
+  resourceType: string;
   values: Record<string, unknown>;
   context?: Record<string, unknown>;
 }
 
-export interface CreateStrategy<T = AttioRecord | AttioTask> {
+export interface CreateStrategy<T = UniversalRecord | AttioTask> {
   create(params: CreateStrategyParams): Promise<T>;
 }

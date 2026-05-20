@@ -15,10 +15,13 @@
  * - Commit a37cf250: Test relocation and enhancement
  */
 
-import { describe, it, beforeAll, afterAll, expect } from 'vitest';
-import { MCPTestBase } from '../shared/mcp-test-base';
-import { QAAssertions } from '../shared/qa-assertions';
-import type { TestResult } from '../shared/quality-gates';
+import { describe, it, beforeAll, afterAll, afterEach, expect } from 'vitest';
+import { MCPTestBase } from '../shared/mcp-test-base.js';
+import { QAAssertions } from '../shared/qa-assertions.js';
+import {
+  createResultTracker,
+  hasPhoneFormatGuidance,
+} from '../shared/phone-test-utils.js';
 
 class PhoneNormalizationTest extends MCPTestBase {
   constructor() {
@@ -28,7 +31,7 @@ class PhoneNormalizationTest extends MCPTestBase {
 
 describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
   const testCase = new PhoneNormalizationTest();
-  const results: TestResult[] = [];
+  const tracker = createResultTracker();
 
   beforeAll(async () => {
     await testCase.setup();
@@ -43,11 +46,8 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
     await testCase.teardown();
 
     // Log quality gate results
-    const passedCount = results.filter((r) => r.passed).length;
-    const totalCount = results.length;
-    console.log(
-      `\nPhone Normalization E2E Results: ${passedCount}/${totalCount} passed`
-    );
+    const { passed, total } = tracker.getSummary();
+    console.log(`\nPhone Normalization E2E Results: ${passed}/${total} passed`);
   });
 
   describe('Phone Number Structure Transformation', () => {
@@ -68,7 +68,7 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
           ],
         };
 
-        const result = await testCase.executeToolCall('create-record', {
+        const result = await testCase.executeToolCall('create_record', {
           resource_type: 'people',
           record_data: personData,
         });
@@ -85,7 +85,7 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
         error = e instanceof Error ? e.message : String(e);
         throw e;
       } finally {
-        results.push({ test: testName, passed, error });
+        tracker.track(testName, passed, error);
       }
     });
 
@@ -106,7 +106,7 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
           ],
         };
 
-        const result = await testCase.executeToolCall('create-record', {
+        const result = await testCase.executeToolCall('create_record', {
           resource_type: 'people',
           record_data: personData,
         });
@@ -120,7 +120,7 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
         error = e instanceof Error ? e.message : String(e);
         throw e;
       } finally {
-        results.push({ test: testName, passed, error });
+        tracker.track(testName, passed, error);
       }
     });
   });
@@ -145,7 +145,7 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
           ],
         };
 
-        const result = await testCase.executeToolCall('create-record', {
+        const result = await testCase.executeToolCall('create_record', {
           resource_type: 'people',
           record_data: personData,
         });
@@ -160,7 +160,7 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
         error = e instanceof Error ? e.message : String(e);
         throw e;
       } finally {
-        results.push({ test: testName, passed, error });
+        tracker.track(testName, passed, error);
       }
     });
 
@@ -184,7 +184,7 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
           ],
         };
 
-        const result = await testCase.executeToolCall('create-record', {
+        const result = await testCase.executeToolCall('create_record', {
           resource_type: 'people',
           record_data: personData,
         });
@@ -198,7 +198,7 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
         error = e instanceof Error ? e.message : String(e);
         throw e;
       } finally {
-        results.push({ test: testName, passed, error });
+        tracker.track(testName, passed, error);
       }
     });
 
@@ -225,7 +225,7 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
           ],
         };
 
-        const result = await testCase.executeToolCall('create-record', {
+        const result = await testCase.executeToolCall('create_record', {
           resource_type: 'people',
           record_data: personData,
         });
@@ -239,7 +239,7 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
         error = e instanceof Error ? e.message : String(e);
         throw e;
       } finally {
-        results.push({ test: testName, passed, error });
+        tracker.track(testName, passed, error);
       }
     });
   });
@@ -261,7 +261,7 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
           ],
         };
 
-        const result = await testCase.executeToolCall('create-record', {
+        const result = await testCase.executeToolCall('create_record', {
           resource_type: 'people',
           record_data: personData,
         });
@@ -275,7 +275,7 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
         error = e instanceof Error ? e.message : String(e);
         throw e;
       } finally {
-        results.push({ test: testName, passed, error });
+        tracker.track(testName, passed, error);
       }
     });
 
@@ -295,7 +295,7 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
           ],
         };
 
-        const result = await testCase.executeToolCall('create-record', {
+        const result = await testCase.executeToolCall('create_record', {
           resource_type: 'people',
           record_data: personData,
         });
@@ -309,7 +309,7 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
         error = e instanceof Error ? e.message : String(e);
         throw e;
       } finally {
-        results.push({ test: testName, passed, error });
+        tracker.track(testName, passed, error);
       }
     });
   });
@@ -338,7 +338,7 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
           ],
         };
 
-        const createResult = await testCase.executeToolCall('create-record', {
+        const createResult = await testCase.executeToolCall('create_record', {
           resource_type: 'people',
           record_data: createData,
         });
@@ -354,7 +354,7 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
           name: 'Phone Test Person 9 Updated',
         };
 
-        const updateResult = await testCase.executeToolCall('update-record', {
+        const updateResult = await testCase.executeToolCall('update_record', {
           resource_type: 'people',
           record_id: recordId,
           record_data: updateData,
@@ -367,7 +367,7 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
         error = e instanceof Error ? e.message : String(e);
         throw e;
       } finally {
-        results.push({ test: testName, passed, error });
+        tracker.track(testName, passed, error);
       }
     });
   });
@@ -391,7 +391,7 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
 
         // This should either succeed (storing as-is) or fail with helpful error
         try {
-          const result = await testCase.executeToolCall('create-record', {
+          const result = await testCase.executeToolCall('create_record', {
             resource_type: 'people',
             record_data: personData,
           });
@@ -409,12 +409,7 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
               : String(createError);
 
           // Should contain guidance about phone format
-          const hasGuidance =
-            errorMsg.includes('phone') ||
-            errorMsg.includes('format') ||
-            errorMsg.includes('E.164');
-
-          if (hasGuidance) {
+          if (hasPhoneFormatGuidance(errorMsg)) {
             passed = true; // Error message is helpful
           } else {
             throw new Error(`Error lacks phone format guidance: ${errorMsg}`);
@@ -424,7 +419,7 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
         error = e instanceof Error ? e.message : String(e);
         throw e;
       } finally {
-        results.push({ test: testName, passed, error });
+        tracker.track(testName, passed, error);
       }
     });
   });
@@ -450,7 +445,7 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
           ],
         };
 
-        const result = await testCase.executeToolCall('create-record', {
+        const result = await testCase.executeToolCall('create_record', {
           resource_type: 'people',
           record_data: personData,
         });
@@ -464,7 +459,7 @@ describe('MCP E2E: Phone Number Normalization (Issue #798)', () => {
         error = e instanceof Error ? e.message : String(e);
         throw e;
       } finally {
-        results.push({ test: testName, passed, error });
+        tracker.track(testName, passed, error);
       }
     });
   });

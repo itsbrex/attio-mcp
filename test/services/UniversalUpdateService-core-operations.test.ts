@@ -44,6 +44,17 @@ vi.mock('../../src/services/MockService.js', () => ({
     isUsingMockData: vi.fn().mockReturnValue(true),
   },
 }));
+vi.mock('@/utils/config-loader.js', () => ({
+  loadMappingConfig: vi.fn(() => ({
+    mappings: {
+      attributes: {
+        objects: {
+          funds: {},
+        },
+      },
+    },
+  })),
+}));
 import { UniversalUpdateService } from '../../src/services/UniversalUpdateService.js';
 import { UniversalResourceType } from '../../src/handlers/tool-configs/universal/types.js';
 import { AttioRecord } from '../../src/types/attio.js';
@@ -71,7 +82,7 @@ describe('UniversalUpdateService', () => {
     delete process.env.OFFLINE_MODE;
     delete process.env.PERFORMANCE_TEST;
     delete process.env.ENABLE_ENHANCED_VALIDATION;
-    process.env.SKIP_FIELD_VERIFICATION = 'true';
+    process.env.ENABLE_FIELD_VERIFICATION = 'false';
 
     vi.mocked(validateFields).mockReturnValue({
       warnings: [],
@@ -129,9 +140,10 @@ describe('UniversalUpdateService', () => {
       expect(result.id.object_id).toBe('people');
     });
 
-    it('should update a list record and convert format', async () => {
+    it('should update a list record in list-native format', async () => {
       const mockList = {
         id: { list_id: 'list_789' },
+        title: 'Updated List',
         name: 'Updated List',
         description: 'Updated description',
         object_slug: 'companies',
@@ -139,6 +151,7 @@ describe('UniversalUpdateService', () => {
         workspace_id: 'ws_123',
         workspace_member_access: 'read',
         created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-02T00:00:00Z',
       } as any;
       vi.mocked(updateList).mockResolvedValue(mockList);
 
@@ -151,10 +164,7 @@ describe('UniversalUpdateService', () => {
       expect(updateList).toHaveBeenCalledWith('list_789', {
         name: 'Test Company',
       });
-      expect(result.id.object_id).toBe('lists');
-      expect(result.values.name).toBe('Updated List');
-      expect(result.values.api_slug).toBe('updated-list');
-      expect(result.updated_at).toBeDefined();
+      expect(result).toEqual(mockList);
     });
 
     it('should update a records object record', async () => {
@@ -197,6 +207,35 @@ describe('UniversalUpdateService', () => {
         expect.any(Object) // Don't assert on exact data since validation logic has changed
       );
       expect(result.id.object_id).toBe('deals');
+    });
+
+    it('should update a config-discovered custom object record', async () => {
+      const mockRecord: AttioRecord = {
+        id: { record_id: 'fund_123' },
+        values: { name: 'Updated Fund' },
+      } as any;
+      vi.mocked(updateObjectRecord).mockResolvedValue(mockRecord);
+      vi.mocked(mapRecordFields).mockReturnValue({
+        mapped: { name: 'Updated Fund' },
+        warnings: [],
+        errors: [],
+      } as any);
+
+      const result = await UniversalUpdateService.updateRecord({
+        resource_type: 'funds',
+        record_id: 'fund_123',
+        record_data: { values: { name: 'Updated Fund' } },
+      });
+
+      expect(mapRecordFields).toHaveBeenCalledWith(
+        'funds',
+        { name: 'Updated Fund' },
+        expect.any(Array)
+      );
+      expect(updateObjectRecord).toHaveBeenCalledWith('funds', 'fund_123', {
+        name: 'Updated Fund',
+      });
+      expect(result.id.object_id).toBe('funds');
     });
 
     it('should update a task record with field transformation (excluding immutable content)', async () => {

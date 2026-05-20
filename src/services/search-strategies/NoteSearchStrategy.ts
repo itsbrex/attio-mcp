@@ -18,29 +18,34 @@
  * Recommendation: Request Attio to add workspace-wide notes endpoint or search capability.
  */
 
-import { AttioRecord, AttioNote } from '../../types/attio.js';
+import { performance } from 'perf_hooks';
+
 import {
   SearchType,
   MatchType,
   SortType,
   UniversalResourceType,
-} from '../../handlers/tool-configs/universal/types.js';
-import { BaseSearchStrategy } from './BaseSearchStrategy.js';
-import { SearchStrategyParams, StrategyDependencies } from './interfaces.js';
-import { performance } from 'perf_hooks';
-import { SearchUtilities } from '../search-utilities/SearchUtilities.js';
-import { createScopedLogger, OperationType } from '../../utils/logger.js';
-
-// Import performance tracking and caching services
-import { enhancedPerformanceTracker } from '../../middleware/performance-enhanced.js';
-import { CachingService } from '../CachingService.js';
-import { UniversalUtilityService } from '../UniversalUtilityService.js';
+} from '@/handlers/tool-configs/universal/types.js';
+import { enhancedPerformanceTracker } from '@/middleware/performance-enhanced.js';
+import { SearchUtilities } from '@/services/search-utilities/SearchUtilities.js';
+import { BaseSearchStrategy } from '@/services/search-strategies/BaseSearchStrategy.js';
+import type {
+  SearchStrategyParams,
+  StrategyDependencies,
+} from '@/services/search-strategies/interfaces.js';
+import { UniversalUtilityService } from '@/services/UniversalUtilityService.js';
+import type {
+  AttioNote,
+  AttioRecord,
+  UniversalRecordResult,
+} from '@/types/attio.js';
+import { createScopedLogger, OperationType } from '@/utils/logger.js';
 
 // Performance warning threshold for large note datasets
 const NOTES_PERFORMANCE_WARNING_THRESHOLD = 2000;
 
 /**
- * Search strategy for notes with performance optimization, caching, and content search support
+ * Search strategy for notes with performance optimization and content search support
  *
  * IMPLEMENTATION NOTE:
  * The Attio Notes API (/notes endpoint) does not support native text search.
@@ -64,7 +69,7 @@ export class NoteSearchStrategy extends BaseSearchStrategy {
     return true; // Notes support content search via applyContentSearch method
   }
 
-  async search(params: SearchStrategyParams): Promise<AttioRecord[]> {
+  async search(params: SearchStrategyParams): Promise<UniversalRecordResult[]> {
     const {
       query,
       limit,
@@ -95,19 +100,10 @@ export class NoteSearchStrategy extends BaseSearchStrategy {
   }
 
   /**
-   * Search notes with performance optimization, caching, and content search support
-   *
-   * PERFORMANCE-OPTIMIZED NOTES PAGINATION
+   * Search notes with performance monitoring and content search support.
    *
    * The Attio Notes API does not support native text search or advanced filtering.
-   * This implementation uses smart caching and performance monitoring to
-   * minimize the performance impact of loading all notes.
-   *
-   * Optimizations:
-   * - Smart caching with 30-second TTL to avoid repeated full loads
-   * - Performance warnings for large datasets (>500 notes)
-   * - Early termination for large offsets
-   * - Memory usage monitoring and cleanup
+   * This implementation fetches notes by parent filter and applies client-side filtering.
    */
   private async searchNotes(
     perfId: string,
@@ -120,14 +116,13 @@ export class NoteSearchStrategy extends BaseSearchStrategy {
     match_type: MatchType = MatchType.PARTIAL,
     sort: SortType = SortType.NAME,
     filters?: Record<string, unknown>
-  ): Promise<AttioRecord[]> {
+  ): Promise<UniversalRecordResult[]> {
     const log = createScopedLogger(
       'NoteSearchStrategy',
       'notes_search',
       OperationType.DATA_PROCESSING
     );
 
-    // Use CachingService for notes data management
     const loadNotesData = async (): Promise<AttioRecord[]> => {
       try {
         if (!this.dependencies.noteFunction) {
@@ -157,7 +152,7 @@ export class NoteSearchStrategy extends BaseSearchStrategy {
           });
           return [];
         } else {
-          // Convert AttioNote[] to AttioRecord[]
+          // Convert AttioNote[] to UniversalRecordResult[]
           // Cast to AttioNote[] since we know the API returns notes
           return (notesList as AttioNote[]).map((note) =>
             this.convertNoteToRecord(note)
@@ -169,12 +164,9 @@ export class NoteSearchStrategy extends BaseSearchStrategy {
       }
     };
 
-    // Generate cache key based on parent filters to prevent collisions
-    const cacheKey = CachingService.getNotesListCacheKey(filters);
-    const { data: notes, fromCache } = await CachingService.getOrLoadNotes(
-      loadNotesData,
-      cacheKey
-    );
+    // SECURITY: note results can include sensitive tenant data; avoid process-wide caching.
+    const notes = await loadNotesData();
+    const fromCache = false;
 
     // Performance warning for large datasets
     if (!fromCache && notes.length > NOTES_PERFORMANCE_WARNING_THRESHOLD) {

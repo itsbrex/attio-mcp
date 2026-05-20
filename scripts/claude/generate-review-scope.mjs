@@ -67,10 +67,7 @@ function ensureSafePath(filePath) {
   return rel;
 }
 
-function listRing0(baseRef, headRef) {
-  const safeBase = sanitizeRef(baseRef, 'origin/main');
-  const safeHead = sanitizeRef(headRef, 'HEAD');
-  const diffRange = `${safeBase}...${safeHead}`;
+function listRing0(diffRange) {
   const output = runGit(['diff', '--name-status', diffRange]);
   const files = [];
   const deletions = [];
@@ -94,9 +91,140 @@ function listRing0(baseRef, headRef) {
   };
 }
 
+/**
+ * Captures the unified diff for the given diff range.
+ * This provides the actual line-by-line changes for more focused review.
+ *
+ * @param {string} diffRange - The git diff range (e.g., 'origin/main...HEAD')
+ * @param {number} maxChars - Maximum characters to return (default 15000)
+ * @returns {string} The unified diff content, truncated if necessary
+ */
+function captureUnifiedDiff(diffRange, maxChars = 15000) {
+  try {
+    let diff = runGit(['diff', '--unified=3', diffRange]);
+
+    // Escape triple backticks to prevent Markdown fencing issues
+    // Renders as \`\`\` inside the ```diff``` block, preserving visual intent without breaking fence
+    diff = diff.replace(/```/g, '\\`\\`\\`');
+
+    if (diff.length > maxChars) {
+      return (
+        diff.slice(0, maxChars) +
+        `\n... [diff truncated at ${maxChars} chars - ${diff.length - maxChars} chars omitted]`
+      );
+    }
+    return diff;
+  } catch (error) {
+    console.warn('[scope] Failed to capture unified diff:', error.message);
+    return '';
+  }
+}
+
+// Relative imports (./foo, ../bar)
 const RELATIVE_IMPORT_RE = /import\s+[^;]*?from\s+['\"](\.{1,2}\/.+?)['\"]/g;
 const EXPORT_IMPORT_RE = /export\s+[^;]*?from\s+['\"](\.{1,2}\/[^'\"]+)['\"]/g;
 const REQUIRE_RE = /require\(\s*['\"](\.{1,2}\/[^'\"]+)['\"]\s*\)/g;
+
+// Path alias imports (@/... maps to src/...)
+// These are configured in tsconfig.json: "@/*": ["src/*"]
+const PATH_ALIAS_IMPORT_RE = /import\s+[^;]*?from\s+['\"]@\/([^'\"]+)['\"]/g;
+const PATH_ALIAS_EXPORT_RE = /export\s+[^;]*?from\s+['\"]@\/([^'\"]+)['\"]/g;
+
+// Dynamic imports (await import(...) or just import(...))
+// Captures both relative paths and @/ path aliases in dynamic import() calls
+const DYNAMIC_RELATIVE_IMPORT_RE =
+  /import\s*\(\s*['\"](\.{1,2}\/[^'\"]+)['\"]\s*\)/g;
+const DYNAMIC_PATH_ALIAS_IMPORT_RE =
+  /import\s*\(\s*['\"]@\/([^'\"]+)['\"]\s*\)/g;
+
+const EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
+
+/**
+ * Resolves a path alias import to an actual file path.
+ * @param {string} aliasPath - The path after @/ (e.g., "services/utils/foo.js")
+ * @returns {string|null} - The resolved path (e.g., "src/services/utils/foo.ts") or null
+ */
+function resolvePathAlias(aliasPath) {
+  // @/foo/bar.js → src/foo/bar
+  let resolved = `src/${aliasPath}`;
+
+  // Convert .js extension to .ts for source files (ESM imports use .js)
+  if (resolved.endsWith('.js')) {
+    resolved = resolved.replace(/\.js$/, '.ts');
+  }
+
+  // Check if file exists with various extensions
+  const safePath = ensureSafePath(resolved);
+  if (safePath && existsSync(safePath)) {
+    return safePath;
+  }
+
+  // Try without extension (might be a directory with index)
+  const withoutExt = resolved.replace(/\.[^/.]+$/, '');
+  for (const ext of EXTENSIONS) {
+    const candidate = ensureSafePath(`${withoutExt}${ext}`);
+    if (candidate && existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  // Try as directory with index file
+  for (const ext of EXTENSIONS) {
+    const indexPath = ensureSafePath(join(resolved, `index${ext}`));
+    if (indexPath && existsSync(indexPath)) {
+      return indexPath;
+    }
+  }
+
+  // Return the .ts path even if it doesn't exist (let caller handle)
+  return safePath;
+}
+
+/**
+ * Collects all @/ alias imports from Ring 0 files and pre-resolves them.
+ * Returns an array of alias paths with resolved paths and existence info.
+ * This provides Claude with pre-computed alias resolutions to prevent
+ * false positive "missing file" errors when files exist outside sparse checkout.
+ *
+ * @param {string[]} ring0 - Array of Ring 0 file paths
+ * @returns {Array<{alias: string, resolved: string, exists: boolean}>}
+ */
+function collectAliasResolutions(ring0) {
+  const resolutions = new Map();
+
+  // Use the same context-aware patterns as extractRelativeImports()
+  // This avoids false positives from regex literals, comments, or strings
+  const aliasPatterns = [
+    new RegExp(PATH_ALIAS_IMPORT_RE),
+    new RegExp(PATH_ALIAS_EXPORT_RE),
+    new RegExp(DYNAMIC_PATH_ALIAS_IMPORT_RE),
+  ];
+
+  for (const file of ring0) {
+    const ext = extname(file);
+    if (!EXTENSIONS.includes(ext)) continue;
+    const source = readFileSafe(file);
+    if (!source) continue;
+
+    // Collect unique alias paths from all import patterns
+    for (const pattern of aliasPatterns) {
+      let match;
+      while ((match = pattern.exec(source)) !== null) {
+        const aliasPath = match[1];
+        if (resolutions.has(aliasPath)) continue;
+
+        const resolved = resolvePathAlias(aliasPath);
+        const exists = resolved && existsSync(resolved);
+        resolutions.set(aliasPath, {
+          alias: `@/${aliasPath}`,
+          resolved: resolved || `src/${aliasPath}`,
+          exists,
+        });
+      }
+    }
+  }
+  return Array.from(resolutions.values());
+}
 
 function extractRelativeImports(filePath, source) {
   const matches = new Set();
@@ -106,15 +234,40 @@ function extractRelativeImports(filePath, source) {
       matches.add(match[1]);
     }
   };
+
+  // Capture relative imports (static)
   capture(new RegExp(RELATIVE_IMPORT_RE));
   capture(new RegExp(EXPORT_IMPORT_RE));
   capture(new RegExp(REQUIRE_RE));
-  return Array.from(matches)
+  // Capture relative imports (dynamic)
+  capture(new RegExp(DYNAMIC_RELATIVE_IMPORT_RE));
+
+  // Capture path alias imports (@/...)
+  const aliasMatches = new Set();
+  const captureAlias = (regex) => {
+    let match;
+    while ((match = regex.exec(source)) !== null) {
+      aliasMatches.add(match[1]);
+    }
+  };
+  // Capture path alias imports (static)
+  captureAlias(new RegExp(PATH_ALIAS_IMPORT_RE));
+  captureAlias(new RegExp(PATH_ALIAS_EXPORT_RE));
+  // Capture path alias imports (dynamic)
+  captureAlias(new RegExp(DYNAMIC_PATH_ALIAS_IMPORT_RE));
+
+  // Resolve relative imports
+  const relativeResolved = Array.from(matches)
     .map((rel) => normalizeRelative(filePath, rel))
     .filter(Boolean);
-}
 
-const EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
+  // Resolve path alias imports
+  const aliasResolved = Array.from(aliasMatches)
+    .map((alias) => resolvePathAlias(alias))
+    .filter(Boolean);
+
+  return [...relativeResolved, ...aliasResolved];
+}
 
 function normalizeRelative(fromFile, relativePath) {
   const baseDir = dirname(fromFile);
@@ -200,11 +353,14 @@ function main() {
     'HEAD'
   );
 
+  // Compute diffRange once for both listRing0 and captureUnifiedDiff
+  const diffRange = `${baseRef}...${headRef}`;
+
   let fallback = false;
   let ring0 = [];
   let deletions = [];
   try {
-    const result = listRing0(baseRef, headRef);
+    const result = listRing0(diffRange);
     ring0 = result.files;
     deletions = result.deletions;
   } catch (error) {
@@ -262,6 +418,17 @@ function main() {
   writeFileSync(ring0Path, JSON.stringify(ring0, null, 2) + '\n');
   writeFileSync(ring1Path, JSON.stringify(ring1, null, 2) + '\n');
 
+  // Write alias resolution hints for Claude (pre-computed from full repo)
+  let aliasResolutionsPath = null;
+  const aliasResolutions = collectAliasResolutions(ring0);
+  if (aliasResolutions.length > 0) {
+    aliasResolutionsPath = join(outputDir, 'alias-resolutions.json');
+    writeFileSync(
+      aliasResolutionsPath,
+      JSON.stringify(aliasResolutions, null, 2) + '\n'
+    );
+  }
+
   // Write deletions summary if there are any deletions
   let deletionsSummaryPath = null;
   if (deletions.length > 0) {
@@ -283,10 +450,21 @@ function main() {
     writeFileSync(deletionsSummaryPath, deletionContent);
   }
 
+  // Capture and write unified diff for line-level review scope
+  let hasDiff = false;
+  let diffPath = null;
+  const unifiedDiff = captureUnifiedDiff(diffRange);
+  if (unifiedDiff) {
+    diffPath = join(outputDir, 'diff.txt');
+    writeFileSync(diffPath, unifiedDiff + '\n');
+    hasDiff = true;
+  }
+
   const summary = {
     ring0Count: ring0.length,
     ring1Count: ring1.length,
     deletionsCount: deletions.length,
+    hasDiff,
     fallback,
     baseRef,
     headRef,
@@ -302,12 +480,22 @@ function main() {
     ring1.length,
     'deletions:',
     deletions.length,
+    'diff:',
+    hasDiff ? 'yes' : 'no',
     'fallback:',
     fallback ? 'yes' : 'no'
   );
   console.info(`[scope] output: ${outputDir}`);
   if (deletionsSummaryPath) {
     console.info(`[scope] deletions summary: ${deletionsSummaryPath}`);
+  }
+  if (diffPath) {
+    console.info(`[scope] unified diff: ${diffPath}`);
+  }
+  if (aliasResolutionsPath) {
+    console.info(
+      `[scope] alias resolutions: ${aliasResolutionsPath} (${aliasResolutions.length} entries)`
+    );
   }
 }
 

@@ -1,7 +1,6 @@
 import js from '@eslint/js';
 import tsParser from '@typescript-eslint/parser';
 import tsPlugin from '@typescript-eslint/eslint-plugin';
-import importPlugin from 'eslint-plugin-import';
 
 export default [
   {
@@ -64,20 +63,6 @@ export default [
     },
     plugins: {
       '@typescript-eslint': tsPlugin,
-      import: importPlugin,
-    },
-    settings: {
-      'import/resolver': {
-        typescript: {
-          project: [
-            './tsconfig.json',
-            './test/tsconfig.json',
-            './configs/tsconfig/tsconfig.eslint.json',
-            './configs/tsconfig/tsconfig.tests.json',
-          ],
-          alwaysTryTypes: true,
-        },
-      },
     },
     rules: {
       // Import recommended rules but convert errors to warnings for migration phase
@@ -88,7 +73,15 @@ export default [
       ),
       // Temporarily relaxed rules to get CI working - matching legacy config
       '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-vars': 'warn',
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+          destructuredArrayIgnorePattern: '^_',
+        },
+      ],
       '@typescript-eslint/no-var-requires': 'off',
       'no-useless-catch': 'warn',
       'no-case-declarations': 'warn',
@@ -121,20 +114,6 @@ export default [
     },
     plugins: {
       '@typescript-eslint': tsPlugin,
-      import: importPlugin,
-    },
-    settings: {
-      'import/resolver': {
-        typescript: {
-          project: [
-            './tsconfig.json',
-            './test/tsconfig.json',
-            './configs/tsconfig/tsconfig.eslint.json',
-            './configs/tsconfig/tsconfig.tests.json',
-          ],
-          alwaysTryTypes: true,
-        },
-      },
     },
     rules: {
       'no-console': 'off',

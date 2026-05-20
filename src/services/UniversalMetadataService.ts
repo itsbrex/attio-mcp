@@ -26,6 +26,7 @@ import type {
   DiscoveryMetricsSummary,
   MetricsFilter,
 } from './metadata/index.js';
+import { isConfiguredCustomObjectResourceType } from '../utils/resource-type-detection.js';
 
 class UniversalMetadataFacade {
   constructor(private readonly deps: MetadataServicesDeps) {}
@@ -47,7 +48,7 @@ class UniversalMetadataFacade {
   }
 
   async discoverAttributesForResourceType(
-    resourceType: UniversalResourceType,
+    resourceType: string,
     options?: {
       categories?: string[];
       objectSlug?: string;
@@ -73,7 +74,7 @@ class UniversalMetadataFacade {
   }
 
   async getAttributesForRecord(
-    resourceType: UniversalResourceType,
+    resourceType: string,
     recordId: string
   ): Promise<JsonObject> {
     return this.recordService.getAttributesForRecord(resourceType, recordId);
@@ -173,7 +174,7 @@ class UniversalMetadataFacade {
   }
 
   async discoverAttributes(
-    resource_type: UniversalResourceType,
+    resource_type: string,
     options?: {
       categories?: string[];
       objectSlug?: string;
@@ -213,9 +214,8 @@ class UniversalMetadataFacade {
           options
         );
 
-        const { FIELD_MAPPINGS } = await import(
-          '../handlers/tool-configs/universal/field-mapper.js'
-        );
+        const { FIELD_MAPPINGS } =
+          await import('../handlers/tool-configs/universal/field-mapper.js');
         const dealsMapping = FIELD_MAPPINGS[UniversalResourceType.DEALS];
 
         if (dealsMapping?.fieldMappings) {
@@ -250,6 +250,13 @@ class UniversalMetadataFacade {
         return this.discoverAttributesForResourceType(resource_type, options);
 
       default:
+        if (isConfiguredCustomObjectResourceType(resource_type)) {
+          return this.discoverAttributesForResourceType(resource_type, {
+            ...options,
+            objectSlug: options?.objectSlug ?? resource_type,
+          });
+        }
+
         throw new Error(
           `Unsupported resource type for discover attributes: ${resource_type}`
         );
@@ -285,7 +292,7 @@ export class UniversalMetadataService {
   }
 
   static async discoverAttributesForResourceType(
-    resourceType: UniversalResourceType,
+    resourceType: string,
     options?: {
       categories?: string[];
       objectSlug?: string;
@@ -303,7 +310,7 @@ export class UniversalMetadataService {
   }
 
   static async getAttributesForRecord(
-    resourceType: UniversalResourceType,
+    resourceType: string,
     recordId: string
   ): Promise<Record<string, unknown>> {
     return this.facade.getAttributesForRecord(resourceType, recordId);
@@ -322,8 +329,38 @@ export class UniversalMetadataService {
     return this.facade.getAttributes(params);
   }
 
+  /**
+   * Get record details by resource type and record ID
+   * Fix for Issue #1068: Enable get_record_details for lists
+   */
+  static async getRecordDetails(params: {
+    resource_type: UniversalResourceType;
+    record_id: string;
+  }): Promise<Record<string, unknown>> {
+    const { resource_type, record_id } = params;
+
+    // Import list service for lists
+    const { getListDetails } = await import('../objects/lists/base.js');
+
+    switch (resource_type) {
+      case UniversalResourceType.LISTS: {
+        // Return list details in proper format (not wrapped in values)
+        const list = await getListDetails(record_id);
+        return list as unknown as Record<string, unknown>;
+      }
+
+      // For other resource types, use existing attribute fetching
+      // (can be extended to other resources as needed)
+      default:
+        throw new Error(
+          `getRecordDetails not yet implemented for resource_type: ${resource_type}. ` +
+            `Use getAttributes() or getAttributesForRecord() instead.`
+        );
+    }
+  }
+
   static async discoverAttributes(
-    resource_type: UniversalResourceType,
+    resource_type: string,
     options?: {
       categories?: string[];
       objectSlug?: string;

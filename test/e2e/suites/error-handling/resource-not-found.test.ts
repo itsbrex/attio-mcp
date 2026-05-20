@@ -43,7 +43,7 @@ export function resourceNotFoundTests() {
     it('should handle task not found errors', async () => {
       // Note: update-task actually calls update-record internally with resource_type: 'tasks'
       // The error message might be different than expected
-      const response = (await callUniversalTool('update-record', {
+      const response = (await callUniversalTool('update_record', {
         resource_type: 'tasks',
         record_id: errorScenarios.invalidIds.task,
         record_data: {
@@ -71,7 +71,7 @@ export function resourceNotFoundTests() {
     });
 
     it('should handle note not found errors', async () => {
-      const response = (await callNotesTool('list-notes', {
+      const response = (await callNotesTool('list_notes', {
         resource_type: 'companies',
         record_id: errorScenarios.invalidIds.note,
         limit: 50,
@@ -83,3 +83,9 @@ export function resourceNotFoundTests() {
     });
   });
 }
+
+describe.skip('Resource Not Found module', () => {
+  it('is composed by a parent suite', () => {
+    expect(true).toBe(true);
+  });
+});
