@@ -2,6 +2,7 @@
  * Attribute type detection and management for Attio attributes
  */
 import { getLazyAttioClient } from '@/api/lazy-client.js';
+import { fetchAllObjectAttributes } from '@/utils/attribute-discovery-pagination.js';
 import {
   validateLocationValue,
   validatePersonalNameValue,
@@ -105,20 +106,15 @@ export async function getObjectAttributeMetadata(
     }
 
     const api = getLazyAttioClient();
-    const response = await api.get(`/objects/${objectSlug}/attributes`);
-    // Handle multiple API response structures for attributes
-    const rawAttributes = response?.data?.data || response?.data || [];
+    const rawAttributes = await fetchAllObjectAttributes({
+      client: api,
+      objectSlug,
+    });
 
-    // Ensure attributes is always an array - handle multiple shape variants
+    // fetchAllObjectAttributes always normalizes to an array
     const attributes: AttioAttributeMetadata[] = Array.isArray(rawAttributes)
-      ? rawAttributes
-      : Array.isArray(rawAttributes?.attributes)
-        ? rawAttributes.attributes
-        : Array.isArray(rawAttributes?.items)
-          ? rawAttributes.items
-          : Array.isArray(rawAttributes?.data)
-            ? rawAttributes.data
-            : [];
+      ? (rawAttributes as AttioAttributeMetadata[])
+      : [];
 
     // Build metadata map with normalization to support variant fields used in tests/mocks
     const metadataMap = new Map<string, AttioAttributeMetadata>();

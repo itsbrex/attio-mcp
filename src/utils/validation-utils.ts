@@ -10,6 +10,7 @@
 
 import { createScopedLogger, OperationType } from './logger.js';
 import { getValidatedAttioClient } from './client-resolver.js';
+import { fetchAllObjectAttributes } from './attribute-discovery-pagination.js';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -25,12 +26,6 @@ export interface AttributeInfo {
     title?: string;
     value: string;
   }>;
-}
-
-interface AttioApiResponse {
-  data?: {
-    data?: AttributeInfo[];
-  };
 }
 
 /**
@@ -76,10 +71,10 @@ export async function getResourceAttributes(
   try {
     // Use type-safe client resolver instead of dynamic any types
     const client = getValidatedAttioClient();
-    const response = (await client.get(
-      `/objects/${resourceType}/attributes`
-    )) as AttioApiResponse;
-    const attributes: AttributeInfo[] = response?.data?.data || [];
+    const attributes = (await fetchAllObjectAttributes({
+      client,
+      objectSlug: resourceType,
+    })) as AttributeInfo[];
 
     // Cache the results
     attributeCache.set(cacheKey, attributes);

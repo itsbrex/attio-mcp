@@ -1,6 +1,10 @@
 import { getLazyAttioClient } from '@/api/lazy-client.js';
 import { OBJECT_SLUG_MAP } from '@/constants/universal.constants.js';
 import { UniversalResourceType } from '@/handlers/tool-configs/universal/types.js';
+import {
+  fetchAllObjectAttributes,
+  DEFAULT_ATTRIBUTE_DISCOVERY_MAX,
+} from '@/utils/attribute-discovery-pagination.js';
 import { secureValidateCategories } from '@/utils/validation/field-validation.js';
 import { DiscoveryRunner } from './discovery-runner.js';
 import { buildTaskMetadata } from './task-metadata.js';
@@ -50,31 +54,32 @@ export class DefaultMetadataDiscoveryService
     const { objectSlug, categories } = options;
     const client = getLazyAttioClient();
     try {
-      let path = `/objects/${objectSlug}/attributes`;
       let sanitizedCategories: string[] | undefined;
       if (categories?.length) {
         sanitizedCategories = secureValidateCategories(
           categories,
           'category filtering in discover-object-attributes'
         );
-
-        if (sanitizedCategories.length > 0) {
-          path += `?categories=${encodeURIComponent(
-            sanitizedCategories.join(',')
-          )}`;
-        }
       }
 
-      const response = await client.get(path);
-      const parsed = this.transformService.parseAttributesResponse(
-        response?.data as unknown
+      const parsed = await fetchAllObjectAttributes({
+        client,
+        objectSlug,
+        categories:
+          sanitizedCategories && sanitizedCategories.length > 0
+            ? sanitizedCategories
+            : undefined,
+        maxAttributes: DEFAULT_ATTRIBUTE_DISCOVERY_MAX,
+      });
+      const normalized = this.transformService.parseAttributesResponse(
+        parsed as unknown
       );
       const filtered = sanitizedCategories?.length
         ? (this.transformService.filterByCategory(
-            parsed,
+            normalized,
             sanitizedCategories
           ) as unknown[])
-        : parsed;
+        : normalized;
       const mappings = this.transformService.buildMappings(filtered);
 
       return {
@@ -168,24 +173,23 @@ export class DefaultMetadataDiscoveryService
       const resourceSlug =
         OBJECT_SLUG_MAP[resourceType.toLowerCase()] ||
         resourceType.toLowerCase();
-      let path = `/objects/${resourceSlug}/attributes`;
+      let validatedCategories: string[] | undefined;
       if (options?.categories?.length) {
-        const validatedCategories = secureValidateCategories(
+        validatedCategories = secureValidateCategories(
           options.categories,
           'category filtering in get-attributes'
         );
-
-        if (validatedCategories.length > 0) {
-          path += `?categories=${encodeURIComponent(
-            validatedCategories.join(',')
-          )}`;
-        }
       }
 
-      const response = await client.get(path);
-      const parsed = this.transformService.parseAttributesResponse(
-        response?.data as unknown
-      );
+      const parsed = await fetchAllObjectAttributes({
+        client,
+        objectSlug: resourceSlug,
+        categories:
+          validatedCategories && validatedCategories.length > 0
+            ? validatedCategories
+            : undefined,
+        maxAttributes: DEFAULT_ATTRIBUTE_DISCOVERY_MAX,
+      });
       const mappings = this.transformService.buildMappings(parsed);
 
       return {

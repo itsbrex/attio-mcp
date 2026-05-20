@@ -348,6 +348,7 @@ Document what works best for your team and industry. Share successful prompts wi
 - [Location Company Resolution Playbook](playbooks/location-company-resolution-playbook.md) - Resolve location/company links and update lease fields
 - [Location People Association Playbook](playbooks/location-people-association-playbook.md) - Sync company people onto location records
 - [Location End-to-End Sync Playbook](playbooks/location-end-to-end-sync-playbook.md) - Full location update + people association workflow
+- [Company LXD 204-Month Report Playbook](playbooks/company-lxd-204-month-report-playbook.md) - Company-level LXD/SF/Last Call Date report with company record links
 
 **💪 Power User Resources**
 

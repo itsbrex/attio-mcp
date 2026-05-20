@@ -7,6 +7,7 @@ import { listCompanies } from './basic.js';
 import { wrapError, getErrorMessage } from '../../utils/error-utilities.js';
 import { createScopedLogger } from '../../utils/logger.js';
 import { getLazyAttioClient } from '@/api/lazy-client.js';
+import { fetchAllObjectAttributes } from '@/utils/attribute-discovery-pagination.js';
 import {
   buildAttributeMetadataIndex,
   findAttributeMetadata,
@@ -375,11 +376,10 @@ export async function discoverCompanyAttributes(): Promise<{
     let attributeMetadataIndex: ReturnType<typeof buildAttributeMetadataIndex> =
       {};
     try {
-      const metadataResponse = await client.get(
-        '/objects/companies/attributes'
-      );
-      const attributes =
-        metadataResponse?.data?.data || metadataResponse?.data || [];
+      const attributes = await fetchAllObjectAttributes({
+        client,
+        objectSlug: 'companies',
+      });
       if (Array.isArray(attributes)) {
         attributeMetadataIndex = buildAttributeMetadataIndex(attributes);
       }

@@ -83,3 +83,6 @@ tsconfig.tsbuildinfo
 # MCP Publisher tokens (local authentication)
 .mcpregistry_*
 mcp-publisher
+
+# Local-only personal reporting scripts (contain workspace-specific logic)
+scripts/reports/

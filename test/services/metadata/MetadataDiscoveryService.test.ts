@@ -117,6 +117,57 @@ describe('DefaultMetadataDiscoveryService', () => {
     expect((result.attributes as unknown[]).length).toBe(1);
   });
 
+  it('paginates attribute discovery up to max cap (500)', async () => {
+    const makeAttrs = (start: number, count: number) =>
+      Array.from({ length: count }, (_, i) => ({
+        title: `Attr ${start + i}`,
+        api_slug: `attr_${start + i}`,
+        type: 'text',
+      }));
+
+    mockGet.mockImplementation(async (path: string) => {
+      if (path.includes('offset=400')) {
+        return { data: { data: makeAttrs(400, 150) } };
+      }
+      if (path.includes('offset=300')) {
+        return { data: { data: makeAttrs(300, 100) } };
+      }
+      if (path.includes('offset=200')) {
+        return { data: { data: makeAttrs(200, 100) } };
+      }
+      if (path.includes('offset=100')) {
+        return { data: { data: makeAttrs(100, 100) } };
+      }
+      return { data: { data: makeAttrs(0, 100) } };
+    });
+
+    const result = await service.discoverForType({
+      resourceType: UniversalResourceType.COMPANIES,
+      useCache: false,
+    });
+
+    expect(result.count).toBe(500);
+    expect(mockGet).toHaveBeenCalledTimes(5);
+  });
+
+  it('stops pagination when a page yields no new attributes', async () => {
+    const repeated = [
+      { title: 'Name', api_slug: 'name', type: 'text' },
+      { title: 'Domain', api_slug: 'domain', type: 'text' },
+    ];
+
+    mockGet.mockResolvedValue({ data: { data: repeated } });
+
+    const result = await service.discoverForType({
+      resourceType: UniversalResourceType.COMPANIES,
+      useCache: false,
+    });
+
+    expect(result.count).toBe(2);
+    // Stops after first page because it is smaller than the page-size threshold.
+    expect(mockGet).toHaveBeenCalledTimes(1);
+  });
+
   it('propagates structured errors from API failures', async () => {
     mockGet.mockRejectedValue(new Error('boom'));
 

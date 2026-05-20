@@ -9,6 +9,7 @@ import {
   writeMappingConfig,
   MappingConfig,
 } from '../../utils/config-loader.js';
+import { fetchAllObjectAttributes } from '../../utils/attribute-discovery-pagination.js';
 import { handleAxiosError } from '../../utils/error-utilities.js';
 
 /**
@@ -103,8 +104,11 @@ export async function getObjectAttributes(
   const client = createAttioClient(apiKey);
 
   try {
-    const response = await client.get(`/objects/${objectSlug}/attributes`);
-    const attributes: AttioAttribute[] = response.data.data || [];
+    const rawAttributes = await fetchAllObjectAttributes({
+      client,
+      objectSlug,
+    });
+    const attributes: AttioAttribute[] = rawAttributes as AttioAttribute[];
 
     // Create mapping from title to api_slug
     const mappings: Record<string, string> = {};
