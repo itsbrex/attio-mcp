@@ -65,9 +65,9 @@ export function createServer(context?: ServerContext) {
   logger.info('Server creation started');
 
   // For backward compatibility: if no context provided (STDIO mode),
-  // create one that reads from environment variables
+  // create one that reads from environment variables.
   // If ATTIO_USE_TEST_WORKSPACE=true, use test credentials to prevent production changes.
-  // Also support ATTIO_ACCESS_TOKEN as an OAuth alternative.
+  // Issue #928: Support both ATTIO_API_KEY and ATTIO_ACCESS_TOKEN (OAuth alternative).
   const useTestWorkspace =
     process.env.ATTIO_USE_TEST_WORKSPACE?.toLowerCase() === 'true';
   const ctx: ServerContext = context || {

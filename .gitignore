@@ -97,6 +97,9 @@ scripts/reports/
 
 # Claude Code session transcripts (have historically leaked credentials)
 .specstory/
+.specstory
 
 # Test output from `generate-skill --all`
 output-test2/
+
+.env.development

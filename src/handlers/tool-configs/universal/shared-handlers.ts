@@ -574,7 +574,7 @@ export async function handleUniversalGetAttributeOptions(
   // TODO: Add list_id parameter to support list attributes (see plan Phase 3B)
   if (resource_type === UniversalResourceType.LISTS) {
     throw new Error(
-      'records_get_attribute_options does not yet support list attributes. ' +
+      'get_record_attribute_options does not yet support list attributes. ' +
         'Use get-list-details to inspect list attribute schemas instead.'
     );
   }
@@ -662,7 +662,7 @@ export async function handleUniversalGetAttributeOptions(
             : '';
         throw new Error(
           `Attribute "${attribute}" not found on ${objectSlug}.${suggestionText}\n\n` +
-            `Use API slugs (e.g., "stage" not "Deal stage"). Run records_discover_attributes(resource_type="${objectSlug}") to see available attribute slugs.`
+            `Use API slugs (e.g., "stage" not "Deal stage"). Run discover_record_attributes(resource_type="${objectSlug}") to see available attribute slugs.`
         );
       }
     } catch (resolutionError) {
@@ -673,7 +673,7 @@ export async function handleUniversalGetAttributeOptions(
 
     throw new Error(
       `${errorMsg}\n\nTip: Use the API slug (e.g., "stage") not the display name (e.g., "Deal stage"). ` +
-        `Run records_discover_attributes to see available attribute slugs.`
+        `Run discover_record_attributes to see available attribute slugs.`
     );
   }
 }
