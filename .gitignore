@@ -13,6 +13,11 @@ CLAUDE.md
 .env.production
 .env.local
 .env.*.local
+.env.bak*
+
+# Workspace-generated attribute mappings (legacy config/ location; live path is configs/runtime/mappings/)
+config/custom.json
+config/mappings/custom.json
 
 # Keep examples
 !.env.example
