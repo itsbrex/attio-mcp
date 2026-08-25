@@ -116,6 +116,36 @@ yargs(hideBin(process.argv))
           type: 'number',
           default: 100,
         })
+        .option('concurrency', {
+          description:
+            'Concurrent option/attribute fetches (default: 4); 429s are retried with backoff',
+          type: 'number',
+          default: 4,
+        })
+        .option('lists', {
+          description:
+            'Include workspace lists (list_id + stage options) in the skill; disable with --no-lists',
+          type: 'boolean',
+          default: true,
+        })
+        .option('install', {
+          description:
+            'Install the generated skill directly into the Claude skills directory',
+          type: 'boolean',
+          default: false,
+        })
+        .option('install-dir', {
+          description:
+            'Claude skills directory (default: ~/.claude/skills); used by --install and --check',
+          type: 'string',
+        })
+        .option('check', {
+          description:
+            'Drift check: compare live workspace schema against the installed skill. ' +
+            'Exit 0 = in sync, 1 = drifted, 2 = not installed. No files are written.',
+          type: 'boolean',
+          default: false,
+        })
         .option('api-key', {
           alias: 'k',
           description: 'Attio API key (defaults to ATTIO_API_KEY env var)',
@@ -135,6 +165,11 @@ yargs(hideBin(process.argv))
               `--${provided.join(', --')} are mutually exclusive; pick one`
             );
           }
+          if (argv.install && argv.check) {
+            throw new Error(
+              '--install and --check are mutually exclusive; pick one'
+            );
+          }
           if (
             typeof argv.optionFetchDelay !== 'number' ||
             !Number.isFinite(argv.optionFetchDelay) ||
@@ -143,6 +178,13 @@ yargs(hideBin(process.argv))
             throw new Error(
               '--option-fetch-delay must be a non-negative number'
             );
+          }
+          if (
+            typeof argv.concurrency !== 'number' ||
+            !Number.isFinite(argv.concurrency) ||
+            argv.concurrency < 1
+          ) {
+            throw new Error('--concurrency must be a positive number');
           }
           return true;
         });

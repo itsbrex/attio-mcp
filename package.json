@@ -107,6 +107,8 @@
     "discover:attributes:robust": "./scripts/run-discover.sh attributes",
     "discover:all-attributes:robust": "./scripts/run-discover.sh attributes --all",
     "skill:generate": "attio-discover generate-skill --all",
+    "skill:install": "attio-discover generate-skill --all --install",
+    "skill:check": "attio-discover generate-skill --all --check",
     "debug:list-members": "node --import tsx scripts/debug/list-workspace-members.ts",
     "debug:create-test-list": "node --import tsx scripts/debug/create-test-list.ts",
     "debug:cleanup-test-list": "node --import tsx scripts/debug/cleanup-test-list.ts",

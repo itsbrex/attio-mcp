@@ -4,6 +4,9 @@
  * @see Issue #983
  */
 
+import * as fs from 'fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import ora from 'ora';
 import chalk from 'chalk';
 import {
@@ -11,6 +14,8 @@ import {
   SchemaFormatterService,
   OutputWriterService,
 } from '@/services/skill-generator/index.js';
+import { compareSchemaToSkill } from '@/services/skill-generator/drift.js';
+import { DEFAULT_CONCURRENCY } from '@/services/skill-generator/concurrency.js';
 import type { GenerateSkillConfig } from '@/services/skill-generator/types.js';
 import { getAvailableObjects } from './attributes.js';
 
@@ -27,14 +32,27 @@ interface GenerateSkillArgs {
   maxOptions?: number;
   includeArchived?: boolean;
   optionFetchDelay?: number;
+  concurrency?: number;
+  lists?: boolean;
+  install?: boolean;
+  installDir?: string;
+  check?: boolean;
   apiKey?: string;
   [key: string]: unknown;
 }
 
+/** Directory name of the generated skill (matches the SKILL.md name) */
+const SKILL_DIR_NAME = 'attio-workspace-schema';
+
 /**
- * Phase 1 objects (companies, people, deals)
+ * Resolves the skill install directory (~/.claude/skills by default)
  */
-const PHASE_1_OBJECTS = ['companies', 'people', 'deals'];
+function resolveInstallPath(installDir?: string): string {
+  const baseDir = installDir
+    ? path.resolve(installDir)
+    : path.join(os.homedir(), '.claude', 'skills');
+  return path.join(baseDir, SKILL_DIR_NAME);
+}
 
 /**
  * Command handler for generating skills
@@ -82,18 +100,7 @@ export async function generateSkill(argv: GenerateSkillArgs): Promise<void> {
       spinner.text = `Generating skill for ${argv.object}...`;
     }
 
-    // 3. Warn about non-Phase 1 objects
-    const nonPhase1 = objects.filter((obj) => !PHASE_1_OBJECTS.includes(obj));
-    if (nonPhase1.length > 0) {
-      spinner.warn(
-        chalk.yellow(
-          `⚠️  Objects ${nonPhase1.join(', ')} are experimental (Phase 1: ${PHASE_1_OBJECTS.join(', ')})`
-        )
-      );
-      spinner.start('Continuing with generation...');
-    }
-
-    // 4. Build configuration
+    // 3. Build configuration
     const config: GenerateSkillConfig = {
       objects,
       format: (argv.format as 'skill' | 'markdown' | 'json') || 'skill',
@@ -102,16 +109,22 @@ export async function generateSkill(argv: GenerateSkillArgs): Promise<void> {
       maxOptionsPerAttribute: argv.maxOptions || 20,
       includeArchived: argv.includeArchived || false,
       optionFetchDelayMs: argv.optionFetchDelay ?? 100,
+      concurrency: argv.concurrency ?? DEFAULT_CONCURRENCY,
+      includeLists: argv.lists !== false,
+      install: argv.install || false,
+      installDir: argv.installDir,
       apiKey,
     };
 
-    // 5. Fetch workspace schema
+    // 4. Fetch workspace schema
     spinner.text = `Fetching workspace schema for ${objects.length} object(s)...`;
     const schemaService = new WorkspaceSchemaService();
     const schema = await schemaService.fetchSchema(objects, {
       maxOptionsPerAttribute: config.maxOptionsPerAttribute,
       includeArchived: config.includeArchived,
       optionFetchDelayMs: config.optionFetchDelayMs,
+      concurrency: config.concurrency,
+      includeLists: config.includeLists,
     });
 
     if (schema.objects.length === 0) {
@@ -131,8 +144,17 @@ export async function generateSkill(argv: GenerateSkillArgs): Promise<void> {
     }
 
     spinner.succeed(
-      `Fetched schema for ${chalk.green(schema.objects.length.toString())} object(s)`
+      `Fetched schema for ${chalk.green(schema.objects.length.toString())} object(s)` +
+        (schema.lists
+          ? ` and ${chalk.green(String(schema.lists.length))} list(s)`
+          : '')
     );
+
+    // 5. Drift check mode: compare live schema hash against installed skill
+    if (argv.check) {
+      await runDriftCheck(schema, argv.installDir);
+      return; // runDriftCheck exits the process
+    }
 
     // 6. Format schema
     spinner.start(`Formatting output as ${config.format}...`);
@@ -140,14 +162,25 @@ export async function generateSkill(argv: GenerateSkillArgs): Promise<void> {
     const formatted = await formatterService.format(schema, config.format);
     spinner.succeed(`Formatted as ${chalk.cyan(config.format)}`);
 
-    // 7. Write output
-    spinner.start('Writing files to disk...');
+    // 7. Write output (install mode writes into the Claude skills directory)
     const writerService = new OutputWriterService();
-    const output = await writerService.write(formatted, config);
+    let output;
+    if (config.install) {
+      if (config.format !== 'skill') {
+        spinner.fail('--install requires --format skill (the default).');
+        process.exit(1);
+      }
+      const installPath = resolveInstallPath(config.installDir);
+      spinner.start(`Installing skill to ${installPath}...`);
+      output = await writerService.writeTo(formatted, installPath);
+      spinner.succeed(chalk.green('✓ Skill installed!\n'));
+    } else {
+      spinner.start('Writing files to disk...');
+      output = await writerService.write(formatted, config);
+      spinner.succeed(chalk.green('✓ Skill generated successfully!\n'));
+    }
 
     // 8. Success message
-    spinner.succeed(chalk.green('✓ Skill generated successfully!\n'));
-
     process.stdout.write(chalk.cyan('  Output:') + '\n');
     process.stdout.write(chalk.white(`    ${output.path}`) + '\n');
     process.stdout.write('\n');
@@ -156,7 +189,7 @@ export async function generateSkill(argv: GenerateSkillArgs): Promise<void> {
       process.stdout.write(chalk.white(`    - ${file}`) + '\n');
     });
 
-    if (config.zip) {
+    if (config.zip && !config.install) {
       process.stdout.write('\n');
       process.stdout.write(
         chalk.green('  ✓ ZIP package ready for Claude upload!') + '\n'
@@ -175,4 +208,59 @@ export async function generateSkill(argv: GenerateSkillArgs): Promise<void> {
     );
     process.exit(1);
   }
+}
+
+/**
+ * Compares the live schema against the installed skill and exits with:
+ * - 0 when in sync
+ * - 1 when the workspace has drifted from the installed skill
+ * - 2 when no installed skill (or hash stamp) was found
+ */
+async function runDriftCheck(
+  schema: Awaited<ReturnType<WorkspaceSchemaService['fetchSchema']>>,
+  installDir?: string
+): Promise<void> {
+  const installPath = resolveInstallPath(installDir);
+  const skillMdPath = path.join(installPath, 'SKILL.md');
+
+  let skillMdContent: string;
+  try {
+    skillMdContent = await fs.readFile(skillMdPath, 'utf8');
+  } catch {
+    process.stdout.write(
+      chalk.yellow(`✗ No installed skill found at ${skillMdPath}\n`) +
+        chalk.white('  Run with --install to install it.\n')
+    );
+    process.exit(2);
+  }
+
+  const report = compareSchemaToSkill(schema, skillMdContent);
+
+  if (report.installedHash === null) {
+    process.stdout.write(
+      chalk.yellow(
+        `✗ Installed skill at ${skillMdPath} has no schema hash stamp.\n`
+      ) +
+        chalk.white(
+          '  Regenerate with --install to stamp it for drift checking.\n'
+        )
+    );
+    process.exit(2);
+  }
+
+  if (report.inSync) {
+    process.stdout.write(
+      chalk.green('✓ Installed skill is in sync with the workspace.\n') +
+        chalk.white(`  Schema hash: ${report.liveHash}\n`)
+    );
+    process.exit(0);
+  }
+
+  process.stdout.write(
+    chalk.red('✗ Workspace schema has drifted from the installed skill.\n') +
+      chalk.white(`  Installed: ${report.installedHash}\n`) +
+      chalk.white(`  Live:      ${report.liveHash}\n`) +
+      chalk.white('  Regenerate with --install to update.\n')
+  );
+  process.exit(1);
 }
