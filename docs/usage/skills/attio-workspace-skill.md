@@ -26,8 +26,14 @@ The `attio-discover generate-skill` CLI command creates a Claude Skill that docu
 ## Quick Start
 
 ```bash
-# Generate + install the skill for ALL workspace objects (standard + custom)
-# directly into ~/.claude/skills/attio-workspace-schema
+# Generate the skill for ALL workspace objects (standard + custom) and:
+#   1. install it to ALL detected agents via the skills CLI
+#      (same targets as `npx skills add <dir> -g -y`: Claude Code, Cursor,
+#      Codex, Amp, Cline, opencode, … — falls back to a direct copy into
+#      ~/.claude/skills if the skills CLI is unavailable)
+#   2. write dated web-client bundles onto the Desktop:
+#      attio-workspace-schema-YYYY-MM-DD-<hash8>.skill  (Claude.ai upload)
+#      attio-workspace-schema-YYYY-MM-DD-<hash8>.zip    (other web clients)
 npx attio-discover generate-skill --all --install
 
 # Later: check whether the workspace has drifted from the installed skill
@@ -57,8 +63,10 @@ npx attio-discover generate-skill [OPTIONS]
 | `--format`             | `-f`  | choice  | `skill`            | Output format: `skill`, `markdown`, or `json`                    |
 | `--output`             | -     | string  | `./output`         | Output directory path                                            |
 | `--zip`                | `-z`  | boolean | false              | Package as ZIP file (ready for Claude upload)                    |
-| `--install`            | -     | boolean | false              | Install directly into the Claude skills directory                |
-| `--install-dir`        | -     | string  | `~/.claude/skills` | Skills directory used by `--install` and `--check`               |
+| `--install`            | -     | boolean | false              | Install to ALL detected agents (skills CLI) + Desktop bundles    |
+| `--install-dir`        | -     | string  | `~/.claude/skills` | Used by `--check` and the direct-copy fallback                   |
+| `--bundles`            | -     | boolean | true               | With `--install`: write `.zip`/`.skill` bundles; `--no-bundles`  |
+| `--bundle-dir`         | -     | string  | `~/Desktop`        | Directory for the web-client bundles                             |
 | `--check`              | -     | boolean | false              | Drift check against installed skill (exit 0/1/2); writes nothing |
 | `--lists`              | -     | boolean | true               | Include workspace lists (list_id + stage options); `--no-lists`  |
 | `--concurrency`        | -     | number  | 4                  | Concurrent option/attribute fetches; 429s retried with backoff   |
@@ -91,8 +99,11 @@ npx attio-discover generate-skill --all --option-fetch-delay 50
 # Explicit subset of objects (standard or custom)
 npx attio-discover generate-skill --objects companies,people,the_swarm_warm_intros
 
-# Install into a custom skills directory
-npx attio-discover generate-skill --all --install --install-dir ~/my-skills
+# Install without the Desktop bundles
+npx attio-discover generate-skill --all --install --no-bundles
+
+# Write the web-client bundles somewhere other than the Desktop
+npx attio-discover generate-skill --all --install --bundle-dir ~/Downloads
 
 # Skip list discovery
 npx attio-discover generate-skill --all --no-lists

@@ -130,13 +130,27 @@ yargs(hideBin(process.argv))
         })
         .option('install', {
           description:
-            'Install the generated skill directly into the Claude skills directory',
+            'Install to ALL detected agents via the skills CLI (same targets as ' +
+            '`npx skills add <dir> -g -y`) and write dated .zip/.skill bundles to the Desktop',
           type: 'boolean',
           default: false,
         })
         .option('install-dir', {
           description:
-            'Claude skills directory (default: ~/.claude/skills); used by --install and --check',
+            'Claude skills directory (default: ~/.claude/skills); used by --check and the ' +
+            'direct-copy fallback when the skills CLI is unavailable',
+          type: 'string',
+        })
+        .option('bundles', {
+          description:
+            'With --install: write versioned .zip (web clients) + .skill (Claude.ai) bundles; ' +
+            'disable with --no-bundles',
+          type: 'boolean',
+          default: true,
+        })
+        .option('bundle-dir', {
+          description:
+            'Directory for the web-client bundles (default: ~/Desktop)',
           type: 'string',
         })
         .option('check', {

@@ -16,6 +16,8 @@ import {
 } from '@/services/skill-generator/index.js';
 import { compareSchemaToSkill } from '@/services/skill-generator/drift.js';
 import { DEFAULT_CONCURRENCY } from '@/services/skill-generator/concurrency.js';
+import { installToAllAgents } from '@/services/skill-generator/agent-installer.js';
+import { writeWebBundles } from '@/services/skill-generator/bundler.js';
 import type { GenerateSkillConfig } from '@/services/skill-generator/types.js';
 import { getAvailableObjects } from './attributes.js';
 
@@ -36,6 +38,8 @@ interface GenerateSkillArgs {
   lists?: boolean;
   install?: boolean;
   installDir?: string;
+  bundles?: boolean;
+  bundleDir?: string;
   check?: boolean;
   apiKey?: string;
   [key: string]: unknown;
@@ -113,6 +117,8 @@ export async function generateSkill(argv: GenerateSkillArgs): Promise<void> {
       includeLists: argv.lists !== false,
       install: argv.install || false,
       installDir: argv.installDir,
+      bundles: argv.bundles !== false,
+      bundleDir: argv.bundleDir,
       apiKey,
     };
 
@@ -162,7 +168,7 @@ export async function generateSkill(argv: GenerateSkillArgs): Promise<void> {
     const formatted = await formatterService.format(schema, config.format);
     spinner.succeed(`Formatted as ${chalk.cyan(config.format)}`);
 
-    // 7. Write output (install mode writes into the Claude skills directory)
+    // 7. Write output (install mode: stage, install to all agents, bundle)
     const writerService = new OutputWriterService();
     let output;
     if (config.install) {
@@ -170,10 +176,62 @@ export async function generateSkill(argv: GenerateSkillArgs): Promise<void> {
         spinner.fail('--install requires --format skill (the default).');
         process.exit(1);
       }
-      const installPath = resolveInstallPath(config.installDir);
-      spinner.start(`Installing skill to ${installPath}...`);
-      output = await writerService.writeTo(formatted, installPath);
-      spinner.succeed(chalk.green('✓ Skill installed!\n'));
+
+      // 7a. Stage the skill folder (./output/attio-workspace-skill)
+      spinner.start('Staging skill files...');
+      output = await writerService.write(formatted, { ...config, zip: false });
+      spinner.succeed(`Staged skill at ${chalk.white(output.path)}`);
+
+      // 7b. Install to ALL detected agents via the skills CLI
+      // (same targets as `npx skills add <dir> -g -y`); the CLI's own
+      // output streams below so the detected agents are visible.
+      spinner.stop();
+      process.stdout.write(
+        chalk.cyan('  Installing to all detected agents (skills CLI)...') + '\n'
+      );
+      const agentInstall = installToAllAgents(output.path);
+      if (agentInstall.ok) {
+        spinner.succeed(
+          chalk.green(
+            `✓ Installed to all detected agents via ${agentInstall.runner}`
+          )
+        );
+      } else {
+        // Fallback: direct copy into the Claude skills directory
+        const installPath = resolveInstallPath(config.installDir);
+        spinner.warn(
+          chalk.yellow(
+            `skills CLI unavailable (${agentInstall.error}); falling back to direct install`
+          )
+        );
+        spinner.start(`Installing skill to ${installPath}...`);
+        await writerService.writeTo(formatted, installPath);
+        spinner.succeed(chalk.green(`✓ Installed to ${installPath}`));
+      }
+
+      // 7c. Web-client bundles: dated .zip + .skill onto the Desktop
+      // (.skill for Claude.ai, .zip for other web clients)
+      if (config.bundles !== false) {
+        const bundleDir =
+          config.bundleDir ?? path.join(os.homedir(), 'Desktop');
+        spinner.start(`Writing web-client bundles to ${bundleDir}...`);
+        const bundles = await writeWebBundles(formatted.files, {
+          folderName: SKILL_DIR_NAME,
+          outputDir: bundleDir,
+          generatedAt: schema.metadata.generatedAt,
+          schemaHash: schema.metadata.schemaHash,
+        });
+        spinner.succeed(chalk.green('✓ Web-client bundles written\n'));
+        process.stdout.write(chalk.cyan('  Bundles:') + '\n');
+        process.stdout.write(
+          chalk.white(`    - ${bundles.skillPath}  (Claude.ai upload)`) + '\n'
+        );
+        process.stdout.write(
+          chalk.white(`    - ${bundles.zipPath}  (other web clients)`) + '\n'
+        );
+      } else {
+        process.stdout.write('\n');
+      }
     } else {
       spinner.start('Writing files to disk...');
       output = await writerService.write(formatted, config);

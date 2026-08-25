@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **`generate-skill --install`** — installs the generated workspace-schema skill directly into `~/.claude/skills/attio-workspace-schema` (override with `--install-dir`), no manual ZIP/copy step
+- **`generate-skill --install`** — installs the generated workspace-schema skill to **all detected agents** via the `skills` CLI (same targets as `npx skills add <dir> -g -y`: Claude Code, Cursor, Codex, Amp, Cline, opencode, …), falling back to a direct copy into `~/.claude/skills` when the CLI is unavailable; also writes dated, hash-versioned web-client bundles onto the Desktop — `attio-workspace-schema-YYYY-MM-DD-<hash8>.skill` (Claude.ai upload) and `.zip` (other web clients); `--no-bundles` / `--bundle-dir` to adjust
 - **`generate-skill --check`** — drift detection: `SKILL.md` is stamped with a stable schema hash plus workspace name/ID; `--check` re-fetches the live schema and exits 0 (in sync), 1 (drifted), or 2 (not installed) without writing files
 - **Workspace lists in generated skills** — `resources/lists.md` documents every list's name, API slug, `list_id`, parent object, and stage/select option values (`--no-lists` to skip)
 - **Record-reference targets** — attribute references now document which object slugs they may point at (resolved from `allowed_object_ids`), rendered as `**References**` in per-object files

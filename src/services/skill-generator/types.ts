@@ -44,6 +44,12 @@ export interface GenerateSkillConfig {
   /** Override the Claude skills directory (default: ~/.claude/skills) */
   installDir?: string;
 
+  /** Write versioned .zip/.skill web-client bundles when installing (default: true) */
+  bundles?: boolean;
+
+  /** Directory for web-client bundles (default: ~/Desktop) */
+  bundleDir?: string;
+
   /** Attio API key for authentication */
   apiKey: string;
 }

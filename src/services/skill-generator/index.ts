@@ -21,6 +21,14 @@ export {
   withRateLimitRetry,
   isRateLimitError,
 } from './concurrency.js';
+export {
+  buildSkillArchive,
+  bundleBaseName,
+  writeWebBundles,
+} from './bundler.js';
+export type { BundleOptions, BundleResult } from './bundler.js';
+export { installToAllAgents } from './agent-installer.js';
+export type { AgentInstallResult } from './agent-installer.js';
 export type {
   GenerateSkillConfig,
   WorkspaceSchema,
