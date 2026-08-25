@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`generate-skill --install`** — installs the generated workspace-schema skill directly into `~/.claude/skills/attio-workspace-schema` (override with `--install-dir`), no manual ZIP/copy step
+- **`generate-skill --check`** — drift detection: `SKILL.md` is stamped with a stable schema hash plus workspace name/ID; `--check` re-fetches the live schema and exits 0 (in sync), 1 (drifted), or 2 (not installed) without writing files
+- **Workspace lists in generated skills** — `resources/lists.md` documents every list's name, API slug, `list_id`, parent object, and stage/select option values (`--no-lists` to skip)
+- **Record-reference targets** — attribute references now document which object slugs they may point at (resolved from `allowed_object_ids`), rendered as `**References**` in per-object files
+- **`generate-skill --concurrency`** — bounded parallel option/attribute fetching (default 4) with automatic retry + backoff on HTTP 429 (honors `Retry-After`), replacing serial fetch-with-delay as the only throttle
+
+### Changed
+
+- Skill `SKILL.md` index now shows per-object attribute counts and links lists for progressive disclosure
+- Select/status option values now use the real API value (falling back to the option title per Attio docs) instead of a slugified guess that produced values the API rejects
+- Removed the obsolete "experimental" warning for non-Phase-1 objects in `generate-skill` — custom objects are first-class since `--all` discovery
+
 ### Fixed
 
 - **Cloudflare Worker remote MCP: connector dropped to `401` ~1 hour after connecting** (`examples/cloudflare-mcp-server`). The worker stored each KV session→token mapping with a 1-hour expiry derived from `expires_in || 3600`, but Attio's OAuth tokens are long-lived and return no `expires_in`, so sessions self-expired ~1h after connect. The worker then forwarded the orphaned session token to Attio and every `/mcp` call failed. Sessions now use a 30-day lifetime when Attio omits `expires_in`, and an unresolved session token returns `401`/re-authenticate instead of being forwarded to Attio (which also closes a per-caller-auth bypass on the miss path)

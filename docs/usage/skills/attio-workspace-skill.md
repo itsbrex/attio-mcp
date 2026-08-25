@@ -26,13 +26,18 @@ The `attio-discover generate-skill` CLI command creates a Claude Skill that docu
 ## Quick Start
 
 ```bash
-# Generate skill for all Phase 1 objects (companies, people, deals)
-npx attio-discover generate-skill --all --zip
+# Generate + install the skill for ALL workspace objects (standard + custom)
+# directly into ~/.claude/skills/attio-workspace-schema
+npx attio-discover generate-skill --all --install
 
+# Later: check whether the workspace has drifted from the installed skill
+npx attio-discover generate-skill --all --check
+# exit 0 = in sync, 1 = drifted (re-run --install), 2 = not installed
+
+# Or generate a ZIP for Claude Desktop upload
+npx attio-discover generate-skill --all --zip
 # Output: ./output/attio-workspace-skill.zip
 ```
-
-Then import the ZIP into Claude Desktop or copy the folder for Claude Code.
 
 ## CLI Reference
 
@@ -44,17 +49,23 @@ npx attio-discover generate-skill [OPTIONS]
 
 ### Options
 
-| Option                 | Short | Type    | Default         | Description                                            |
-| ---------------------- | ----- | ------- | --------------- | ------------------------------------------------------ |
-| `--object`             | `-o`  | string  | -               | Single object to generate (e.g., `companies`)          |
-| `--all`                | `-a`  | boolean | false           | Generate for Phase 1 objects: companies, people, deals |
-| `--format`             | `-f`  | choice  | `skill`         | Output format: `skill`, `markdown`, or `json`          |
-| `--output`             | -     | string  | `./output`      | Output directory path                                  |
-| `--zip`                | `-z`  | boolean | false           | Package as ZIP file (ready for Claude upload)          |
-| `--max-options`        | -     | number  | 20              | Max select/status options per attribute                |
-| `--option-fetch-delay` | -     | number  | 100             | Delay between attribute option fetches (ms)            |
-| `--include-archived`   | -     | boolean | false           | Include archived options in output                     |
-| `--api-key`            | `-k`  | string  | `ATTIO_API_KEY` | Attio API key (env var preferred)                      |
+| Option                 | Short | Type    | Default            | Description                                                      |
+| ---------------------- | ----- | ------- | ------------------ | ---------------------------------------------------------------- |
+| `--object`             | `-o`  | string  | -                  | Single object to generate (e.g., `companies`)                    |
+| `--objects`            | -     | string  | -                  | Comma-separated subset of object slugs                           |
+| `--all`                | `-a`  | boolean | false              | Generate for all workspace objects (standard + custom)           |
+| `--format`             | `-f`  | choice  | `skill`            | Output format: `skill`, `markdown`, or `json`                    |
+| `--output`             | -     | string  | `./output`         | Output directory path                                            |
+| `--zip`                | `-z`  | boolean | false              | Package as ZIP file (ready for Claude upload)                    |
+| `--install`            | -     | boolean | false              | Install directly into the Claude skills directory                |
+| `--install-dir`        | -     | string  | `~/.claude/skills` | Skills directory used by `--install` and `--check`               |
+| `--check`              | -     | boolean | false              | Drift check against installed skill (exit 0/1/2); writes nothing |
+| `--lists`              | -     | boolean | true               | Include workspace lists (list_id + stage options); `--no-lists`  |
+| `--concurrency`        | -     | number  | 4                  | Concurrent option/attribute fetches; 429s retried with backoff   |
+| `--max-options`        | -     | number  | 20                 | Max select/status options per attribute                          |
+| `--option-fetch-delay` | -     | number  | 100                | Delay between attribute option fetches (ms)                      |
+| `--include-archived`   | -     | boolean | false              | Include archived options in output                               |
+| `--api-key`            | `-k`  | string  | `ATTIO_API_KEY`    | Attio API key (env var preferred)                                |
 
 ### Examples
 
@@ -76,7 +87,38 @@ npx attio-discover generate-skill --all --output ./my-skills
 
 # Reduce delay between option fetches (higher-rate API tiers)
 npx attio-discover generate-skill --all --option-fetch-delay 50
+
+# Explicit subset of objects (standard or custom)
+npx attio-discover generate-skill --objects companies,people,the_swarm_warm_intros
+
+# Install into a custom skills directory
+npx attio-discover generate-skill --all --install --install-dir ~/my-skills
+
+# Skip list discovery
+npx attio-discover generate-skill --all --no-lists
+
+# Faster generation on higher-rate API tiers
+npx attio-discover generate-skill --all --concurrency 8 --option-fetch-delay 0
 ```
+
+### Drift Checking
+
+The generated `SKILL.md` is stamped with a **Schema Hash** — a stable
+SHA-256 over the fetched objects, attributes, options, and lists
+(timestamps excluded). `--check` re-fetches the live schema and compares:
+
+```bash
+npx attio-discover generate-skill --all --check
+```
+
+| Exit code | Meaning                                       |
+| --------- | --------------------------------------------- |
+| 0         | Installed skill is in sync with the workspace |
+| 1         | Workspace drifted — re-run with `--install`   |
+| 2         | No installed skill (or no hash stamp) found   |
+
+This makes automated freshness checks trivial (cron, CI, or a session
+hook): `generate-skill --all --check || generate-skill --all --install`.
 
 ## Output Formats
 
