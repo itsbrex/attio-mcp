@@ -9,6 +9,18 @@
 export { WorkspaceSchemaService } from './WorkspaceSchemaService.js';
 export { SchemaFormatterService } from './SchemaFormatterService.js';
 export { OutputWriterService } from './OutputWriterService.js';
+export {
+  computeSchemaHash,
+  extractSchemaHash,
+  compareSchemaToSkill,
+} from './drift.js';
+export type { DriftReport } from './drift.js';
+export {
+  DEFAULT_CONCURRENCY,
+  mapWithConcurrency,
+  withRateLimitRetry,
+  isRateLimitError,
+} from './concurrency.js';
 export type {
   GenerateSkillConfig,
   WorkspaceSchema,
@@ -18,4 +30,5 @@ export type {
   FormattedOutput,
   SkillOutput,
   FetchSchemaOptions,
+  ListSchema,
 } from './types.js';

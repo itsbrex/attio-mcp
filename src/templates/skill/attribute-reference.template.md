@@ -40,6 +40,9 @@
 - Target Object: `{{relationship.targetObject}}`
 - Cardinality: {{relationship.cardinality}}
   {{/if}}
+  {{#if (isDefined referencedObjects)}}
+  **References**: {{#if referencedObjects.length}}{{#each referencedObjects}}`{{this}}`{{#unless @last}}, {{/unless}}{{/each}}{{else}}any object{{/if}}
+  {{/if}}
 
 ---
 

@@ -215,6 +215,8 @@ describe('WorkspaceSchemaService', () => {
       const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
 
       try {
+        // Two option-based attributes: the delay applies BETWEEN fetches,
+        // so a single attribute would (correctly) skip the trailing delay
         const mockMetadata: Map<string, AttioAttributeMetadata> = new Map([
           [
             'industry',
@@ -226,6 +228,20 @@ describe('WorkspaceSchemaService', () => {
               },
               api_slug: 'industry',
               title: 'Industry',
+              type: 'select',
+              is_writable: true,
+            },
+          ],
+          [
+            'segment',
+            {
+              id: {
+                workspace_id: 'ws1',
+                object_id: 'obj1',
+                attribute_id: 'attr2',
+              },
+              api_slug: 'segment',
+              title: 'Segment',
               type: 'select',
               is_writable: true,
             },
@@ -246,6 +262,7 @@ describe('WorkspaceSchemaService', () => {
           maxOptionsPerAttribute: 20,
           includeArchived: false,
           optionFetchDelayMs: 123,
+          concurrency: 1,
         });
 
         await vi.runAllTimersAsync();
@@ -359,11 +376,15 @@ describe('WorkspaceSchemaService', () => {
         nestedIdOptions
       );
 
-      const result = await service['fetchObjectSchema']('companies', {
-        maxOptionsPerAttribute: 10,
-        includeArchived: false,
-        optionFetchDelayMs: 0,
-      });
+      const result = await service['fetchObjectSchema'](
+        'companies',
+        {
+          maxOptionsPerAttribute: 10,
+          includeArchived: false,
+          optionFetchDelayMs: 0,
+        },
+        new Map()
+      );
 
       const leadTypeAttr = result.attributes.find(
         (a) => a.apiSlug === 'lead_type'
@@ -699,6 +720,327 @@ describe('WorkspaceSchemaService', () => {
       });
 
       expect(result.objects[0].displayName).toBe('Some Object');
+    });
+  });
+
+  describe('option values', () => {
+    it('should use the API-provided value when present', async () => {
+      const mockMetadata: Map<string, AttioAttributeMetadata> = new Map([
+        [
+          'industry',
+          {
+            id: { workspace_id: 'ws1', object_id: 'o1', attribute_id: 'a1' },
+            api_slug: 'industry',
+            title: 'Industry',
+            type: 'select',
+            is_writable: true,
+          },
+        ],
+      ]);
+      vi.mocked(getObjectAttributeMetadata).mockResolvedValue(mockMetadata);
+      vi.mocked(AttributeOptionsService.getOptions).mockResolvedValue({
+        options: [{ id: 'opt1', title: 'Technology', value: 'tech_value' }],
+        attributeType: 'select',
+      });
+
+      const result = await service.fetchSchema(['companies'], {
+        maxOptionsPerAttribute: 20,
+        includeArchived: false,
+        optionFetchDelayMs: 0,
+      });
+
+      const attr = result.objects[0].attributes[0];
+      expect(attr.options?.[0].value).toBe('tech_value');
+    });
+
+    it('should fall back to the option title when no value is provided', async () => {
+      const mockMetadata: Map<string, AttioAttributeMetadata> = new Map([
+        [
+          'lead_type',
+          {
+            id: { workspace_id: 'ws1', object_id: 'o1', attribute_id: 'a1' },
+            api_slug: 'lead_type',
+            title: 'Lead Type',
+            type: 'select',
+            is_writable: true,
+          },
+        ],
+      ]);
+      vi.mocked(getObjectAttributeMetadata).mockResolvedValue(mockMetadata);
+      vi.mocked(AttributeOptionsService.getOptions).mockResolvedValue({
+        options: [
+          { id: 'opt1', title: 'Existing Customer' },
+        ] as unknown as AttributeOptionsResult['options'],
+        attributeType: 'select',
+      });
+
+      const result = await service.fetchSchema(['companies'], {
+        maxOptionsPerAttribute: 20,
+        includeArchived: false,
+        optionFetchDelayMs: 0,
+      });
+
+      const attr = result.objects[0].attributes[0];
+      // Title IS the API value per Attio docs — never a slugified guess
+      expect(attr.options?.[0].value).toBe('Existing Customer');
+    });
+  });
+
+  describe('record-reference targets', () => {
+    it('should resolve allowed_object_ids to object slugs via the object index', async () => {
+      const mockMetadata: Map<string, AttioAttributeMetadata> = new Map([
+        [
+          'associated_company',
+          {
+            id: { workspace_id: 'ws1', object_id: 'o1', attribute_id: 'a1' },
+            api_slug: 'associated_company',
+            title: 'Associated Company',
+            type: 'record-reference',
+            is_writable: true,
+            config: {
+              record_reference: {
+                allowed_object_ids: ['uuid-companies', 'uuid-unknown'],
+              },
+            },
+          },
+        ],
+      ]);
+      vi.mocked(getObjectAttributeMetadata).mockResolvedValue(mockMetadata);
+
+      const objectIndex = new Map([['uuid-companies', 'companies']]);
+      const result = await service['fetchObjectSchema'](
+        'deals',
+        {
+          maxOptionsPerAttribute: 20,
+          includeArchived: false,
+          optionFetchDelayMs: 0,
+        },
+        objectIndex
+      );
+
+      const attr = result.attributes[0];
+      // Resolved id becomes a slug; unresolved id is kept raw
+      expect(attr.referencedObjects).toEqual(['companies', 'uuid-unknown']);
+    });
+
+    it('should mark unrestricted references with an empty array', async () => {
+      const mockMetadata: Map<string, AttioAttributeMetadata> = new Map([
+        [
+          'related_record',
+          {
+            id: { workspace_id: 'ws1', object_id: 'o1', attribute_id: 'a1' },
+            api_slug: 'related_record',
+            title: 'Related Record',
+            type: 'record-reference',
+            is_writable: true,
+          },
+        ],
+      ]);
+      vi.mocked(getObjectAttributeMetadata).mockResolvedValue(mockMetadata);
+
+      const result = await service['fetchObjectSchema'](
+        'deals',
+        {
+          maxOptionsPerAttribute: 20,
+          includeArchived: false,
+          optionFetchDelayMs: 0,
+        },
+        new Map()
+      );
+
+      expect(result.attributes[0].referencedObjects).toEqual([]);
+    });
+
+    it('should not set referencedObjects for non-reference attributes', async () => {
+      const mockMetadata: Map<string, AttioAttributeMetadata> = new Map([
+        [
+          'name',
+          {
+            id: { workspace_id: 'ws1', object_id: 'o1', attribute_id: 'a1' },
+            api_slug: 'name',
+            title: 'Name',
+            type: 'text',
+            is_writable: true,
+          },
+        ],
+      ]);
+      vi.mocked(getObjectAttributeMetadata).mockResolvedValue(mockMetadata);
+
+      const result = await service['fetchObjectSchema'](
+        'companies',
+        {
+          maxOptionsPerAttribute: 20,
+          includeArchived: false,
+          optionFetchDelayMs: 0,
+        },
+        new Map()
+      );
+
+      expect(result.attributes[0].referencedObjects).toBeUndefined();
+    });
+  });
+
+  describe('workspace metadata and schema hash', () => {
+    it('should stamp workspace identity from /self and a schema hash', async () => {
+      const mockMetadata: Map<string, AttioAttributeMetadata> = new Map([
+        [
+          'name',
+          {
+            id: { workspace_id: 'ws1', object_id: 'o1', attribute_id: 'a1' },
+            api_slug: 'name',
+            title: 'Name',
+            type: 'text',
+            is_writable: true,
+          },
+        ],
+      ]);
+      vi.mocked(getObjectAttributeMetadata).mockResolvedValue(mockMetadata);
+      vi.mocked(getLazyAttioClient).mockReturnValue({
+        get: vi.fn().mockImplementation((url: string) => {
+          if (url === '/self') {
+            return Promise.resolve({
+              data: {
+                workspace_id: 'ws-uuid-1',
+                workspace_name: 'Acme Workspace',
+              },
+            });
+          }
+          return Promise.resolve({ data: { data: [] } });
+        }),
+      } as unknown as ReturnType<typeof getLazyAttioClient>);
+
+      const result = await service.fetchSchema(['companies'], {
+        maxOptionsPerAttribute: 20,
+        includeArchived: false,
+        optionFetchDelayMs: 0,
+      });
+
+      expect(result.metadata.workspace).toBe('Acme Workspace');
+      expect(result.metadata.workspaceId).toBe('ws-uuid-1');
+      expect(result.metadata.schemaHash).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    it('should fall back to "attio" when /self fails', async () => {
+      const mockMetadata: Map<string, AttioAttributeMetadata> = new Map();
+      vi.mocked(getObjectAttributeMetadata).mockResolvedValue(mockMetadata);
+      // Default beforeEach mock rejects all client calls
+
+      const result = await service.fetchSchema(['companies'], {
+        maxOptionsPerAttribute: 20,
+        includeArchived: false,
+        optionFetchDelayMs: 0,
+      });
+
+      expect(result.metadata.workspace).toBe('attio');
+      expect(result.metadata.workspaceId).toBeUndefined();
+    });
+  });
+
+  describe('lists', () => {
+    it('should fetch lists with stage options when includeLists is set', async () => {
+      const mockMetadata: Map<string, AttioAttributeMetadata> = new Map();
+      vi.mocked(getObjectAttributeMetadata).mockResolvedValue(mockMetadata);
+
+      vi.mocked(getLazyAttioClient).mockReturnValue({
+        get: vi.fn().mockImplementation((url: string) => {
+          if (url.startsWith('/lists?')) {
+            return Promise.resolve({
+              data: {
+                data: [
+                  {
+                    id: { workspace_id: 'ws1', list_id: 'list-uuid-1' },
+                    api_slug: 'prospecting',
+                    name: 'Prospecting',
+                    parent_object: 'companies',
+                  },
+                ],
+              },
+            });
+          }
+          if (url.startsWith('/lists/list-uuid-1/attributes?')) {
+            return Promise.resolve({
+              data: {
+                data: [
+                  {
+                    api_slug: 'stage',
+                    title: 'Stage',
+                    type: 'status',
+                    is_writable: true,
+                  },
+                ],
+              },
+            });
+          }
+          if (url.startsWith('/lists/list-uuid-1/attributes/stage/statuses')) {
+            return Promise.resolve({
+              data: {
+                data: [
+                  {
+                    id: { status_id: 'status-1' },
+                    title: 'Interested',
+                    is_archived: false,
+                  },
+                  {
+                    id: { status_id: 'status-2' },
+                    title: 'Demo Scheduled',
+                    is_archived: false,
+                  },
+                ],
+              },
+            });
+          }
+          return Promise.reject(new Error('Not found'));
+        }),
+      } as unknown as ReturnType<typeof getLazyAttioClient>);
+
+      const result = await service.fetchSchema(['companies'], {
+        maxOptionsPerAttribute: 20,
+        includeArchived: false,
+        optionFetchDelayMs: 0,
+        includeLists: true,
+      });
+
+      expect(result.lists).toHaveLength(1);
+      const list = result.lists![0];
+      expect(list.listId).toBe('list-uuid-1');
+      expect(list.apiSlug).toBe('prospecting');
+      expect(list.name).toBe('Prospecting');
+      expect(list.parentObjects).toEqual(['companies']);
+      expect(list.attributes).toHaveLength(1);
+      expect(list.attributes[0].apiSlug).toBe('stage');
+      expect(list.attributes[0].options?.map((o) => o.title)).toEqual([
+        'Interested',
+        'Demo Scheduled',
+      ]);
+      expect(list.attributes[0].options?.[0].id).toBe('status-1');
+    });
+
+    it('should omit lists when includeLists is not set', async () => {
+      const mockMetadata: Map<string, AttioAttributeMetadata> = new Map();
+      vi.mocked(getObjectAttributeMetadata).mockResolvedValue(mockMetadata);
+
+      const result = await service.fetchSchema(['companies'], {
+        maxOptionsPerAttribute: 20,
+        includeArchived: false,
+        optionFetchDelayMs: 0,
+      });
+
+      expect(result.lists).toBeUndefined();
+    });
+
+    it('should degrade to an empty list array when /lists fails', async () => {
+      const mockMetadata: Map<string, AttioAttributeMetadata> = new Map();
+      vi.mocked(getObjectAttributeMetadata).mockResolvedValue(mockMetadata);
+      // Default beforeEach mock rejects all client calls
+
+      const result = await service.fetchSchema(['companies'], {
+        maxOptionsPerAttribute: 20,
+        includeArchived: false,
+        optionFetchDelayMs: 0,
+        includeLists: true,
+      });
+
+      expect(result.lists).toEqual([]);
     });
   });
 });

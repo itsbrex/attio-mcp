@@ -32,6 +32,18 @@ export interface GenerateSkillConfig {
   /** Delay between attribute option fetches in milliseconds (default: 100) */
   optionFetchDelayMs?: number;
 
+  /** Number of concurrent option/attribute fetches (default: 4) */
+  concurrency?: number;
+
+  /** Whether to include workspace lists in the generated skill (default: true) */
+  includeLists?: boolean;
+
+  /** Install the generated skill directly into the Claude skills directory */
+  install?: boolean;
+
+  /** Override the Claude skills directory (default: ~/.claude/skills) */
+  installDir?: string;
+
   /** Attio API key for authentication */
   apiKey: string;
 }
@@ -48,12 +60,41 @@ export interface WorkspaceSchema {
     /** Workspace identifier or name */
     workspace: string;
 
+    /** Workspace UUID from the Attio API (when available) */
+    workspaceId?: string;
+
     /** List of object slugs included in this schema */
     objects: string[];
+
+    /** Content hash of the schema (objects + lists), used for drift detection */
+    schemaHash?: string;
   };
 
   /** Array of object schemas */
   objects: ObjectSchema[];
+
+  /** Workspace lists (when list discovery is enabled) */
+  lists?: ListSchema[];
+}
+
+/**
+ * Schema for a single Attio list
+ */
+export interface ListSchema {
+  /** List UUID (used as list_id in API calls) */
+  listId: string;
+
+  /** List API slug */
+  apiSlug: string;
+
+  /** Human-readable list name */
+  name: string;
+
+  /** Parent object slug(s) this list contains records of */
+  parentObjects: string[];
+
+  /** Stage/select attributes on the list with their options */
+  attributes: AttributeSchema[];
 }
 
 /**
@@ -118,6 +159,12 @@ export interface AttributeSchema {
     /** Relationship cardinality */
     cardinality: string;
   };
+
+  /**
+   * For record-reference attributes: object slugs this attribute may point at.
+   * Empty array means the reference is unrestricted (any object).
+   */
+  referencedObjects?: string[];
 }
 
 /**
@@ -174,4 +221,10 @@ export interface FetchSchemaOptions {
 
   /** Delay between attribute option fetches in milliseconds (default: 100) */
   optionFetchDelayMs?: number;
+
+  /** Number of concurrent option/attribute fetches (default: 4) */
+  concurrency?: number;
+
+  /** Whether to fetch workspace lists (default: false) */
+  includeLists?: boolean;
 }

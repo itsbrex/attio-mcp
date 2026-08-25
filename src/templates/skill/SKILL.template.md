@@ -6,7 +6,10 @@ description: Use when working with Attio workspace data to know valid attributes
 # Attio Workspace Schema Reference
 
 **Generated**: {{metadata.generatedAt}}
+**Workspace**: {{metadata.workspace}}{{#if metadata.workspaceId}} (`{{metadata.workspaceId}}`){{/if}}
 **Objects**: {{#each metadata.objects}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
+{{#if metadata.schemaHash}}**Schema Hash**: `{{metadata.schemaHash}}`
+{{/if}}
 
 ⚠️ **CRITICAL: Display Name vs API Slug**
 
@@ -20,14 +23,25 @@ The #1 error source when working with Attio is using Display Names instead of AP
 
 {{#each objects}}
 
-- {{displayName}}: [resources/{{objectSlug}}-attributes.md](resources/{{objectSlug}}-attributes.md)
+- {{{displayName}}} (`{{objectSlug}}`): {{attributeCount}} attributes{{#if optionAttributeCount}}, {{optionAttributeCount}} with option values{{/if}} → [resources/{{objectSlug}}-attributes.md](resources/{{objectSlug}}-attributes.md)
   {{/each}}
 
 Each file contains:
 
 - Select/status option values
 - Complete attribute specifications
-- Relationship definitions
+- Relationship definitions and record-reference targets
+  {{#if lists.length}}
+
+## Lists
+
+Workspace lists with their `list_id` values and stage options: [resources/lists.md](resources/lists.md)
+
+{{#each lists}}
+
+- {{{name}}} (`{{apiSlug}}`){{#if parentObjects.length}} — {{#each parentObjects}}{{this}}{{#unless @last}}, {{/unless}}{{/each}} records{{/if}}
+  {{/each}}
+  {{/if}}
 
 ## Complex Type Structures
 

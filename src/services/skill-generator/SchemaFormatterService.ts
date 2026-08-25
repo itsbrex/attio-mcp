@@ -62,7 +62,10 @@ export class SchemaFormatterService {
   private async formatAsSkill(
     schema: WorkspaceSchema
   ): Promise<FormattedOutput> {
-    const skillMd = await this.renderTemplate('SKILL.template.md', schema);
+    const skillMd = await this.renderTemplate(
+      'SKILL.template.md',
+      this.buildSkillIndexView(schema)
+    );
 
     // Validate Claude Skill description length requirement (≤200 chars)
     const descMatch = skillMd.match(/^description:\s*(.+)$/m);
@@ -103,13 +106,43 @@ export class SchemaFormatterService {
       schema
     );
 
+    // Render the lists reference when list discovery produced results
+    const listFiles: Record<string, string> = {};
+    if (schema.lists && schema.lists.length > 0) {
+      listFiles['resources/lists.md'] = await this.renderTemplate(
+        'lists.template.md',
+        schema
+      );
+    }
+
     return {
       format: 'skill',
       files: {
         'SKILL.md': skillMd,
         ...attributeFiles,
+        ...listFiles,
         'resources/complex-types.md': complexTypes,
       },
+    };
+  }
+
+  /**
+   * Builds the view model for the SKILL.md index: each object is annotated
+   * with attribute counts so the index communicates per-file weight without
+   * the reader opening it.
+   */
+  private buildSkillIndexView(
+    schema: WorkspaceSchema
+  ): Record<string, unknown> {
+    return {
+      ...schema,
+      objects: schema.objects.map((obj) => ({
+        ...obj,
+        attributeCount: obj.attributes.length,
+        optionAttributeCount: obj.attributes.filter(
+          (attr) => attr.options && attr.options.length > 0
+        ).length,
+      })),
     };
   }
 
@@ -123,7 +156,10 @@ export class SchemaFormatterService {
     schema: WorkspaceSchema
   ): Promise<FormattedOutput> {
     // Render all templates and combine them
-    const skillMd = await this.renderTemplate('SKILL.template.md', schema);
+    const skillMd = await this.renderTemplate(
+      'SKILL.template.md',
+      this.buildSkillIndexView(schema)
+    );
     const attrRef = await this.renderTemplate(
       'attribute-reference.template.md',
       schema
@@ -132,9 +168,18 @@ export class SchemaFormatterService {
       'complex-types.template.md',
       schema
     );
+    const listsMd =
+      schema.lists && schema.lists.length > 0
+        ? await this.renderTemplate('lists.template.md', schema)
+        : null;
 
     // Combine into single document
-    const combined = `${skillMd}\n\n---\n\n${attrRef}\n\n---\n\n${complexTypes}`;
+    const combined = [
+      skillMd,
+      attrRef,
+      ...(listsMd ? [listsMd] : []),
+      complexTypes,
+    ].join('\n\n---\n\n');
 
     return {
       format: 'markdown',
@@ -168,7 +213,7 @@ export class SchemaFormatterService {
    */
   private async renderTemplate(
     templateName: string,
-    data: WorkspaceSchema
+    data: WorkspaceSchema | Record<string, unknown>
   ): Promise<string> {
     // Check cache first
     if (!this.templates.has(templateName)) {
@@ -187,7 +232,8 @@ export class SchemaFormatterService {
         throw new Error(
           `Failed to load template ${templateName}: ${
             error instanceof Error ? error.message : String(error)
-          }`
+          }`,
+          { cause: error }
         );
       }
     }
@@ -218,6 +264,12 @@ export class SchemaFormatterService {
     // Helper: JSON stringify with formatting
     Handlebars.registerHelper('json', (obj: unknown) => {
       return JSON.stringify(obj, null, 2);
+    });
+
+    // Helper: distinguish "absent" from "empty array" (Handlebars #if
+    // treats both as falsy; record-reference targets need the difference)
+    Handlebars.registerHelper('isDefined', (value: unknown) => {
+      return value !== undefined && value !== null;
     });
 
     this.helpersRegistered = true;

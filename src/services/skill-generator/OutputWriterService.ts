@@ -36,22 +36,7 @@ export class OutputWriterService {
   ): Promise<SkillOutput> {
     const outputPath = this.resolveOutputPath(config);
 
-    // Create output directory
-    await fs.mkdir(outputPath, { recursive: true });
-
-    // Write all files
-    const writtenFiles: string[] = [];
-    for (const [relativePath, content] of Object.entries(formatted.files)) {
-      const fullPath = path.join(outputPath, relativePath);
-      const dir = path.dirname(fullPath);
-
-      // Ensure directory exists
-      await fs.mkdir(dir, { recursive: true });
-
-      // Write file
-      await fs.writeFile(fullPath, content, 'utf8');
-      writtenFiles.push(relativePath);
-    }
+    const writtenFiles = await this.writeFiles(formatted, outputPath);
 
     // Create ZIP if requested
     if (config.zip) {
@@ -64,6 +49,63 @@ export class OutputWriterService {
       path: outputPath,
       files: writtenFiles,
     };
+  }
+
+  /**
+   * Writes formatted output to an explicit target directory, bypassing the
+   * cwd containment used for ./output paths. Used by `generate-skill
+   * --install` to write directly into the Claude skills directory
+   * (e.g., ~/.claude/skills/attio-workspace-schema).
+   *
+   * @param formatted - Formatted output from SchemaFormatterService
+   * @param targetDir - Absolute directory to write the skill into
+   * @returns Information about written files
+   */
+  async writeTo(
+    formatted: FormattedOutput,
+    targetDir: string
+  ): Promise<SkillOutput> {
+    if (!path.isAbsolute(targetDir)) {
+      throw new Error(
+        `Install target must be an absolute path, got: ${targetDir}`
+      );
+    }
+
+    const writtenFiles = await this.writeFiles(formatted, targetDir);
+
+    return {
+      format: formatted.format,
+      path: targetDir,
+      files: writtenFiles,
+    };
+  }
+
+  /**
+   * Writes all files of a formatted output beneath a base directory.
+   *
+   * @param formatted - Formatted output
+   * @param basePath - Directory to write into (created if missing)
+   * @returns Relative paths of written files
+   */
+  private async writeFiles(
+    formatted: FormattedOutput,
+    basePath: string
+  ): Promise<string[]> {
+    await fs.mkdir(basePath, { recursive: true });
+
+    const writtenFiles: string[] = [];
+    for (const [relativePath, content] of Object.entries(formatted.files)) {
+      const fullPath = path.join(basePath, relativePath);
+      const dir = path.dirname(fullPath);
+
+      // Ensure directory exists
+      await fs.mkdir(dir, { recursive: true });
+
+      // Write file
+      await fs.writeFile(fullPath, content, 'utf8');
+      writtenFiles.push(relativePath);
+    }
+    return writtenFiles;
   }
 
   /**

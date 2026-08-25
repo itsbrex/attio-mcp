@@ -365,4 +365,44 @@ describe('OutputWriterService', () => {
       expect(result.path).toContain('attio-workspace-schema-json');
     });
   });
+
+  describe('writeTo (install mode)', () => {
+    it('should write files into an explicit absolute target directory', async () => {
+      const formatted: FormattedOutput = {
+        format: 'skill',
+        files: {
+          'SKILL.md': '# Installed Skill',
+          'resources/companies-attributes.md': '# Companies',
+        },
+      };
+
+      const installTarget = path.join(
+        testOutputDir,
+        'skills',
+        'attio-workspace-schema'
+      );
+
+      const result = await service.writeTo(formatted, installTarget);
+
+      expect(result.path).toBe(installTarget);
+      expect(result.files).toHaveLength(2);
+
+      const content = await fs.readFile(
+        path.join(installTarget, 'SKILL.md'),
+        'utf8'
+      );
+      expect(content).toBe('# Installed Skill');
+    });
+
+    it('should reject relative install targets', async () => {
+      const formatted: FormattedOutput = {
+        format: 'skill',
+        files: { 'SKILL.md': 'test' },
+      };
+
+      await expect(
+        service.writeTo(formatted, './relative/skills')
+      ).rejects.toThrow('absolute path');
+    });
+  });
 });

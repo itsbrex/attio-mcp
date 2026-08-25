@@ -419,4 +419,132 @@ describe('SchemaFormatterService', () => {
       expect(jsonStr).toContain('    "generatedAt"');
     });
   });
+
+  describe('skill index metadata', () => {
+    it('should include attribute counts per object in the index', async () => {
+      const result = await service.format(mockSchema, 'skill');
+      const skillMd = result.files['SKILL.md'];
+
+      expect(skillMd).toContain('Companies (`companies`): 2 attributes');
+      expect(skillMd).toContain('1 with option values');
+      expect(skillMd).toContain('People (`people`): 1 attributes');
+    });
+
+    it('should stamp workspace identity and schema hash when present', async () => {
+      mockSchema.metadata.workspaceId = 'ws-uuid-1';
+      mockSchema.metadata.schemaHash = 'a'.repeat(64);
+
+      const result = await service.format(mockSchema, 'skill');
+      const skillMd = result.files['SKILL.md'];
+
+      expect(skillMd).toContain('**Workspace**: test-workspace (`ws-uuid-1`)');
+      expect(skillMd).toContain(`**Schema Hash**: \`${'a'.repeat(64)}\``);
+    });
+
+    it('should omit the schema hash line when not stamped', async () => {
+      const result = await service.format(mockSchema, 'skill');
+      expect(result.files['SKILL.md']).not.toContain('Schema Hash');
+    });
+  });
+
+  describe('record-reference rendering', () => {
+    beforeEach(() => {
+      mockSchema.objects[0].attributes.push({
+        apiSlug: 'team',
+        displayName: 'Team',
+        type: 'record-reference',
+        isMultiselect: true,
+        isUnique: false,
+        isRequired: false,
+        isWritable: true,
+        referencedObjects: ['people'],
+      });
+      mockSchema.objects[0].attributes.push({
+        apiSlug: 'related_record',
+        displayName: 'Related Record',
+        type: 'record-reference',
+        isMultiselect: false,
+        isUnique: false,
+        isRequired: false,
+        isWritable: true,
+        referencedObjects: [],
+      });
+    });
+
+    it('should render referenced object slugs', async () => {
+      const result = await service.format(mockSchema, 'skill');
+      const attrMd = result.files['resources/companies-attributes.md'];
+
+      expect(attrMd).toContain('**References**: `people`');
+    });
+
+    it('should render unrestricted references as any object', async () => {
+      const result = await service.format(mockSchema, 'skill');
+      const attrMd = result.files['resources/companies-attributes.md'];
+
+      expect(attrMd).toContain('**References**: any object');
+    });
+  });
+
+  describe('lists rendering', () => {
+    beforeEach(() => {
+      mockSchema.lists = [
+        {
+          listId: 'list-uuid-1',
+          apiSlug: 'prospecting',
+          name: 'Prospecting',
+          parentObjects: ['companies'],
+          attributes: [
+            {
+              apiSlug: 'stage',
+              displayName: 'Stage',
+              type: 'status',
+              isMultiselect: false,
+              isUnique: false,
+              isRequired: false,
+              isWritable: true,
+              options: [
+                { id: 's1', title: 'Interested', value: 'Interested' },
+                { id: 's2', title: 'Demo Scheduled', value: 'Demo Scheduled' },
+              ],
+            },
+          ],
+        },
+      ];
+    });
+
+    it('should emit resources/lists.md with list ids and stage options', async () => {
+      const result = await service.format(mockSchema, 'skill');
+      const listsMd = result.files['resources/lists.md'];
+
+      expect(listsMd).toBeDefined();
+      expect(listsMd).toContain('`list-uuid-1`');
+      expect(listsMd).toContain('Prospecting');
+      expect(listsMd).toContain('Interested');
+      expect(listsMd).toContain('Demo Scheduled');
+    });
+
+    it('should link lists from the SKILL.md index', async () => {
+      const result = await service.format(mockSchema, 'skill');
+      const skillMd = result.files['SKILL.md'];
+
+      expect(skillMd).toContain('resources/lists.md');
+      expect(skillMd).toContain('Prospecting (`prospecting`)');
+    });
+
+    it('should not emit lists.md when schema has no lists', async () => {
+      mockSchema.lists = undefined;
+      const result = await service.format(mockSchema, 'skill');
+
+      expect(result.files['resources/lists.md']).toBeUndefined();
+    });
+
+    it('should include lists in the combined markdown format', async () => {
+      const result = await service.format(mockSchema, 'markdown');
+      const markdown = result.files['attio-workspace-schema.md'];
+
+      expect(markdown).toContain('Workspace Lists');
+      expect(markdown).toContain('`list-uuid-1`');
+    });
+  });
 });

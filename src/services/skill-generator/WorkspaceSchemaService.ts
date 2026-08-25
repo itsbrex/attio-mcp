@@ -8,6 +8,7 @@
  */
 
 import { getObjectAttributeMetadata } from '@/api/attribute-types.js';
+import type { AttioAttributeMetadata } from '@/api/attribute-types.js';
 import { getLazyAttioClient } from '@/api/lazy-client.js';
 import { AttributeOptionsService } from '@/services/metadata/AttributeOptionsService.js';
 import {
@@ -15,11 +16,18 @@ import {
   error as logError,
   warn as logWarn,
 } from '@/utils/logger.js';
+import {
+  DEFAULT_CONCURRENCY,
+  mapWithConcurrency,
+  withRateLimitRetry,
+} from './concurrency.js';
+import { computeSchemaHash } from './drift.js';
 import type {
   WorkspaceSchema,
   ObjectSchema,
   AttributeSchema,
   FetchSchemaOptions,
+  ListSchema,
 } from './types.js';
 
 /**
@@ -45,17 +53,24 @@ function isNestedOptionId(id: unknown): id is NestedOptionId {
 }
 
 /**
- * Generates a slug-style value from an option title
- * Converts "Existing Customer" → "existing_customer"
- * @param title - The option title
- * @returns Slug-style value
- * @see Issue #1014
+ * Resolves the API value for a select/status option.
+ *
+ * Uses the real `value` field when the API provides one; otherwise falls
+ * back to the option title, which per Attio docs is the value accepted in
+ * record payloads. (Previously a slugified guess was generated from the
+ * title, which produced values the API would reject.)
+ *
+ * @param option - Raw option from the Attio API
+ * @returns The API value for this option
  */
-function generateOptionValue(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_') // Replace non-alphanumeric with underscore
-    .replace(/^_+|_+$/g, ''); // Trim leading/trailing underscores
+function resolveOptionValue(option: {
+  title: string;
+  value?: unknown;
+}): string {
+  if (typeof option.value === 'string' && option.value.length > 0) {
+    return option.value;
+  }
+  return option.title;
 }
 
 /**
@@ -123,31 +138,121 @@ export class WorkspaceSchemaService {
     objectSlugs: string[],
     options: FetchSchemaOptions
   ): Promise<WorkspaceSchema> {
-    const objects: ObjectSchema[] = [];
+    // Fetch workspace identity and the object index (id → slug) up front;
+    // both degrade gracefully to nulls/empty maps on failure.
+    const [workspaceInfo, objectIndex] = await Promise.all([
+      this.fetchWorkspaceInfo(),
+      this.fetchObjectIndex(),
+    ]);
 
-    for (const objectSlug of objectSlugs) {
-      try {
-        const objectSchema = await this.fetchObjectSchema(objectSlug, options);
-        objects.push(objectSchema);
-      } catch (error: unknown) {
-        logError(
-          'WorkspaceSchemaService',
-          `Failed to fetch schema for ${objectSlug}`,
-          error instanceof Error ? error : new Error(String(error)),
-          { objectSlug }
-        );
-        // Continue processing other objects despite error
+    // Fetch object schemas with bounded parallelism (options within each
+    // object are also fetched concurrently, so keep this level modest).
+    const objectResults = await mapWithConcurrency(
+      objectSlugs,
+      Math.min(2, options.concurrency ?? DEFAULT_CONCURRENCY),
+      async (objectSlug) => {
+        try {
+          return await this.fetchObjectSchema(objectSlug, options, objectIndex);
+        } catch (error: unknown) {
+          logError(
+            'WorkspaceSchemaService',
+            `Failed to fetch schema for ${objectSlug}`,
+            error instanceof Error ? error : new Error(String(error)),
+            { objectSlug }
+          );
+          // Continue processing other objects despite error
+          return null;
+        }
       }
-    }
+    );
+    const objects = objectResults.filter(
+      (obj): obj is ObjectSchema => obj !== null
+    );
 
-    return {
+    const lists = options.includeLists
+      ? await this.fetchListSchemas(options)
+      : undefined;
+
+    const schema: WorkspaceSchema = {
       metadata: {
         generatedAt: new Date().toISOString(),
-        workspace: 'attio', // Could be enhanced to fetch actual workspace name
+        workspace: workspaceInfo.name || 'attio',
+        workspaceId: workspaceInfo.id,
         objects: objectSlugs,
       },
       objects,
+      ...(lists !== undefined ? { lists } : {}),
     };
+    schema.metadata.schemaHash = computeSchemaHash(schema);
+    return schema;
+  }
+
+  /**
+   * Fetches workspace identity from the Attio token introspection endpoint.
+   * Degrades to empty values on failure.
+   */
+  private async fetchWorkspaceInfo(): Promise<{
+    name?: string;
+    id?: string;
+  }> {
+    try {
+      const client = getLazyAttioClient();
+      const response = await client.get('/self');
+      const data = response?.data?.data || response?.data;
+      return {
+        name:
+          typeof data?.workspace_name === 'string'
+            ? data.workspace_name
+            : undefined,
+        id:
+          typeof data?.workspace_id === 'string'
+            ? data.workspace_id
+            : undefined,
+      };
+    } catch {
+      logDebug(
+        'WorkspaceSchemaService',
+        'Could not fetch workspace info from /self, using fallback',
+        {}
+      );
+      return {};
+    }
+  }
+
+  /**
+   * Fetches the workspace object index mapping object UUIDs to API slugs.
+   * Used to resolve record-reference `allowed_object_ids` into readable
+   * object slugs. Degrades to an empty map on failure.
+   */
+  private async fetchObjectIndex(): Promise<Map<string, string>> {
+    const index = new Map<string, string>();
+    try {
+      const client = getLazyAttioClient();
+      const response = await client.get('/objects');
+      const data = response?.data?.data || response?.data;
+      if (Array.isArray(data)) {
+        for (const obj of data) {
+          const slug = obj?.api_slug;
+          const rawId = obj?.id;
+          const objectId =
+            typeof rawId === 'string'
+              ? rawId
+              : typeof rawId?.object_id === 'string'
+                ? rawId.object_id
+                : undefined;
+          if (typeof slug === 'string' && objectId) {
+            index.set(objectId, slug);
+          }
+        }
+      }
+    } catch {
+      logDebug(
+        'WorkspaceSchemaService',
+        'Could not fetch object index; record-reference targets will show raw ids',
+        {}
+      );
+    }
+    return index;
   }
 
   /**
@@ -159,9 +264,11 @@ export class WorkspaceSchemaService {
    */
   private async fetchObjectSchema(
     objectSlug: string,
-    options: FetchSchemaOptions
+    options: FetchSchemaOptions,
+    objectIndex: Map<string, string>
   ): Promise<ObjectSchema> {
     const optionFetchDelayMs = this.getOptionFetchDelayMs(options);
+    const concurrency = options.concurrency ?? DEFAULT_CONCURRENCY;
     const PHASE1_OBJECTS = ['companies', 'people', 'deals'];
 
     // 1. Fetch object title from API for custom objects (Issue #1017)
@@ -188,65 +295,14 @@ export class WorkspaceSchemaService {
         description: metadata.description,
       };
 
-      // 4. Fetch options for select/status attributes
-      if (this.isOptionBasedAttribute(metadata.type)) {
-        try {
-          const optionsResult = await AttributeOptionsService.getOptions(
-            objectSlug,
-            apiSlug,
-            options.includeArchived
-          );
-
-          // Apply truncation
-          const totalOptions = optionsResult.options.length;
-          const truncated = totalOptions > options.maxOptionsPerAttribute;
-
-          attributeSchema.options = optionsResult.options
-            .slice(0, options.maxOptionsPerAttribute)
-            .map((opt) => ({
-              // Handle nested ID objects from Attio API
-              // API returns: { workspace_id, object_id, attribute_id, option_id }
-              id: isNestedOptionId(opt.id)
-                ? opt.id.option_id
-                : typeof opt.id === 'string'
-                  ? opt.id
-                  : '',
-              title: opt.title,
-              // Generate slug-style value from title since Attio API doesn't provide it
-              // "Existing Customer" → "existing_customer"
-              value: generateOptionValue(opt.title),
-              isArchived: 'is_archived' in opt ? opt.is_archived : false,
-            }));
-
-          attributeSchema.optionsTruncated = truncated;
-          attributeSchema.totalOptions = totalOptions;
-
-          // Rate limiting: Add delay between option fetches
-          if (optionFetchDelayMs > 0) {
-            await new Promise((resolve) =>
-              setTimeout(resolve, optionFetchDelayMs)
-            );
-          }
-        } catch (error: unknown) {
-          // Log warning but don't fail - attribute can still be documented
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
-          logWarn(
-            'WorkspaceSchemaService',
-            `No options available for ${objectSlug}.${apiSlug}`,
-            { objectSlug, attributeSlug: apiSlug, errorMessage }
-          );
-        }
-      }
-
-      // 5. Add complex type structures
+      // 4. Add complex type structures
       if (this.isComplexType(metadata.type)) {
         attributeSchema.complexTypeStructure = this.getComplexTypeStructure(
           metadata.type
         );
       }
 
-      // 6. Add relationship metadata (only when we have real data)
+      // 5. Add relationship metadata (only when we have real data)
       if (metadata.relationship?.object && metadata.relationship?.cardinality) {
         attributeSchema.relationship = {
           targetObject: metadata.relationship.object,
@@ -254,14 +310,296 @@ export class WorkspaceSchemaService {
         };
       }
 
+      // 6. Resolve record-reference targets to object slugs
+      const referencedObjects = this.resolveReferencedObjects(
+        metadata,
+        objectIndex
+      );
+      if (referencedObjects) {
+        attributeSchema.referencedObjects = referencedObjects;
+      }
+
       attributes.push(attributeSchema);
     }
+
+    // 7. Fetch options for select/status attributes with bounded
+    // parallelism and rate-limit-aware retries
+    const optionAttributes = attributes.filter((attr) =>
+      this.isOptionBasedAttribute(attr.type)
+    );
+    await mapWithConcurrency(
+      optionAttributes,
+      concurrency,
+      (attr) => this.populateAttributeOptions(objectSlug, attr, options),
+      optionFetchDelayMs
+    );
 
     return {
       objectSlug,
       displayName: this.getDisplayName(objectSlug, objectTitle),
       attributes,
     };
+  }
+
+  /**
+   * Fetches and attaches select/status options to an attribute schema.
+   * Failures are logged and leave the attribute without options.
+   */
+  private async populateAttributeOptions(
+    objectSlug: string,
+    attributeSchema: AttributeSchema,
+    options: FetchSchemaOptions
+  ): Promise<void> {
+    const apiSlug = attributeSchema.apiSlug;
+    try {
+      const optionsResult = await withRateLimitRetry(
+        () =>
+          AttributeOptionsService.getOptions(
+            objectSlug,
+            apiSlug,
+            options.includeArchived
+          ),
+        `${objectSlug}.${apiSlug} options`
+      );
+
+      // Apply truncation
+      const totalOptions = optionsResult.options.length;
+      const truncated = totalOptions > options.maxOptionsPerAttribute;
+
+      attributeSchema.options = optionsResult.options
+        .slice(0, options.maxOptionsPerAttribute)
+        .map((opt) => ({
+          // Handle nested ID objects from Attio API
+          // API returns: { workspace_id, object_id, attribute_id, option_id }
+          id: isNestedOptionId(opt.id)
+            ? opt.id.option_id
+            : typeof opt.id === 'string'
+              ? opt.id
+              : '',
+          title: opt.title,
+          value: resolveOptionValue(opt),
+          isArchived: 'is_archived' in opt ? opt.is_archived : false,
+        }));
+
+      attributeSchema.optionsTruncated = truncated;
+      attributeSchema.totalOptions = totalOptions;
+    } catch (error: unknown) {
+      // Log warning but don't fail - attribute can still be documented
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logWarn(
+        'WorkspaceSchemaService',
+        `No options available for ${objectSlug}.${apiSlug}`,
+        { objectSlug, attributeSlug: apiSlug, errorMessage }
+      );
+    }
+  }
+
+  /**
+   * Resolves the object slugs a record-reference attribute may point at.
+   *
+   * Prefers explicit relationship metadata; otherwise maps
+   * `config.record_reference.allowed_object_ids` (UUIDs) to slugs via the
+   * workspace object index. Unresolvable ids are kept raw so the
+   * information is never silently dropped.
+   *
+   * @returns Slug array (empty = unrestricted reference), or undefined
+   *          when the attribute is not a record reference
+   */
+  private resolveReferencedObjects(
+    metadata: AttioAttributeMetadata,
+    objectIndex: Map<string, string>
+  ): string[] | undefined {
+    if (metadata.type !== 'record-reference') {
+      return undefined;
+    }
+    const allowedIds = metadata.config?.record_reference?.allowed_object_ids;
+    if (!Array.isArray(allowedIds) || allowedIds.length === 0) {
+      // Null/empty means the reference is unrestricted
+      return [];
+    }
+    return allowedIds.map((id) => objectIndex.get(id) ?? id);
+  }
+
+  /**
+   * Fetches workspace lists with their stage/select attributes and options.
+   * Every step degrades gracefully; a list that fails to enumerate its
+   * attributes is still included without them.
+   */
+  private async fetchListSchemas(
+    options: FetchSchemaOptions
+  ): Promise<ListSchema[]> {
+    const client = getLazyAttioClient();
+    let rawLists: unknown[] = [];
+    try {
+      const response = await client.get('/lists?limit=100');
+      const data = response?.data?.data || response?.data;
+      if (Array.isArray(data)) {
+        rawLists = data;
+      }
+    } catch (error: unknown) {
+      logWarn('WorkspaceSchemaService', 'Could not fetch workspace lists', {
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+      return [];
+    }
+
+    const concurrency = options.concurrency ?? DEFAULT_CONCURRENCY;
+    const listResults = await mapWithConcurrency(
+      rawLists,
+      Math.min(2, concurrency),
+      async (raw) => {
+        const entry = raw as Record<string, unknown>;
+        const rawId = entry.id as string | { list_id?: string } | undefined;
+        const listId =
+          typeof rawId === 'string' ? rawId : (rawId?.list_id ?? '');
+        const apiSlug =
+          typeof entry.api_slug === 'string' ? entry.api_slug : '';
+        if (!listId && !apiSlug) return null;
+
+        const parentRaw = entry.parent_object;
+        const parentObjects = Array.isArray(parentRaw)
+          ? parentRaw.filter((p): p is string => typeof p === 'string')
+          : typeof parentRaw === 'string'
+            ? [parentRaw]
+            : [];
+
+        return {
+          listId,
+          apiSlug,
+          name: typeof entry.name === 'string' ? entry.name : apiSlug,
+          parentObjects,
+          attributes: await this.fetchListAttributes(
+            listId || apiSlug,
+            options
+          ),
+        } satisfies ListSchema;
+      }
+    );
+
+    return listResults.filter((list): list is ListSchema => list !== null);
+  }
+
+  /**
+   * Fetches a list's select/status attributes with their options.
+   */
+  private async fetchListAttributes(
+    listIdOrSlug: string,
+    options: FetchSchemaOptions
+  ): Promise<AttributeSchema[]> {
+    const client = getLazyAttioClient();
+    let rawAttributes: unknown[] = [];
+    try {
+      const response = await client.get(
+        `/lists/${listIdOrSlug}/attributes?limit=500`
+      );
+      const data = response?.data?.data || response?.data;
+      if (Array.isArray(data)) {
+        rawAttributes = data;
+      }
+    } catch (error: unknown) {
+      logWarn(
+        'WorkspaceSchemaService',
+        `Could not fetch attributes for list ${listIdOrSlug}`,
+        {
+          listId: listIdOrSlug,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        }
+      );
+      return [];
+    }
+
+    const attributes: AttributeSchema[] = [];
+    for (const raw of rawAttributes) {
+      const meta = raw as AttioAttributeMetadata;
+      if (!meta?.api_slug) continue;
+      attributes.push({
+        apiSlug: meta.api_slug,
+        displayName: meta.title,
+        type: meta.type,
+        isMultiselect: meta.is_multiselect || false,
+        isUnique: meta.is_unique || false,
+        isRequired: meta.is_required || false,
+        isWritable: meta.is_writable !== false,
+        description: meta.description,
+      });
+    }
+
+    // Only fetch options for stage/select attributes on lists
+    const optionAttributes = attributes.filter((attr) =>
+      this.isOptionBasedAttribute(attr.type)
+    );
+    await mapWithConcurrency(
+      optionAttributes,
+      options.concurrency ?? DEFAULT_CONCURRENCY,
+      (attr) => this.populateListAttributeOptions(listIdOrSlug, attr, options),
+      this.getOptionFetchDelayMs(options)
+    );
+
+    return attributes;
+  }
+
+  /**
+   * Fetches and attaches options for a list attribute (statuses for stage
+   * attributes, options for selects). Failures leave the attribute bare.
+   */
+  private async populateListAttributeOptions(
+    listIdOrSlug: string,
+    attributeSchema: AttributeSchema,
+    options: FetchSchemaOptions
+  ): Promise<void> {
+    const client = getLazyAttioClient();
+    const endpoint = attributeSchema.type === 'status' ? 'statuses' : 'options';
+    const showArchived = options.includeArchived ? '?show_archived=true' : '';
+    try {
+      const response = await withRateLimitRetry(
+        () =>
+          client.get(
+            `/lists/${listIdOrSlug}/attributes/${attributeSchema.apiSlug}/${endpoint}${showArchived}`
+          ),
+        `list ${listIdOrSlug}.${attributeSchema.apiSlug} ${endpoint}`
+      );
+      const data = response?.data?.data || response?.data;
+      if (!Array.isArray(data)) return;
+
+      const totalOptions = data.length;
+      attributeSchema.options = data
+        .slice(0, options.maxOptionsPerAttribute)
+        .map((raw) => {
+          const opt = raw as {
+            id?: unknown;
+            title: string;
+            value?: unknown;
+            is_archived?: boolean;
+          };
+          const rawId = opt.id as
+            | string
+            | { option_id?: string; status_id?: string }
+            | undefined;
+          return {
+            id:
+              typeof rawId === 'string'
+                ? rawId
+                : (rawId?.option_id ?? rawId?.status_id ?? ''),
+            title: opt.title,
+            value: resolveOptionValue(opt),
+            isArchived: opt.is_archived ?? false,
+          };
+        });
+      attributeSchema.optionsTruncated =
+        totalOptions > options.maxOptionsPerAttribute;
+      attributeSchema.totalOptions = totalOptions;
+    } catch (error: unknown) {
+      logWarn(
+        'WorkspaceSchemaService',
+        `No options available for list ${listIdOrSlug}.${attributeSchema.apiSlug}`,
+        {
+          listId: listIdOrSlug,
+          attributeSlug: attributeSchema.apiSlug,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        }
+      );
+    }
   }
 
   /**
