@@ -70,9 +70,9 @@ npx attio-discover generate-skill [OPTIONS]
 | `--check`              | -     | boolean | false              | Drift check against installed skill (exit 0/1/2); writes nothing |
 | `--lists`              | -     | boolean | true               | Include workspace lists (list_id + stage options); `--no-lists`  |
 | `--concurrency`        | -     | number  | 4                  | Concurrent option/attribute fetches; 429s retried with backoff   |
-| `--max-options`        | -     | number  | 20                 | Max select/status options per attribute                          |
+| `--max-options`        | -     | number  | 20                 | Options rendered per attribute in skill/markdown; `0` = all      |
 | `--option-fetch-delay` | -     | number  | 100                | Delay between attribute option fetches (ms)                      |
-| `--include-archived`   | -     | boolean | false              | Include archived options in output                               |
+| `--include-archived`   | -     | boolean | false              | Include archived attributes and options (marked `_(archived)_`)  |
 | `--api-key`            | `-k`  | string  | `ATTIO_API_KEY`    | Attio API key (env var preferred)                                |
 
 ### Examples
@@ -112,11 +112,30 @@ npx attio-discover generate-skill --all --no-lists
 npx attio-discover generate-skill --all --concurrency 8 --option-fetch-delay 0
 ```
 
+### Exhaustive Discovery
+
+Every run rebuilds the schema from the live workspace so renames and new
+values are always picked up:
+
+- **Objects**: `GET /objects` (unpaginated) supplies the slug list for
+  `--all` and the current display title of _every_ object — standard
+  objects included, so renaming "Companies" to "Accounts" shows up.
+- **Attributes**: `/objects/{slug}/attributes` and
+  `/lists/{id}/attributes` are walked page by page (`limit`/`offset`);
+  the in-process attribute metadata cache is bypassed.
+- **Options / statuses**: the full option list is always fetched.
+  `--max-options` only limits what the skill/markdown renders (with a
+  "showing N of M" note); JSON output and the schema hash always cover
+  every option.
+- **Archived**: `--include-archived` adds `show_archived=true` to the
+  attribute and option requests; archived items render as `_(archived)_`.
+
 ### Drift Checking
 
 The generated `SKILL.md` is stamped with a **Schema Hash** — a stable
-SHA-256 over the fetched objects, attributes, options, and lists
-(timestamps excluded). `--check` re-fetches the live schema and compares:
+SHA-256 over the fetched objects (including titles), attributes, the
+complete option/status sets, and lists (timestamps excluded). `--check`
+re-fetches the live schema and compares:
 
 ```bash
 npx attio-discover generate-skill --all --check

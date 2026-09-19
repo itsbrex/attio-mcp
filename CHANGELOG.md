@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Exhaustive workspace-schema discovery** — `generate-skill` now fetches the complete option/status list for every attribute (`--max-options` only limits what the skill/markdown renders; JSON output and the drift hash cover every value), walks list attributes page by page, bypasses the in-process attribute metadata cache, takes object display titles from the live `/objects` index for every object (renamed standard objects are picked up), and with `--include-archived` also lists archived attributes (rendered `_(archived)_`); `--max-options 0` renders all options
 - Skill `SKILL.md` index now shows per-object attribute counts and links lists for progressive disclosure
 - Select/status option values now use the real API value (falling back to the option title per Attio docs) instead of a slugified guess that produced values the API rejects
 - Removed the obsolete "experimental" warning for non-Phase-1 objects in `generate-skill` — custom objects are first-class since `--all` discovery
