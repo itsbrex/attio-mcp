@@ -110,7 +110,7 @@ export async function generateSkill(argv: GenerateSkillArgs): Promise<void> {
       format: (argv.format as 'skill' | 'markdown' | 'json') || 'skill',
       outputDir: argv.output || './output',
       zip: argv.zip || false,
-      maxOptionsPerAttribute: argv.maxOptions || 20,
+      maxOptionsPerAttribute: argv.maxOptions ?? 20,
       includeArchived: argv.includeArchived || false,
       optionFetchDelayMs: argv.optionFetchDelay ?? 100,
       concurrency: argv.concurrency ?? DEFAULT_CONCURRENCY,
@@ -165,7 +165,9 @@ export async function generateSkill(argv: GenerateSkillArgs): Promise<void> {
     // 6. Format schema
     spinner.start(`Formatting output as ${config.format}...`);
     const formatterService = new SchemaFormatterService();
-    const formatted = await formatterService.format(schema, config.format);
+    const formatted = await formatterService.format(schema, config.format, {
+      maxOptionsPerAttribute: config.maxOptionsPerAttribute,
+    });
     spinner.succeed(`Formatted as ${chalk.cyan(config.format)}`);
 
     // 7. Write output (install mode: stage, install to all agents, bundle)

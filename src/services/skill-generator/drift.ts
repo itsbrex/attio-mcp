@@ -37,6 +37,7 @@ function canonicalAttribute(attr: AttributeSchema): Record<string, unknown> {
     isUnique: attr.isUnique,
     isRequired: attr.isRequired,
     isWritable: attr.isWritable,
+    isArchived: attr.isArchived ?? false,
     description: attr.description ?? null,
     options: attr.options
       ? sortByKey(attr.options, (o) => o.title).map((o) => ({

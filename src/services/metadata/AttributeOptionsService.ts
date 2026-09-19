@@ -31,16 +31,29 @@ export class AttributeOptionsService {
    * @param objectSlug - The object slug (e.g., "companies", "people", "deals")
    * @param attributeSlug - The attribute slug (e.g., "channel", "stage")
    * @param showArchived - Whether to include archived options
+   * @param attributeType - Known attribute type; `status` skips the select
+   *   probe and reads `/statuses` directly (fewer calls, no spurious errors)
    * @returns Options with attribute type information
    */
   static async getOptions(
     objectSlug: string,
     attributeSlug: string,
-    showArchived?: boolean
+    showArchived?: boolean,
+    attributeType?: string
   ): Promise<AttributeOptionsResult> {
+    // Known status attribute → statuses endpoint is the only source of truth
+    if (attributeType === 'status') {
+      const statuses = await getStatusOptions(
+        objectSlug,
+        attributeSlug,
+        showArchived
+      );
+      return { options: statuses, attributeType: 'status' };
+    }
+
     let selectOptions: AttioSelectOption[] = [];
     let selectError: unknown = null;
-    let statusError: unknown = null;
+    let statusError: unknown;
 
     // Try select endpoint first (covers select and multi-select)
     try {

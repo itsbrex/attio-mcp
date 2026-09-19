@@ -10,7 +10,7 @@
 | ------------ | -------- | ---- | ----- | -------- | ------ |
 
 {{#each attributes}}
-| {{displayName}} | `{{apiSlug}}` | {{type}} | {{#if isMultiselect}}✓{{else}}✗{{/if}} | {{#if isRequired}}✓{{else}}✗{{/if}} | {{#if isUnique}}✓{{else}}✗{{/if}} |
+| {{displayName}}{{#if isArchived}} _(archived)_{{/if}} | `{{apiSlug}}` | {{type}} | {{#if isMultiselect}}✓{{else}}✗{{/if}} | {{#if isRequired}}✓{{else}}✗{{/if}} | {{#if isUnique}}✓{{else}}✗{{/if}} |
 {{/each}}
 
 ---
@@ -21,10 +21,10 @@
 
 ### {{displayName}} (`{{apiSlug}}`)
 
-**Type**: `{{type}}`{{#if isMultiselect}} _(multi-select)_{{/if}}{{#if isRequired}} _(required)_{{/if}}{{#if isUnique}} _(unique)_{{/if}}{{#unless isWritable}} _(read-only)_{{/unless}}{{#if description}}
+**Type**: `{{type}}`{{#if isMultiselect}} _(multi-select)_{{/if}}{{#if isRequired}} _(required)_{{/if}}{{#if isUnique}} _(unique)_{{/if}}{{#unless isWritable}} _(read-only)_{{/unless}}{{#if isArchived}} _(archived)_{{/if}}{{#if description}}
 **Description**: {{{description}}}{{/if}}
 {{#if options}}
-**Options**: {{#each options}}{{{title}}}{{#unless @last}}, {{/unless}}{{/each}}{{#if optionsTruncated}} _(showing {{options.length}} of {{totalOptions}})_{{/if}}
+**Options**: {{#each options}}{{{title}}}{{#if isArchived}} _(archived)_{{/if}}{{#unless @last}}, {{/unless}}{{/each}}{{#if optionsTruncated}} _(showing {{options.length}} of {{totalOptions}})_{{/if}}
 {{/if}}
 {{#if complexTypeStructure}}
 **Structure**:

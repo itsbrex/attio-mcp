@@ -82,18 +82,33 @@ function getAttributeCache(): TTLCache<
 }
 
 /**
+ * Options for attribute metadata discovery
+ */
+export interface AttributeMetadataOptions {
+  /** Include archived attributes (`show_archived=true`); cached separately */
+  showArchived?: boolean;
+  /** Skip the TTL cache and always hit the API (result is still cached) */
+  bypassCache?: boolean;
+}
+
+/**
  * Fetches and caches attribute metadata for a specific object type
  *
  * @param objectSlug - The object type (e.g., 'companies', 'people')
+ * @param options - Discovery options (archived attributes, cache bypass)
  * @returns Map of attribute slug to metadata
  */
 export async function getObjectAttributeMetadata(
-  objectSlug: string
+  objectSlug: string,
+  options: AttributeMetadataOptions = {}
 ): Promise<Map<string, AttioAttributeMetadata>> {
   const cache = getAttributeCache();
+  const cacheKey = options.showArchived
+    ? `${objectSlug}::archived`
+    : objectSlug;
   // Check cache first
-  if (cache.has(objectSlug)) {
-    return cache.get(objectSlug)!;
+  if (!options.bypassCache && cache.has(cacheKey)) {
+    return cache.get(cacheKey)!;
   }
 
   try {
@@ -101,7 +116,7 @@ export async function getObjectAttributeMetadata(
     if (objectSlug === 'tasks') {
       // Tasks have predefined fields, not dynamic attributes
       const taskMetadata = createTaskAttributeMetadata();
-      cache.set(objectSlug, taskMetadata);
+      cache.set(cacheKey, taskMetadata);
       return taskMetadata;
     }
 
@@ -109,6 +124,7 @@ export async function getObjectAttributeMetadata(
     const rawAttributes = await fetchAllObjectAttributes({
       client: api,
       objectSlug,
+      showArchived: options.showArchived,
     });
 
     // fetchAllObjectAttributes always normalizes to an array
@@ -140,7 +156,7 @@ export async function getObjectAttributeMetadata(
     });
 
     // Cache the result
-    cache.set(objectSlug, metadataMap);
+    cache.set(cacheKey, metadataMap);
 
     return metadataMap;
   } catch (err: unknown) {
@@ -364,6 +380,7 @@ export function clearAttributeCache(objectSlug?: string): void {
   const cache = getAttributeCache();
   if (objectSlug) {
     cache.delete(objectSlug);
+    cache.delete(`${objectSlug}::archived`);
   } else {
     cache.clear();
   }

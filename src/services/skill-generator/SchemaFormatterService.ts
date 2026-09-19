@@ -13,7 +13,12 @@ import Handlebars from 'handlebars';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import type { WorkspaceSchema, FormattedOutput } from './types.js';
+import type {
+  AttributeSchema,
+  FormatOptions,
+  FormattedOutput,
+  WorkspaceSchema,
+} from './types.js';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -33,24 +38,73 @@ export class SchemaFormatterService {
   /**
    * Formats schema to specified output format
    *
+   * The schema always carries the complete option list. For the human
+   * readable formats (skill, markdown) options are truncated at render time
+   * to `maxOptionsPerAttribute` (0 = all); JSON output is never truncated.
+   *
    * @param schema - Complete workspace schema
    * @param format - Output format (skill, markdown, json)
+   * @param options - Rendering options
    * @returns Formatted output ready for writing
    */
   async format(
     schema: WorkspaceSchema,
-    format: 'skill' | 'markdown' | 'json'
+    format: 'skill' | 'markdown' | 'json',
+    options: FormatOptions = {}
   ): Promise<FormattedOutput> {
     switch (format) {
       case 'skill':
-        return this.formatAsSkill(schema);
+        return this.formatAsSkill(this.applyOptionLimit(schema, options));
       case 'markdown':
-        return this.formatAsMarkdown(schema);
+        return this.formatAsMarkdown(this.applyOptionLimit(schema, options));
       case 'json':
         return this.formatAsJSON(schema);
       default:
         throw new Error(`Unsupported format: ${format}`);
     }
+  }
+
+  /**
+   * Returns a render view of the schema with per-attribute options capped
+   * at `maxOptionsPerAttribute`, annotating truncated attributes with
+   * `optionsTruncated` / `totalOptions`. The input schema is not mutated.
+   */
+  private applyOptionLimit(
+    schema: WorkspaceSchema,
+    options: FormatOptions
+  ): WorkspaceSchema {
+    const limit = options.maxOptionsPerAttribute;
+    if (typeof limit !== 'number' || !Number.isFinite(limit) || limit <= 0) {
+      return schema;
+    }
+
+    const capAttribute = (attr: AttributeSchema): AttributeSchema => {
+      if (!attr.options || attr.options.length <= limit) {
+        return attr;
+      }
+      return {
+        ...attr,
+        options: attr.options.slice(0, limit),
+        optionsTruncated: true,
+        totalOptions: attr.options.length,
+      };
+    };
+
+    return {
+      ...schema,
+      objects: schema.objects.map((obj) => ({
+        ...obj,
+        attributes: obj.attributes.map(capAttribute),
+      })),
+      ...(schema.lists
+        ? {
+            lists: schema.lists.map((list) => ({
+              ...list,
+              attributes: list.attributes.map(capAttribute),
+            })),
+          }
+        : {}),
+    };
   }
 
   /**

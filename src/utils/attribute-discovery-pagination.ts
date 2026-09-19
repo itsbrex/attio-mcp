@@ -8,16 +8,28 @@
  * - response size indicates final page (and no cursor is provided)
  */
 
-export const DEFAULT_ATTRIBUTE_DISCOVERY_MAX = 500;
+export const DEFAULT_ATTRIBUTE_DISCOVERY_MAX = 1000;
 export const DEFAULT_ATTRIBUTE_DISCOVERY_PAGE_SIZE = 100;
 
 interface HttpClientLike {
   get: (path: string) => Promise<{ data?: unknown }>;
 }
 
+/**
+ * Attio attribute endpoints are shared between objects and lists:
+ * `GET /v2/{target}/{identifier}/attributes` where target is
+ * `objects` or `lists`.
+ */
+export type AttributeTarget = 'objects' | 'lists';
+
 interface FetchAllObjectAttributesOptions {
   client: HttpClientLike;
+  /** Object slug/UUID (or list slug/UUID when `target` is `lists`) */
   objectSlug: string;
+  /** Attribute container type (default: `objects`) */
+  target?: AttributeTarget;
+  /** Include archived attributes (`show_archived=true`) */
+  showArchived?: boolean;
   categories?: string[];
   maxAttributes?: number;
   pageSize?: number;
@@ -148,16 +160,21 @@ export async function fetchAllObjectAttributes(
       query.set('categories', options.categories.join(','));
     }
 
+    if (options.showArchived) {
+      query.set('show_archived', 'true');
+    }
+
     if (cursor) {
       query.set('cursor', cursor);
     } else if (offset > 0) {
       query.set('offset', String(offset));
     }
 
+    const target: AttributeTarget = options.target ?? 'objects';
     const queryString = query.toString();
     const path = queryString
-      ? `/objects/${options.objectSlug}/attributes?${queryString}`
-      : `/objects/${options.objectSlug}/attributes`;
+      ? `/${target}/${options.objectSlug}/attributes?${queryString}`
+      : `/${target}/${options.objectSlug}/attributes`;
     const response = await options.client.get(path);
 
     const responseData = response?.data;

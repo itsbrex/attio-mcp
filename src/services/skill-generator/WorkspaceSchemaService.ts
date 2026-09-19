@@ -11,6 +11,7 @@ import { getObjectAttributeMetadata } from '@/api/attribute-types.js';
 import type { AttioAttributeMetadata } from '@/api/attribute-types.js';
 import { getLazyAttioClient } from '@/api/lazy-client.js';
 import { AttributeOptionsService } from '@/services/metadata/AttributeOptionsService.js';
+import { fetchAllObjectAttributes } from '@/utils/attribute-discovery-pagination.js';
 import {
   debug as logDebug,
   error as logError,
@@ -74,7 +75,23 @@ function resolveOptionValue(option: {
 }
 
 /**
+ * Workspace object index built from a single `GET /objects` call.
+ */
+interface ObjectIndex {
+  /** Object UUID → API slug (resolves record-reference targets) */
+  idToSlug: Map<string, string>;
+  /** API slug → current display title (picks up object renames) */
+  titles: Map<string, string>;
+}
+
+/**
  * Service for fetching complete workspace schema data
+ *
+ * Discovery is exhaustive by design: every attribute page is walked, every
+ * option/status is fetched (display truncation happens in the formatter),
+ * object titles come from the live object index, and the attribute
+ * metadata cache is bypassed so a regenerate/--check always reflects the
+ * current workspace.
  *
  * Note: API key flows through getLazyAttioClient() from environment/context,
  * not through constructor dependency injection.
@@ -152,7 +169,12 @@ export class WorkspaceSchemaService {
       Math.min(2, options.concurrency ?? DEFAULT_CONCURRENCY),
       async (objectSlug) => {
         try {
-          return await this.fetchObjectSchema(objectSlug, options, objectIndex);
+          return await this.fetchObjectSchema(
+            objectSlug,
+            options,
+            objectIndex.idToSlug,
+            objectIndex.titles
+          );
         } catch (error: unknown) {
           logError(
             'WorkspaceSchemaService',
@@ -220,12 +242,14 @@ export class WorkspaceSchemaService {
   }
 
   /**
-   * Fetches the workspace object index mapping object UUIDs to API slugs.
-   * Used to resolve record-reference `allowed_object_ids` into readable
-   * object slugs. Degrades to an empty map on failure.
+   * Fetches the workspace object index from `GET /objects` (unpaginated
+   * per the Attio spec). Provides UUID → slug (record-reference targets)
+   * and slug → title (current display names, including renamed standard
+   * objects). Degrades to empty maps on failure.
    */
-  private async fetchObjectIndex(): Promise<Map<string, string>> {
-    const index = new Map<string, string>();
+  private async fetchObjectIndex(): Promise<ObjectIndex> {
+    const idToSlug = new Map<string, string>();
+    const titles = new Map<string, string>();
     try {
       const client = getLazyAttioClient();
       const response = await client.get('/objects');
@@ -233,6 +257,7 @@ export class WorkspaceSchemaService {
       if (Array.isArray(data)) {
         for (const obj of data) {
           const slug = obj?.api_slug;
+          if (typeof slug !== 'string') continue;
           const rawId = obj?.id;
           const objectId =
             typeof rawId === 'string'
@@ -240,8 +265,18 @@ export class WorkspaceSchemaService {
               : typeof rawId?.object_id === 'string'
                 ? rawId.object_id
                 : undefined;
-          if (typeof slug === 'string' && objectId) {
-            index.set(objectId, slug);
+          if (objectId) {
+            idToSlug.set(objectId, slug);
+          }
+          const title =
+            typeof obj?.title === 'string' && obj.title.length > 0
+              ? obj.title
+              : typeof obj?.plural_noun === 'string' &&
+                  obj.plural_noun.length > 0
+                ? obj.plural_noun
+                : undefined;
+          if (title) {
+            titles.set(slug, title);
           }
         }
       }
@@ -252,7 +287,7 @@ export class WorkspaceSchemaService {
         {}
       );
     }
-    return index;
+    return { idToSlug, titles };
   }
 
   /**
@@ -265,20 +300,24 @@ export class WorkspaceSchemaService {
   private async fetchObjectSchema(
     objectSlug: string,
     options: FetchSchemaOptions,
-    objectIndex: Map<string, string>
+    objectIndex: Map<string, string>,
+    objectTitles: Map<string, string> = new Map()
   ): Promise<ObjectSchema> {
     const optionFetchDelayMs = this.getOptionFetchDelayMs(options);
     const concurrency = options.concurrency ?? DEFAULT_CONCURRENCY;
-    const PHASE1_OBJECTS = ['companies', 'people', 'deals'];
 
-    // 1. Fetch object title from API for custom objects (Issue #1017)
-    // Skip API call for Phase 1 objects - they have hardcoded display names
-    const objectTitle = PHASE1_OBJECTS.includes(objectSlug)
-      ? null
-      : await this.fetchObjectTitle(objectSlug);
+    // 1. Resolve the live object title (Issue #1017). The object index
+    // already carries titles for every object (standard ones included, so
+    // renames are picked up); fall back to a per-object fetch otherwise.
+    const objectTitle =
+      objectTitles.get(objectSlug) ?? (await this.fetchObjectTitle(objectSlug));
 
-    // 2. Fetch attribute metadata (uses existing 15min TTL cache)
-    const metadataMap = await getObjectAttributeMetadata(objectSlug);
+    // 2. Fetch attribute metadata straight from the API (bypass the 15min
+    // TTL cache so regeneration/--check never sees stale attributes)
+    const metadataMap = await getObjectAttributeMetadata(objectSlug, {
+      showArchived: options.includeArchived,
+      bypassCache: true,
+    });
 
     // 3. Convert metadata to AttributeSchema array
     const attributes: AttributeSchema[] = [];
@@ -292,6 +331,7 @@ export class WorkspaceSchemaService {
         isUnique: metadata.is_unique || false,
         isRequired: metadata.is_required || false,
         isWritable: metadata.is_writable !== false, // Default to true
+        ...(metadata.is_archived === true ? { isArchived: true } : {}),
         description: metadata.description,
       };
 
@@ -357,32 +397,29 @@ export class WorkspaceSchemaService {
           AttributeOptionsService.getOptions(
             objectSlug,
             apiSlug,
-            options.includeArchived
+            options.includeArchived,
+            attributeSchema.type
           ),
         `${objectSlug}.${apiSlug} options`
       );
 
-      // Apply truncation
-      const totalOptions = optionsResult.options.length;
-      const truncated = totalOptions > options.maxOptionsPerAttribute;
+      // Keep every option: the schema (and its drift hash) must reflect the
+      // full value set. Display truncation is applied by the formatter.
+      attributeSchema.options = optionsResult.options.map((opt) => ({
+        // Handle nested ID objects from Attio API
+        // API returns: { workspace_id, object_id, attribute_id, option_id }
+        id: isNestedOptionId(opt.id)
+          ? opt.id.option_id
+          : typeof opt.id === 'string'
+            ? opt.id
+            : '',
+        title: opt.title,
+        value: resolveOptionValue(opt),
+        isArchived: 'is_archived' in opt ? opt.is_archived : false,
+      }));
 
-      attributeSchema.options = optionsResult.options
-        .slice(0, options.maxOptionsPerAttribute)
-        .map((opt) => ({
-          // Handle nested ID objects from Attio API
-          // API returns: { workspace_id, object_id, attribute_id, option_id }
-          id: isNestedOptionId(opt.id)
-            ? opt.id.option_id
-            : typeof opt.id === 'string'
-              ? opt.id
-              : '',
-          title: opt.title,
-          value: resolveOptionValue(opt),
-          isArchived: 'is_archived' in opt ? opt.is_archived : false,
-        }));
-
-      attributeSchema.optionsTruncated = truncated;
-      attributeSchema.totalOptions = totalOptions;
+      attributeSchema.optionsTruncated = false;
+      attributeSchema.totalOptions = attributeSchema.options.length;
     } catch (error: unknown) {
       // Log warning but don't fail - attribute can still be documented
       const errorMessage =
@@ -432,7 +469,8 @@ export class WorkspaceSchemaService {
     const client = getLazyAttioClient();
     let rawLists: unknown[] = [];
     try {
-      const response = await client.get('/lists?limit=100');
+      // GET /lists is unpaginated per the Attio spec (no limit/offset)
+      const response = await client.get('/lists');
       const data = response?.data?.data || response?.data;
       if (Array.isArray(data)) {
         rawLists = data;
@@ -488,15 +526,16 @@ export class WorkspaceSchemaService {
     options: FetchSchemaOptions
   ): Promise<AttributeSchema[]> {
     const client = getLazyAttioClient();
-    let rawAttributes: unknown[] = [];
+    let rawAttributes: unknown[];
     try {
-      const response = await client.get(
-        `/lists/${listIdOrSlug}/attributes?limit=500`
-      );
-      const data = response?.data?.data || response?.data;
-      if (Array.isArray(data)) {
-        rawAttributes = data;
-      }
+      // Walk every page of list attributes (same paginated endpoint shape
+      // as objects: /lists/{list}/attributes?limit&offset&show_archived)
+      rawAttributes = await fetchAllObjectAttributes({
+        client,
+        objectSlug: listIdOrSlug,
+        target: 'lists',
+        showArchived: options.includeArchived,
+      });
     } catch (error: unknown) {
       logWarn(
         'WorkspaceSchemaService',
@@ -521,6 +560,7 @@ export class WorkspaceSchemaService {
         isUnique: meta.is_unique || false,
         isRequired: meta.is_required || false,
         isWritable: meta.is_writable !== false,
+        ...(meta.is_archived === true ? { isArchived: true } : {}),
         description: meta.description,
       });
     }
@@ -562,33 +602,30 @@ export class WorkspaceSchemaService {
       const data = response?.data?.data || response?.data;
       if (!Array.isArray(data)) return;
 
-      const totalOptions = data.length;
-      attributeSchema.options = data
-        .slice(0, options.maxOptionsPerAttribute)
-        .map((raw) => {
-          const opt = raw as {
-            id?: unknown;
-            title: string;
-            value?: unknown;
-            is_archived?: boolean;
-          };
-          const rawId = opt.id as
-            | string
-            | { option_id?: string; status_id?: string }
-            | undefined;
-          return {
-            id:
-              typeof rawId === 'string'
-                ? rawId
-                : (rawId?.option_id ?? rawId?.status_id ?? ''),
-            title: opt.title,
-            value: resolveOptionValue(opt),
-            isArchived: opt.is_archived ?? false,
-          };
-        });
-      attributeSchema.optionsTruncated =
-        totalOptions > options.maxOptionsPerAttribute;
-      attributeSchema.totalOptions = totalOptions;
+      // Full option set; display truncation is the formatter's job
+      attributeSchema.options = data.map((raw) => {
+        const opt = raw as {
+          id?: unknown;
+          title: string;
+          value?: unknown;
+          is_archived?: boolean;
+        };
+        const rawId = opt.id as
+          | string
+          | { option_id?: string; status_id?: string }
+          | undefined;
+        return {
+          id:
+            typeof rawId === 'string'
+              ? rawId
+              : (rawId?.option_id ?? rawId?.status_id ?? ''),
+          title: opt.title,
+          value: resolveOptionValue(opt),
+          isArchived: opt.is_archived ?? false,
+        };
+      });
+      attributeSchema.optionsTruncated = false;
+      attributeSchema.totalOptions = attributeSchema.options.length;
     } catch (error: unknown) {
       logWarn(
         'WorkspaceSchemaService',

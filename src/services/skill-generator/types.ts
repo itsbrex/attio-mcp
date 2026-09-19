@@ -23,10 +23,10 @@ export interface GenerateSkillConfig {
   /** Whether to package output as ZIP file */
   zip: boolean;
 
-  /** Maximum options to display per attribute (default: 20) */
+  /** Maximum options to display per attribute (default: 20; 0 = unlimited) */
   maxOptionsPerAttribute: number;
 
-  /** Whether to include archived options */
+  /** Whether to include archived attributes and options */
   includeArchived: boolean;
 
   /** Delay between attribute option fetches in milliseconds (default: 100) */
@@ -142,16 +142,23 @@ export interface AttributeSchema {
   /** Whether this attribute can be modified */
   isWritable: boolean;
 
+  /** Whether this attribute is archived (only present with --include-archived) */
+  isArchived?: boolean;
+
   /** Optional description of the attribute's purpose */
   description?: string;
 
-  /** For select/status attributes: array of valid options */
+  /**
+   * For select/status attributes: the complete list of valid options as
+   * discovered from the API. Truncation for display happens at render time
+   * (see SchemaFormatterService) so the schema hash covers every option.
+   */
   options?: AttributeOption[];
 
-  /** Whether options were truncated due to maxOptionsPerAttribute limit */
+  /** Whether options were truncated for display (set by the formatter) */
   optionsTruncated?: boolean;
 
-  /** Total number of options available (before truncation) */
+  /** Total number of options discovered (before any display truncation) */
   totalOptions?: number;
 
   /** For complex types: structure definition with field types */
@@ -216,13 +223,27 @@ export interface SkillOutput {
 }
 
 /**
+ * Options for rendering a schema (skill / markdown formats)
+ */
+export interface FormatOptions {
+  /**
+   * Maximum options to render per attribute. `0` (or undefined) renders
+   * every option. JSON output always contains the full option list.
+   */
+  maxOptionsPerAttribute?: number;
+}
+
+/**
  * Options for fetching object schema
  */
 export interface FetchSchemaOptions {
-  /** Maximum options to retrieve per attribute */
+  /**
+   * Display limit for options per attribute. Discovery always fetches the
+   * complete option list; this value is carried through to the formatter.
+   */
   maxOptionsPerAttribute: number;
 
-  /** Whether to include archived options */
+  /** Whether to include archived attributes and options */
   includeArchived: boolean;
 
   /** Delay between attribute option fetches in milliseconds (default: 100) */

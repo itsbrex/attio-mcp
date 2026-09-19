@@ -26,7 +26,7 @@ values below with the list tools (`get-list-entries`, `add-record-to-list`,
 | Attribute | API Slug | Type |
 | --------- | -------- | ---- |
 {{#each attributes}}
-| {{displayName}} | `{{apiSlug}}` | {{type}} |
+| {{displayName}}{{#if isArchived}} _(archived)_{{/if}} | `{{apiSlug}}` | {{type}} |
 {{/each}}
 
 {{#each attributes}}

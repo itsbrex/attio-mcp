@@ -101,12 +101,14 @@ yargs(hideBin(process.argv))
           default: false,
         })
         .option('max-options', {
-          description: 'Max options per attribute (default: 20)',
+          description:
+            'Max options rendered per attribute in skill/markdown output (default: 20; 0 = all). ' +
+            'Discovery and the drift hash always cover every option.',
           type: 'number',
           default: 20,
         })
         .option('include-archived', {
-          description: 'Include archived options',
+          description: 'Include archived attributes and options',
           type: 'boolean',
           default: false,
         })
