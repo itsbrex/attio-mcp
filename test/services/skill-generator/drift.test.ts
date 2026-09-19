@@ -98,6 +98,35 @@ describe('computeSchemaHash', () => {
     expect(computeSchemaHash(a)).not.toBe(computeSchemaHash(b));
   });
 
+  it('changes when an option beyond any display limit is added', () => {
+    // Options are never truncated in the schema, so the hash sees all of them
+    const wide = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        id: `o${i}`,
+        title: `Option ${i}`,
+        value: `Option ${i}`,
+      }));
+    const a = buildSchema();
+    const b = buildSchema();
+    a.objects[0].attributes[1].options = wide(40);
+    b.objects[0].attributes[1].options = wide(41);
+    expect(computeSchemaHash(a)).not.toBe(computeSchemaHash(b));
+  });
+
+  it('changes when an attribute is archived', () => {
+    const a = buildSchema();
+    const b = buildSchema();
+    b.objects[0].attributes[0].isArchived = true;
+    expect(computeSchemaHash(a)).not.toBe(computeSchemaHash(b));
+  });
+
+  it('changes when an object is renamed', () => {
+    const a = buildSchema();
+    const b = buildSchema();
+    b.objects[0].displayName = 'Accounts';
+    expect(computeSchemaHash(a)).not.toBe(computeSchemaHash(b));
+  });
+
   it('changes when lists change', () => {
     const a = buildSchema();
     const b = buildSchema({

@@ -276,7 +276,7 @@ describe('WorkspaceSchemaService', () => {
       }
     });
 
-    it('should truncate options when exceeding maxOptionsPerAttribute', async () => {
+    it("should keep every option regardless of maxOptionsPerAttribute (display truncation is the formatter's job)", async () => {
       const mockMetadata: Map<string, AttioAttributeMetadata> = new Map([
         [
           'industry',
@@ -318,9 +318,95 @@ describe('WorkspaceSchemaService', () => {
         (a) => a.apiSlug === 'industry'
       );
 
-      expect(industryAttr?.options).toHaveLength(20);
-      expect(industryAttr?.optionsTruncated).toBe(true);
+      expect(industryAttr?.options).toHaveLength(30);
+      expect(industryAttr?.optionsTruncated).toBe(false);
       expect(industryAttr?.totalOptions).toBe(30);
+    });
+
+    it('should pass the attribute type through so status attributes skip the select probe', async () => {
+      const mockMetadata: Map<string, AttioAttributeMetadata> = new Map([
+        [
+          'stage',
+          {
+            id: { workspace_id: 'ws1', object_id: 'o1', attribute_id: 'a1' },
+            api_slug: 'stage',
+            title: 'Stage',
+            type: 'status',
+            is_writable: true,
+          },
+        ],
+      ]);
+      vi.mocked(getObjectAttributeMetadata).mockResolvedValue(mockMetadata);
+      vi.mocked(AttributeOptionsService.getOptions).mockResolvedValue({
+        options: [],
+        attributeType: 'status',
+      });
+
+      await service.fetchSchema(['deals'], {
+        maxOptionsPerAttribute: 20,
+        includeArchived: true,
+        optionFetchDelayMs: 0,
+      });
+
+      expect(AttributeOptionsService.getOptions).toHaveBeenCalledWith(
+        'deals',
+        'stage',
+        true,
+        'status'
+      );
+    });
+
+    it('should bypass the attribute metadata cache and honor includeArchived', async () => {
+      vi.mocked(getObjectAttributeMetadata).mockResolvedValue(new Map());
+
+      await service.fetchSchema(['companies'], {
+        maxOptionsPerAttribute: 20,
+        includeArchived: true,
+        optionFetchDelayMs: 0,
+      });
+
+      expect(getObjectAttributeMetadata).toHaveBeenCalledWith('companies', {
+        showArchived: true,
+        bypassCache: true,
+      });
+    });
+
+    it('should flag archived attributes', async () => {
+      const mockMetadata: Map<string, AttioAttributeMetadata> = new Map([
+        [
+          'legacy',
+          {
+            id: { workspace_id: 'ws1', object_id: 'o1', attribute_id: 'a1' },
+            api_slug: 'legacy',
+            title: 'Legacy',
+            type: 'text',
+            is_writable: true,
+            is_archived: true,
+          },
+        ],
+        [
+          'name',
+          {
+            id: { workspace_id: 'ws1', object_id: 'o1', attribute_id: 'a2' },
+            api_slug: 'name',
+            title: 'Name',
+            type: 'text',
+            is_writable: true,
+            is_archived: false,
+          },
+        ],
+      ]);
+      vi.mocked(getObjectAttributeMetadata).mockResolvedValue(mockMetadata);
+
+      const result = await service.fetchSchema(['companies'], {
+        maxOptionsPerAttribute: 20,
+        includeArchived: true,
+        optionFetchDelayMs: 0,
+      });
+
+      const [legacy, name] = result.objects[0].attributes;
+      expect(legacy.isArchived).toBe(true);
+      expect(name.isArchived).toBeUndefined();
     });
 
     it('should extract option_id from nested ID objects (Attio API format)', async () => {
@@ -698,6 +784,48 @@ describe('WorkspaceSchemaService', () => {
       expect(result.objects[0].displayName).toBe('My Custom Object');
     });
 
+    it('should take titles from the /objects index for every object, including standard ones', async () => {
+      const mockMetadata: Map<string, AttioAttributeMetadata> = new Map();
+      vi.mocked(getObjectAttributeMetadata).mockResolvedValue(mockMetadata);
+      const get = vi.fn().mockImplementation((url: string) => {
+        if (url === '/objects') {
+          return Promise.resolve({
+            data: {
+              data: [
+                {
+                  id: { object_id: 'uuid-companies' },
+                  api_slug: 'companies',
+                  title: 'Accounts',
+                },
+                {
+                  id: { object_id: 'uuid-custom' },
+                  api_slug: 'custom_thing',
+                  plural_noun: 'Custom Things',
+                },
+              ],
+            },
+          });
+        }
+        return Promise.reject(new Error('Not found'));
+      });
+      vi.mocked(getLazyAttioClient).mockReturnValue({
+        get,
+      } as unknown as ReturnType<typeof getLazyAttioClient>);
+
+      const result = await service.fetchSchema(['companies', 'custom_thing'], {
+        maxOptionsPerAttribute: 20,
+        includeArchived: false,
+        optionFetchDelayMs: 0,
+      });
+
+      // Renamed standard object picks up the live title, not the hardcoded one
+      expect(result.objects[0].displayName).toBe('Accounts');
+      expect(result.objects[1].displayName).toBe('Custom Things');
+      // No per-object title fetches when the index already has the titles
+      expect(get).not.toHaveBeenCalledWith('/objects/companies');
+      expect(get).not.toHaveBeenCalledWith('/objects/custom_thing');
+    });
+
     it('should fallback to capitalization when API returns no title', async () => {
       const mockMetadata: Map<string, AttioAttributeMetadata> = new Map();
       vi.mocked(getObjectAttributeMetadata).mockResolvedValue(mockMetadata);
@@ -943,7 +1071,8 @@ describe('WorkspaceSchemaService', () => {
 
       vi.mocked(getLazyAttioClient).mockReturnValue({
         get: vi.fn().mockImplementation((url: string) => {
-          if (url.startsWith('/lists?')) {
+          // GET /lists is unpaginated: no query string expected
+          if (url === '/lists') {
             return Promise.resolve({
               data: {
                 data: [
@@ -952,20 +1081,6 @@ describe('WorkspaceSchemaService', () => {
                     api_slug: 'prospecting',
                     name: 'Prospecting',
                     parent_object: 'companies',
-                  },
-                ],
-              },
-            });
-          }
-          if (url.startsWith('/lists/list-uuid-1/attributes?')) {
-            return Promise.resolve({
-              data: {
-                data: [
-                  {
-                    api_slug: 'stage',
-                    title: 'Stage',
-                    type: 'status',
-                    is_writable: true,
                   },
                 ],
               },
@@ -984,6 +1099,20 @@ describe('WorkspaceSchemaService', () => {
                     id: { status_id: 'status-2' },
                     title: 'Demo Scheduled',
                     is_archived: false,
+                  },
+                ],
+              },
+            });
+          }
+          if (url.startsWith('/lists/list-uuid-1/attributes')) {
+            return Promise.resolve({
+              data: {
+                data: [
+                  {
+                    api_slug: 'stage',
+                    title: 'Stage',
+                    type: 'status',
+                    is_writable: true,
                   },
                 ],
               },
@@ -1013,6 +1142,58 @@ describe('WorkspaceSchemaService', () => {
         'Demo Scheduled',
       ]);
       expect(list.attributes[0].options?.[0].id).toBe('status-1');
+    });
+
+    it('should walk every page of list attributes and request archived ones when asked', async () => {
+      vi.mocked(getObjectAttributeMetadata).mockResolvedValue(new Map());
+      const page = (start: number, count: number) =>
+        Array.from({ length: count }, (_, i) => ({
+          api_slug: `attr_${start + i}`,
+          title: `Attr ${start + i}`,
+          type: 'text',
+          is_writable: true,
+        }));
+      const get = vi.fn().mockImplementation((url: string) => {
+        if (url === '/lists') {
+          return Promise.resolve({
+            data: {
+              data: [
+                {
+                  id: { list_id: 'list-uuid-1' },
+                  api_slug: 'big',
+                  name: 'Big',
+                  parent_object: 'companies',
+                },
+              ],
+            },
+          });
+        }
+        if (url === '/lists/list-uuid-1/attributes?show_archived=true') {
+          return Promise.resolve({ data: { data: page(0, 100) } });
+        }
+        if (
+          url ===
+          '/lists/list-uuid-1/attributes?limit=100&show_archived=true&offset=100'
+        ) {
+          return Promise.resolve({ data: { data: page(100, 7) } });
+        }
+        return Promise.reject(new Error(`Unexpected url ${url}`));
+      });
+      vi.mocked(getLazyAttioClient).mockReturnValue({
+        get,
+      } as unknown as ReturnType<typeof getLazyAttioClient>);
+
+      const result = await service.fetchSchema(['companies'], {
+        maxOptionsPerAttribute: 20,
+        includeArchived: true,
+        optionFetchDelayMs: 0,
+        includeLists: true,
+      });
+
+      expect(result.lists?.[0].attributes).toHaveLength(107);
+      expect(get).toHaveBeenCalledWith(
+        '/lists/list-uuid-1/attributes?limit=100&show_archived=true&offset=100'
+      );
     });
 
     it('should omit lists when includeLists is not set', async () => {

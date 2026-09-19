@@ -336,6 +336,143 @@ describe('SchemaFormatterService', () => {
       expect(companiesAttr).toContain('showing 1 of 30');
     });
 
+    describe('render-time option limit (maxOptionsPerAttribute)', () => {
+      const buildWideSchema = (): WorkspaceSchema => ({
+        ...mockSchema,
+        objects: [
+          {
+            objectSlug: 'companies',
+            displayName: 'Companies',
+            attributes: [
+              {
+                apiSlug: 'industry',
+                displayName: 'Industry',
+                type: 'select',
+                isMultiselect: false,
+                isUnique: false,
+                isRequired: false,
+                isWritable: true,
+                options: Array.from({ length: 30 }, (_, i) => ({
+                  id: `opt${i}`,
+                  title: `Option ${i}`,
+                  value: `Option ${i}`,
+                })),
+                optionsTruncated: false,
+                totalOptions: 30,
+              },
+            ],
+          },
+        ],
+        lists: [
+          {
+            listId: 'list-1',
+            apiSlug: 'pipeline',
+            name: 'Pipeline',
+            parentObjects: ['companies'],
+            attributes: [
+              {
+                apiSlug: 'stage',
+                displayName: 'Stage',
+                type: 'status',
+                isMultiselect: false,
+                isUnique: false,
+                isRequired: false,
+                isWritable: true,
+                options: Array.from({ length: 5 }, (_, i) => ({
+                  id: `st${i}`,
+                  title: `Stage ${i}`,
+                  value: `Stage ${i}`,
+                })),
+              },
+            ],
+          },
+        ],
+      });
+
+      it('truncates object and list options at render time and reports totals', async () => {
+        const schema = buildWideSchema();
+        const result = await service.format(schema, 'skill', {
+          maxOptionsPerAttribute: 3,
+        });
+        const companiesAttr = result.files['resources/companies-attributes.md'];
+        const listsMd = result.files['resources/lists.md'];
+
+        expect(companiesAttr).toContain('Option 0, Option 1, Option 2');
+        expect(companiesAttr).not.toContain('Option 3');
+        expect(companiesAttr).toContain('showing 3 of 30');
+        expect(listsMd).toContain('Stage 2');
+        expect(listsMd).not.toContain('Stage 3');
+        expect(listsMd).toContain('showing 3 of 5');
+      });
+
+      it('does not mutate the input schema', async () => {
+        const schema = buildWideSchema();
+        await service.format(schema, 'skill', { maxOptionsPerAttribute: 3 });
+
+        expect(schema.objects[0].attributes[0].options).toHaveLength(30);
+        expect(schema.objects[0].attributes[0].optionsTruncated).toBe(false);
+      });
+
+      it('renders every option when the limit is 0 or omitted', async () => {
+        const schema = buildWideSchema();
+        const unlimited = await service.format(schema, 'skill', {
+          maxOptionsPerAttribute: 0,
+        });
+        const omitted = await service.format(schema, 'skill');
+
+        for (const out of [unlimited, omitted]) {
+          const md = out.files['resources/companies-attributes.md'];
+          expect(md).toContain('Option 29');
+          expect(md).not.toContain('showing');
+        }
+      });
+
+      it('never truncates JSON output', async () => {
+        const schema = buildWideSchema();
+        const result = await service.format(schema, 'json', {
+          maxOptionsPerAttribute: 3,
+        });
+        const json = JSON.parse(result.files['attio-workspace-schema.json']);
+
+        expect(json.objects[0].attributes[0].options).toHaveLength(30);
+        expect(json.objects[0].attributes[0].optionsTruncated).toBe(false);
+      });
+    });
+
+    it('marks archived attributes and options', async () => {
+      const archivedSchema: WorkspaceSchema = {
+        ...mockSchema,
+        objects: [
+          {
+            objectSlug: 'companies',
+            displayName: 'Companies',
+            attributes: [
+              {
+                apiSlug: 'legacy_tier',
+                displayName: 'Legacy Tier',
+                type: 'select',
+                isMultiselect: false,
+                isUnique: false,
+                isRequired: false,
+                isWritable: true,
+                isArchived: true,
+                options: [
+                  { id: 'o1', title: 'Gold', value: 'Gold', isArchived: true },
+                  { id: 'o2', title: 'Silver', value: 'Silver' },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = await service.format(archivedSchema, 'skill');
+      const md = result.files['resources/companies-attributes.md'];
+
+      expect(md).toContain('| Legacy Tier _(archived)_ | `legacy_tier` |');
+      expect(md).toContain('Gold _(archived)_, Silver');
+    });
+
     it('should include complex type structures', async () => {
       const result = await service.format(mockSchema, 'skill');
       const peopleAttr = result.files['resources/people-attributes.md'];

@@ -9,6 +9,10 @@ import type {
   MetadataResult,
 } from '../../../src/services/metadata/types.js';
 import { UniversalResourceType } from '../../../src/handlers/tool-configs/universal/types.js';
+import {
+  DEFAULT_ATTRIBUTE_DISCOVERY_MAX,
+  DEFAULT_ATTRIBUTE_DISCOVERY_PAGE_SIZE,
+} from '../../../src/utils/attribute-discovery-pagination.js';
 
 class FakeMetadataCacheService implements MetadataCacheService {
   private readonly store = new Map<string, MetadataResult>();
@@ -117,7 +121,10 @@ describe('DefaultMetadataDiscoveryService', () => {
     expect((result.attributes as unknown[]).length).toBe(1);
   });
 
-  it('paginates attribute discovery up to max cap (500)', async () => {
+  it(`paginates attribute discovery up to max cap (${DEFAULT_ATTRIBUTE_DISCOVERY_MAX})`, async () => {
+    const pageSize = DEFAULT_ATTRIBUTE_DISCOVERY_PAGE_SIZE;
+    const maxAttributes = DEFAULT_ATTRIBUTE_DISCOVERY_MAX;
+    const lastOffset = maxAttributes - pageSize;
     const makeAttrs = (start: number, count: number) =>
       Array.from({ length: count }, (_, i) => ({
         title: `Attr ${start + i}`,
@@ -125,20 +132,14 @@ describe('DefaultMetadataDiscoveryService', () => {
         type: 'text',
       }));
 
+    // Every page is full; the final page overshoots the cap so the helper
+    // must stop at exactly maxAttributes rather than draining the API
     mockGet.mockImplementation(async (path: string) => {
-      if (path.includes('offset=400')) {
-        return { data: { data: makeAttrs(400, 150) } };
-      }
-      if (path.includes('offset=300')) {
-        return { data: { data: makeAttrs(300, 100) } };
-      }
-      if (path.includes('offset=200')) {
-        return { data: { data: makeAttrs(200, 100) } };
-      }
-      if (path.includes('offset=100')) {
-        return { data: { data: makeAttrs(100, 100) } };
-      }
-      return { data: { data: makeAttrs(0, 100) } };
+      const offset = Number(
+        new URL(path, 'https://api.attio.com').searchParams.get('offset') ?? 0
+      );
+      const count = offset >= lastOffset ? pageSize + 50 : pageSize;
+      return { data: { data: makeAttrs(offset, count) } };
     });
 
     const result = await service.discoverForType({
@@ -146,8 +147,8 @@ describe('DefaultMetadataDiscoveryService', () => {
       useCache: false,
     });
 
-    expect(result.count).toBe(500);
-    expect(mockGet).toHaveBeenCalledTimes(5);
+    expect(result.count).toBe(maxAttributes);
+    expect(mockGet).toHaveBeenCalledTimes(maxAttributes / pageSize);
   });
 
   it('stops pagination when a page yields no new attributes', async () => {

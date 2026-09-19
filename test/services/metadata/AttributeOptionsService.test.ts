@@ -37,6 +37,25 @@ describe('AttributeOptionsService', () => {
   });
 
   describe('getOptions', () => {
+    it('reads /statuses directly when the attribute type is known to be status', async () => {
+      const statusOptions = [
+        { id: 'uuid-1', title: 'MQL', value: 'MQL', is_archived: false },
+      ];
+      mockGetStatusOptions.mockResolvedValue(statusOptions);
+
+      const result = await AttributeOptionsService.getOptions(
+        'deals',
+        'stage',
+        true,
+        'status'
+      );
+
+      expect(result.attributeType).toBe('status');
+      expect(result.options).toEqual(statusOptions);
+      expect(mockGetStatusOptions).toHaveBeenCalledWith('deals', 'stage', true);
+      expect(mockGetSelectOptions).not.toHaveBeenCalled();
+    });
+
     describe('Issue #987 regression test: select empty, status has options', () => {
       it('should return status options when select returns empty array', async () => {
         // This is the core bug fix: /options returns [] but /statuses has data
