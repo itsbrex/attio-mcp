@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "repos": {
+    "typescript-sdk": {
+      "package": "@modelcontextprotocol/sdk",
+      "ecosystem": "npm",
+      "url": "https://github.com/modelcontextprotocol/typescript-sdk.git",
+      "ref": "v1.29.0",
+      "commit": "e12cbd7078db388152f6e839abdbe09ba01f3f32",
+      "packageVersion": "1.29.0",
+      "vendoredAt": "2026-10-15"
+    }
+  }
+}
